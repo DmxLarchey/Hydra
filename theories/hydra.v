@@ -28,6 +28,7 @@ Arguments clos_trans {_}.
 #[local] Reserved Notation "h ⊳₁ g" (at level 70, format "h  ⊳₁  g").
 #[local] Reserved Notation "h ⊳₂ g" (at level 70, format "h  ⊳₂  g").
 
+(** Notations for lists insertion patterns *)
 #[local] Infix "∈" := In (at level 70, no associativity).
 #[local] Notation  "l ⊣ x ⊢ r" := (l++[x]++r) (at level 1, format "l ⊣ x ⊢ r").
 #[local] Notation "l '⊣⊢' r" := (l++r) (at level 1, format "l ⊣⊢ r").
@@ -62,9 +63,9 @@ Proof.
       now exists [], m. 
 Qed.
 
-(** Inductiob definition (Acc based) of R is terminating at x *)
+(** Inductive definition (Acc based) of "R is terminating at x" *)
 
-Definition terminating {X} (R : X → X → Prop) x := Acc (λ x y, R y x) x.
+Definition terminating {X} (R : X → X → Prop) := Acc (λ x y, R y x).
 Definition terminal {X} (R : X → X → Prop) x := ∀y, ~ R x y.
 
 Section terminating_terminal.
@@ -251,14 +252,18 @@ Section list_order.
 
   Corollary wf_mso : well_founded R → well_founded lo.
   Proof. intros ? ?; apply Acc_lo_iff, Forall_forall; auto. Qed.
- 
+
 End list_order.
 
 Arguments lo {_}.
 
 (** Hydras are undecorated and oriented rose trees.
-    We need to generate versatile eliminators by hand.
-*)
+    We need to generate versatile eliminators by hand
+    because Coq does not manage nested inductive types
+    automatically. Moreover it cannot guess the
+    use of ∈/In and would probably generate an equivalent 
+    ad-hoc predicate should it try to invent a more general 
+    nested eliminator for hydra. *)
 
 Unset Elimination Schemes.
 
@@ -267,7 +272,7 @@ Inductive hydra := hydra_cons : list hydra → hydra.
 Set Elimination Schemes.
 
 #[local] Notation "⟨ l ⟩" := (hydra_cons l).
-#[local] Notation "⨸" := ⟨[]⟩.
+#[local] Notation "⨸" := ⟨[]⟩.  (* the head hydra *)
 
 Section hydra_ind.
 
@@ -303,8 +308,8 @@ Section hydra_rect.
             (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
 
   (* We use Acc(essibility) for sub_hydra to implement the 
-     hydra_rect eliminator in Type, though avoiding large elimination 
-     by using Acc_inv *)
+     hydra_rect eliminator in Type, also avoiding large elimination
+     of Acc by using Acc_inv in Prop context *)
   Definition hydra_rect h : P h :=
     (fix loop h a { struct a } :=
       match h return Acc _ h → P h with
@@ -355,11 +360,11 @@ Set Elimination Schemes.
        J. Goubault-Larrecq
        http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf 
 
-   This path ordering is a be simpler though but it keeps the
+   This path ordering is a bit simpler though but it keeps the
    case nesting of lo.
 
-   Three nested induction on a of the Acc characterization
-   of the list ordering. *)
+   Three nested inductions for the proof, then using on the 
+   Acc-characterization of the list ordering. *)
 
 Theorem wf_lpo h : Acc lpo h.
 Proof. 
@@ -375,15 +380,18 @@ Section hercules.
   (* m contains only copies of x *)
   Notation only_copies x m := (∀y, y ∈ m → x = y).
 
+  (* A head cut on the root, ie at height 1, no response from the hydra *)
   Inductive hround_root : hydra → hydra → Prop :=
     | hround_root_0 l r : ⟨l⊣⨸⊢r⟩ ⊳₁ ⟨l⊣⊢r⟩
   where "h ⊳₁ g" := (hround_root h g).
 
+  (* A head cut at height ≥ 2, followed by a response of the hydra *)
   Inductive hround_deep : hydra → hydra → Prop :=
     | hround_deep_0 l₀ r₀ l₁ r₁ m : only_copies ⟨l₀⊣⊢r₀⟩ m → ⟨l₁⊣⟨l₀⊣⨸⊢r₀⟩⊢r₁⟩ ⊳₂ ⟨l₁⊣⊢m⊣⊢r₁⟩
     | hround_deep_1 l h g r : h ⊳₂ g  →  ⟨l⊣h⊢r⟩ ⊳₂ ⟨l⊣g⊢r⟩
   where "h ⊳₂ g" := (hround_deep h g).
 
+  (* A round is either a root round or a deep round *)
   Inductive hround : hydra → hydra → Prop :=
     | hround_1 h g : h ⊳₁ g → h ⊳ g
     | hround_2 h g : h ⊳₂ g → h ⊳ g
@@ -475,6 +483,7 @@ Section hercules.
   Let Hplay_spec n : terminal hround (play n) ∨ play n ⊳ play (S n).
   Proof. now rewrite terminal_hround_iff. Qed.
 
+  (* Any play reaches a killed hydra *)
   Corollary hercules_hydra_rounds : ∃n, play n = ⨸.
   Proof.
     destruct terminating_terminal 
