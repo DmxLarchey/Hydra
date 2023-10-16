@@ -12,25 +12,32 @@ From Coq Require Import PeanoNat Arith.
 
 Import ListNotations Nat.
 
-Arguments In {_}.
-Arguments app {_}.
-Arguments clos_refl_trans {_}.
 Arguments clos_trans {_}.
 
+(** Notations for the construction of the list order *)
 #[local] Reserved Notation "x '≺' y" (at level 70, no associativity, format "x  ≺  y").
 #[local] Reserved Notation "x '≺ₗ' y" (at level 70, no associativity, format "x  ≺ₗ  y").
 #[local] Reserved Notation "x '⊏' y" (at level 70, no associativity, format "x  ⊏  y").
 #[local] Reserved Notation "x '⊏⁺' y" (at level 70, no associativity, format "x  ⊏⁺  y").
 
+(** Notations for hydras *)
 #[local] Reserved Notation "⟨ l ⟩" (at level 0, l at level 200, format "⟨ l ⟩").
 #[local] Reserved Notation "⌊ t ⌋" (at level 0, t at level 200, format "⌊ t ⌋").
+
+(** Notations for Hercules-Hydra rounds *)
+#[local] Reserved Notation "h ⊳ g" (at level 70, format "h  ⊳  g").
+#[local] Reserved Notation "h ⊳₁ g" (at level 70, format "h  ⊳₁  g").
+#[local] Reserved Notation "h ⊳₂ g" (at level 70, format "h  ⊳₂  g").
 
 #[local] Infix "∈" := In (at level 70, no associativity).
 #[local] Notation  "l ⊣ x ⊢ r" := (l++[x]++r) (at level 1, format "l ⊣ x ⊢ r").
 #[local] Notation "l '⊣⊢' r" := (l++r) (at level 1, format "l ⊣⊢ r").
 
-#[local] Hint Resolve Acc_inv Acc_intro in_cons 
-                      in_eq in_elt in_or_app : core.
+#[local] Hint Constructors clos_trans : core.
+#[local] Hint Resolve Acc_inv Acc_intro 
+                      in_cons in_eq in_elt in_or_app : core.
+
+(** Extra list utilities *)
 
 Fact cons_inj {X} (x y : X) l m : x::l = y::m → x = y ∧ l = m.
 Proof. now inversion 1. Qed.
@@ -41,43 +48,22 @@ Proof. revert l m; now intros [] []. Qed.
 Fact sg_eq_insert {X} (x y : X) l r : [x] = l⊣y⊢r → x = y ∧ l = [] ∧ r = [].
 Proof. destruct l as [ | ? [] ]; inversion 1; auto. Qed.
 
-(** informative inversions for map f _ = _ :: _ and map f l = _++_ *)
-
-Section map_eq_inv.
-
-  Variables (X Y : Type) (f : X → Y).
-
-  Fact map_cons_inv m fx fl : map f m = fx::fl → { x : _ & { l | m = x::l ∧ f x = fx ∧ map f l = fl } }.
-  Proof. destruct m as [ | x m ]; try easy; exists x, m; inversion H; auto. Qed.
-
-  Fact map_app_inv  m fl fr :
-     map f m = fl++fr → { l : _ & { r | m = l++r ∧ map f l = fl ∧ map f r = fr } }.
-  Proof.
-    induction fl as [ | fx fl IH ] in m |- *; simpl.
-    + exists [], m; auto.
-    + intros (? & ? & -> & <- & E)%map_cons_inv.
-      destruct (IH _ E) as (? & ? & ? & ? & ?); subst.
-      eexists (_::_), _; simpl; eauto.
-  Qed.
-
-End map_eq_inv.
-
-(** Maximum of a list of nat *)
+(** Maximum of a list of natural numbers *)
 
 Definition lmax := fold_right max 0.
 
-Lemma lmax_locate m : { l : _ & { r | m = l++[lmax m]++r } } + { m = [] }.
+Lemma lmax_locate m :  m = [] ∨ ∃ l r, m = l++[lmax m]++r.
 Proof.
-  induction m as [ | x m [ (l & r & E) | -> ] ]; eauto; simpl; left.
+  induction m as [ | x m [ -> | (l & r & E) ] ]; eauto; simpl; right.
+  + exists [], []; simpl; f_equal; now rewrite max_0_r.
   + destruct (le_lt_dec x (lmax m)).
     * rewrite max_r; auto.
       exists (x::l), r; simpl; f_equal; auto.
     * rewrite max_l; [|now apply lt_le_incl].
       now exists [], m. 
-  + exists [], []; simpl; f_equal; now rewrite max_0_r.
 Qed.
 
-(** R is terminating at x *)
+(** Inductiob definition (Acc based) of R is terminating at x *)
 
 Definition terminating {X} (R : X → X → Prop) x := Acc (λ x y, R y x) x.
 Definition terminal {X} (R : X → X → Prop) x := ∀y, ~ R x y.
@@ -85,72 +71,27 @@ Definition terminal {X} (R : X → X → Prop) x := ∀y, ~ R x y.
 Section terminating_terminal.
 
   Variables (X : Type) (R : X → X → Prop)
-            (p : nat → X) (Hp : ∀n, { R (p n) (p (S n)) } + { terminal R (p n) }).
+            (p : nat → X) (Hp : ∀n, terminal R (p n) ∨ R (p n) (p (S n))).
 
-  Theorem terminating_terminal : terminating R (p 0) → { n | terminal R (p n) }.
+  Theorem terminating_terminal : terminating R (p 0) → ∃n, terminal R (p n).
   Proof.
     generalize 0.
-    refine (fix loop n a { struct a } := _).
-    destruct (Hp n) as [ H1 | H1 ].
-    + apply (loop (S n)), Acc_inv with (1 := a), H1.
-    + now exists n.
+    refine (fix loop i a { struct a } := _).
+    destruct (Hp i) as [ Hi | Hi ].
+    + now exists i.
+    + apply (loop (S i)), Acc_inv with (1 := a), Hi.
   Qed.
 
 End terminating_terminal.
 
-(** Hydras are undecorated rose trees *)
+(** The list order is a weak variant of the multiset order on list 
 
-Unset Elimination Schemes.
+   The proof displayed here is largely inspired from 
+   the short outline of Tobias Nipkow and Wilfried Buchholz 
 
-Inductive hydra := hydra_cons : list hydra → hydra.
+     http://www4.in.tum.de/~nipkow/misc/multiset.ps
 
-Set Elimination Schemes.
-
-#[local] Notation "⟨ l ⟩" := (hydra_cons l).
-#[local] Notation "⨸" := ⟨[]⟩.
-
-Section hydra_ind.
-
-  Variables (P : hydra → Prop)
-            (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
-
-  Fixpoint hydra_ind h : P h.
-  Proof.
-    destruct h as [ l ]; apply HP.
-    induction l as [ | g l IHl ].
-    + intros _ [].
-    + intros ? [ <- | H ].
-      * apply hydra_ind.
-      * apply IHl, H.
-  Qed.
-
-End hydra_ind.
-
-Fact hydra_head_eq_dec h : { h = ⨸ } + { h ≠ ⨸ }.
-Proof. now destruct h as [ [] ]; [ left | right ]. Qed.
-
-Fixpoint hydra_ht (h : hydra) : nat :=
-  match h with
-  | ⟨l⟩ => lmax (map (λ g, 1+⌊g⌋) l)
-  end
-where "⌊ h ⌋" := (hydra_ht h).
-
-Fact hydra_ht_0_inv h : ⌊h⌋ = 0 → h = ⨸.
-Proof.
-  destruct h as [ [ | x m ] ]; simpl; auto.
-  now destruct (lmax (map (λ g, S ⌊g⌋) m)).
-Qed.
-
-Fact hydra_ht_S_inv h n : ⌊h⌋ = S n → { l : _ & { g : _ & { r | h = ⟨l⊣g⊢r⟩ /\ ⌊g⌋ = n } } }.
-Proof.
-  destruct h as [m]; intros H; simpl in H.
-  destruct (lmax_locate (map (λ g, S ⌊g⌋) m)) as [ (l & r & E) | E ].
-  + simpl in E.
-    apply map_app_inv in E as (l' & ? & H1 & H2 & (g & r' & -> & H3 & H4)%map_cons_inv).
-    exists l', g, r'; split; [ f_equal; auto | ].
-    rewrite H in H3; now inversion H3.
-  + now rewrite E in H.
-Qed.
+*)
 
 Section list_order.
 
@@ -165,9 +106,7 @@ Section list_order.
   Hint Resolve lt_fall_sg : core.
 
   (* Inductive definition of the list relation ⊏ 
-     of which the transitive closure ⊏⁺ is the lo. The
-     least relation containing contextual reduction
-     and closed under left permutation *)
+     of which the transitive closure ⊏⁺ is the list order. *)
 
   Inductive lo_step : list X → list X → Prop :=
     | lo_step_intro l m x r : m ≺ₗ x → l++m++r ⊏ l++[x]++r
@@ -175,7 +114,17 @@ Section list_order.
 
   Hint Constructors lo_step : core.
 
-  (* The inversion lemma gives an alternate characterization *)
+  Fact lo_step_ctx l r u v : u ⊏ v → l++u++r ⊏ l++v++r.
+  Proof.
+    induction 1 in l, r |- *; eauto.
+    rewrite !app_ass, <- !(app_ass l); eauto.
+  Qed.
+
+  Fact lo_step_cons x l : l ⊏ x::l.
+  Proof. now apply @lo_step_intro with (l := []) (m := []); simpl. Qed.
+
+  (* The inversion lemma gives an alternate characterization,
+     used below for more specific inversion lemmas below *)
   Local Fact lo_step_inv k p :
          k ⊏ p ↔ ∃ l m x r, k = l++m++r ∧ p = l++[x]++r ∧ m ≺ₗ x.
   Proof.
@@ -184,27 +133,11 @@ Section list_order.
     + intros (? & ? & ? & ? & -> & -> & ?); eauto.
   Qed.
 
-  Local Fact lo_step_inv_sg_rt l x : l ⊏ [x] ↔ l ≺ₗ x.
-  Proof.
-    rewrite lo_step_inv; split.
-    + intros (a & m & y & b & -> & (<- & -> & ->)%sg_eq_insert & H3).
-      now rewrite <- app_nil_end.
-    + exists [], l, x, []; simpl; rewrite <- app_nil_end; auto.
-  Qed.
+  (* These two are key lemmas in the proof of (Acc lo_step) below *)
+  Local Fact lo_step_nil_inv l : ~ l ⊏ [].
+  Proof. now intros ([] & ? & ? & ? & ? & ? & ?)%lo_step_inv. Qed.
 
-  Local Fact lo_step_inv_sg_lft l x : [x] ⊏ l → x ∈ l ∧ l ≠ [x] ∨ ∃ y, y ∈ l ∧ x ≺ y.
-  Proof.
-    intros (a & m & y & b & H1 & -> & H3)%lo_step_inv.
-    symmetry in H1.
-    destruct a as [ | x' a ]; [ destruct m as [ | x' m ] | ]; simpl in *.
-    + subst; left; split; now auto.
-    + apply cons_inj in H1 as (<- & (-> & ->)%app_nil_inv). 
-      right; exists y; auto.
-    + apply cons_inj in H1 as (<- & (-> & (-> & ->)%app_nil_inv)%app_nil_inv).
-      left; split; now auto.
-  Qed.
-
-  Local Fact lo_step_cons_right_inv k y m : 
+  Local Lemma lo_step_cons_right_inv k y m : 
           k ⊏ y::m 
         → (∃ u, k = u++m ∧ u ≺ₗ y)
         ∨ (∃ l u x r, m = l++[x]++r ∧ k = y::l++u++r ∧ u ≺ₗ x).
@@ -213,18 +146,6 @@ Section list_order.
     apply cons_inj in e as [-> ->]; [ left | right ]; eauto.
     exists l, u, x, r; eauto.
   Qed.
-
-  Fact lo_step_ctx l r u v : u ⊏ v → l++u++r ⊏ l++v++r.
-  Proof.
-    induction 1 in l, r |- *; eauto.
-    rewrite !app_ass, <- !(app_ass l); eauto.
-  Qed.
-
-  Fact lo_step_nil_inv l : ~ l ⊏ [].
-  Proof. now intros ([] & ? & ? & ? & ? & ? & ?)%lo_step_inv. Qed.
-
-  Fact lo_step_cons x l : l ⊏ x::l.
-  Proof. now apply @lo_step_intro with (l := []) (m := []); simpl. Qed.
 
   Section Acc_lo_step.
 
@@ -238,7 +159,7 @@ Section list_order.
        → W r 
        → ∀l, l ≺ₗ y → W (l++r).
     Proof.
-      intros hy hr. 
+      intros hy ?. 
       induction l; simpl; eauto.
       intros; apply hy; eauto.
     Qed.
@@ -248,10 +169,7 @@ Section list_order.
          → W m
          → (∀l, l ⊏ m → W (y::l))
          → W (y::m).
-    Proof.
-      intros hy hm ihm; constructor.
-      intros k [ (u & -> & hu) | (l & u & x & r & -> & -> & hu) ]%lo_step_cons_right_inv; eauto.
-    Qed.
+    Proof. constructor; intros ? [ (? & -> & ?) | (? & ? & ? & ? & -> & -> & ?) ]%lo_step_cons_right_inv; eauto. Qed.
 
     Let W_cons y : (∀x, x ≺ y → ∀l, W l → W (x::l)) → ∀l, W l → W (y::l).
     Proof. induction 2; eauto. Qed.
@@ -273,6 +191,8 @@ Section list_order.
 
   Infix "⊏⁺" := lo.
 
+  Hint Resolve lo_step_cons lo_step_ctx : core.
+
   (** Closure properties of lo/⊏⁺ *)
 
   (* The constructor for the basic reduction *)
@@ -282,9 +202,6 @@ Section list_order.
     rewrite (app_nil_end l).
     now constructor 1 with (l := []) (r := []).
   Qed.
-
-  Hint Constructors clos_trans : core.
-  Hint Resolve lo_step_ctx : core.
 
   (* Contextual closure *)
   Fact lo_ctx l r u v : u ⊏⁺ v → l++u++r ⊏⁺ l++v++r.
@@ -316,8 +233,6 @@ Section list_order.
   Fact lo_app_head_tail m m' l r : m ⊏⁺ m' → m ⊏⁺ l++m'++r.
   Proof. now intro; apply lo_app_head, lo_app_tail. Qed.
 
-  Hint Resolve lo_step_cons : core.
-
   Fact lo_cons x l : l ⊏⁺ x::l.
   Proof. red; auto. Qed.
 
@@ -344,6 +259,84 @@ End list_order.
 
 Arguments lo {_}.
 
+(** Hydras are undecorated and oriented rose trees.
+    We need to generate versatile eliminators by hand.
+*)
+
+Unset Elimination Schemes.
+
+Inductive hydra := hydra_cons : list hydra → hydra.
+
+Set Elimination Schemes.
+
+#[local] Notation "⟨ l ⟩" := (hydra_cons l).
+#[local] Notation "⨸" := ⟨[]⟩.
+
+Section hydra_ind.
+
+  Variables (P : hydra → Prop)
+            (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
+
+  (* The Prop-bounded eliminator proceeds by nested fixpoints,
+     unavoidable for nested inductive types *)
+  Fixpoint hydra_ind h : P h.
+  Proof.
+    destruct h as [ l ]; apply HP.
+    induction l as [ | g l IHl ].
+    + intros _ [].
+    + intros ? [ <- | H ].
+      * apply hydra_ind.
+      * apply IHl, H.
+  Qed.
+
+End hydra_ind.
+
+Section hydra_rect.
+
+  (* We use the nested elimnator hydra_ind to show that 
+     the direct sub-hydra relation is well_founded *)
+  Let sub_hydra_wf : well_founded (λ g h, match h with ⟨l⟩ => g ∈ l end).
+  Proof. intros h; induction h; now constructor. Qed.
+
+  Variables (P : hydra → Type)
+            (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
+
+  (* We use Acc(essibility) for sub_hydra to implement the 
+     hydra_rect eliminator in Type, though avoiding large elimination 
+     by using Acc_inv *)
+  Definition hydra_rect h : P h :=
+    (fix loop h a { struct a } :=
+      match h return Acc _ h → P h with
+      | ⟨l⟩ => λ a, HP _ (λ _ H, loop _ (Acc_inv a H))
+      end a) h (sub_hydra_wf h).
+
+End hydra_rect.
+
+(* Like hydra_ind, this is an accepted nested fixpoint *)
+Fixpoint hydra_ht (h : hydra) : nat :=
+  match h with
+  | ⟨l⟩ => lmax (map (λ g, 1+⌊g⌋) l)
+  end
+where "⌊ h ⌋" := (hydra_ht h).
+
+Fact hydra_ht_0_inv h : ⌊h⌋ = 0 → h = ⨸.
+Proof.
+  destruct h as [ [ | x m ] ]; simpl; auto.
+  now destruct (lmax (map (λ g, S ⌊g⌋) m)).
+Qed.
+
+Fact hydra_ht_S_inv h n : ⌊h⌋ = S n → ∃ l g r, h = ⟨l⊣g⊢r⟩ ∧ ⌊g⌋ = n.
+Proof.
+  destruct h as [m]; intros H; simpl in H.
+  destruct (lmax_locate (map (λ g, S ⌊g⌋) m)) as [ E | (l & r & E) ].
+  + now rewrite E in H.
+  + simpl in E.
+    apply map_eq_app in E as (l' & ? & H1 & H2 & (g & r' & -> & H3 & H4)%map_eq_cons).
+    exists l', g, r'; split; [ f_equal; auto | ].
+    rewrite H in H3; now inversion H3.
+Qed.
+
+
 (** Weak variant of the multiset path ordering on hydra
     one could add two other constructors and stability 
     under permutations and still keep it wf *)
@@ -368,18 +361,21 @@ Qed.
 
 Section hercules.
 
-  Reserved Notation "h ⊳ g" (at level 70).
-  Reserved Notation "h ⊳₂ g" (at level 70).
+  Inductive hround_root : hydra → hydra → Prop :=
+    | hround_root_0 l r : ⟨l⊣⨸⊢r⟩ ⊳₁ ⟨l⊣⊢r⟩
+  where "h ⊳₁ g" := (hround_root h g).
 
   Inductive hround_deep : hydra → hydra → Prop :=
     | hround_deep_0 l₀ r₀ l₁ r₁ m : only_copies ⟨l₀⊣⊢r₀⟩ m → ⟨l₁⊣⟨l₀⊣⨸⊢r₀⟩⊢r₁⟩ ⊳₂ ⟨l₁⊣⊢m⊣⊢r₁⟩
     | hround_deep_1 l h g r : h ⊳₂ g  →  ⟨l⊣h⊢r⟩ ⊳₂ ⟨l⊣g⊢r⟩
-  where "h ⊳₂ g" := (hround_deep h g). 
+  where "h ⊳₂ g" := (hround_deep h g).
 
   Inductive hround : hydra → hydra → Prop :=
-    | hround_d1 l r : ⟨l⊣⨸⊢r⟩ ⊳ ⟨l⊣⊢r⟩
-    | hround_d2 h h' : h ⊳₂ h' → h ⊳ h'
-  where "h ⊳ g" := (hround h g). 
+    | hround_1 h g : h ⊳₁ g → h ⊳ g
+    | hround_2 h g : h ⊳₂ g → h ⊳ g
+  where "h ⊳ g" := (hround h g).
+
+  Hint Constructors hround_root hround_deep hround : core.
 
   Local Fact cut_lpo l r : lpo ⟨l⊣⊢r⟩ ⟨l⊣⨸⊢r⟩.
   Proof.
@@ -390,19 +386,22 @@ Section hercules.
 
   Hint Resolve cut_lpo : core.
 
+  Local Fact hround_root_lpo h g : h ⊳₁ g → lpo g h.
+  Proof. intros []; auto. Qed.
+
   Local Lemma hround_deep_lpo g h : h ⊳₂ g → lpo g h.
   Proof.
-    induction 1 as [ l0 r0 l1 r1 c Hc | l h h' r H IH ].
+    induction 1 as [ l0 r0 l1 r1 m H | l h h' r H IH ].
     + constructor.
       rewrite app_ass.
       apply lo_ctx, lo_intro.
-      intros ? <-%Hc; auto.
+      intros ? <-%H; auto.
     + constructor.
       apply lo_ctx, lo_intro.
       now intros ? [ <- | [] ].
   Qed.
 
-  Hint Resolve hround_deep_lpo : core.
+  Hint Resolve hround_root_lpo hround_deep_lpo : core.
 
   Local Lemma hround_lpo g h : h ⊳ g → lpo g h.
   Proof. induction 1; auto. Qed.
@@ -412,7 +411,10 @@ Section hercules.
   Theorem hround_terminating h : terminating hround h.
   Proof. apply wf_incl with (2 := wf_lpo); red; eauto. Qed.
 
-  Fact hydra_ht_SS_hround_deep h : ∀n, ⌊h⌋ = S (S n) → ∃g, h ⊳₂ g.
+  Local Fact hydra_ht_1_hround_root h : ⌊h⌋ = 1 → ∃g, h ⊳₁ g.
+  Proof. intros (? & ? & ? & -> & ->%hydra_ht_0_inv)%hydra_ht_S_inv; eauto. Qed.
+
+  Local Fact hydra_ht_2_hround_deep h : ∀n, ⌊h⌋ = S (S n) → ∃g, h ⊳₂ g.
   Proof.
     induction h as [ m IH ]; intros [ | n ] E.
     + apply hydra_ht_S_inv in E as (l1 & g & r1 & H1 & E).
@@ -427,20 +429,16 @@ Section hercules.
       * inversion H1; auto.
   Qed.
 
-  Fact hydra_ht_1_hround h : ⌊h⌋ = 1 → ∃g, h ⊳ g.
-  Proof.
-    intros (l & ? & r & -> & ->%hydra_ht_0_inv)%hydra_ht_S_inv.
-    exists ⟨l⊣⊢r⟩; constructor.
-  Qed.
+  Local Fact hround_root_nil_inv h g : h ⊳₁ g → h ≠ ⨸.
+  Proof. now intros [[] ]. Qed.
 
-  Fact hround_deep_nil_inv h h' : h ⊳₂ h' → h ≠ ⨸.
+  Local Fact hround_deep_nil_inv h g : h ⊳₂ g → h ≠ ⨸.
   Proof. now intros [ ? ? [] | [] ]. Qed.
 
-  Fact hround_nil_inv h h' : h ⊳ h' → h ≠ ⨸.
-  Proof.
-    intros [ [] | ]; try easy.
-    eapply hround_deep_nil_inv; eauto.
-  Qed.
+  Hint Resolve hround_root_nil_inv hround_deep_nil_inv : core.
+
+  Local Fact hround_nil_inv h g : h ⊳ g → h ≠ ⨸.
+  Proof. intros []; eauto. Qed.
 
   (* The single head is the only hydra which cannot be cut further *)
   Lemma terminal_hround_iff h : terminal hround h ↔ h = ⨸.
@@ -450,24 +448,20 @@ Section hercules.
       case_eq ⌊h⌋.
       * apply hydra_ht_0_inv.
       * intros [ | n ].
-        - intros (h' & E)%hydra_ht_1_hround.
-          now destruct (H h').
-        - intros (h' & ?)%hydra_ht_SS_hround_deep.
-          destruct (H h'); now constructor 2.
+        - intros (g & ?)%hydra_ht_1_hround_root.
+          destruct (H g); auto.
+        - intros (g & ?)%hydra_ht_2_hround_deep.
+          destruct (H g); eauto.
     + now intros -> ? []%hround_nil_inv.
   Qed.
 
   Variables (play : nat → hydra)
             (Hplay : ∀n, play n = ⨸ ∨ play n ⊳ play (S n)).
 
-  Let Hplay_spec n : { play n ⊳ play (S n) } + { terminal hround (play n) }.
-  Proof.
-    destruct (hydra_head_eq_dec (play n)) as [ H | H ].
-    + right; now apply terminal_hround_iff.
-    + left; now destruct (Hplay n).
-  Qed.
+  Let Hplay_spec n : terminal hround (play n) ∨ play n ⊳ play (S n).
+  Proof. now rewrite terminal_hround_iff. Qed.
 
-  Corollary hercules_hydra_rounds : { n | play n = ⨸ }.
+  Corollary hercules_hydra_rounds : ∃n, play n = ⨸.
   Proof.
     destruct terminating_terminal 
       with (1 := Hplay_spec)
