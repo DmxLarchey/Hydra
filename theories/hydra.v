@@ -7,10 +7,9 @@
 (*         CeCILL v2.1 FREE SOFTWARE LICENSE AGREEMENT        *)
 (**************************************************************)
 
-From Coq Require Import List Relations Wellfounded Utf8.
-From Coq Require Import PeanoNat Arith.
+From Coq Require Import PeanoNat List Relations Wellfounded Utf8.
 
-Import ListNotations Nat.
+Import ListNotations.
 
 Arguments clos_trans {_}.
 
@@ -55,11 +54,11 @@ Definition lmax := fold_right max 0.
 Lemma lmax_locate m :  m = [] ∨ ∃ l r, m = l++[lmax m]++r.
 Proof.
   induction m as [ | x m [ -> | (l & r & E) ] ]; eauto; simpl; right.
-  + exists [], []; simpl; f_equal; now rewrite max_0_r.
-  + destruct (le_lt_dec x (lmax m)).
+  + exists [], []; simpl; f_equal; now rewrite Nat.max_0_r.
+  + destruct (Nat.le_gt_cases x (lmax m)).
     * rewrite max_r; auto.
       exists (x::l), r; simpl; f_equal; auto.
-    * rewrite max_l; [|now apply lt_le_incl].
+    * rewrite max_l; [|now apply Nat.lt_le_incl].
       now exists [], m. 
 Qed.
 
@@ -277,8 +276,9 @@ Section hydra_ind.
   Variables (P : hydra → Prop)
             (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
 
-  (* The Prop-bounded eliminator proceeds by nested fixpoints,
-     unavoidable for nested inductive types *)
+  (* The Prop-bounded eliminator proceeds by guarded 
+     nested fixpoints, unavoidable in the case of
+     nested inductive types *)
   Fixpoint hydra_ind h : P h.
   Proof.
     destruct h as [ l ]; apply HP.
@@ -292,6 +292,9 @@ Section hydra_ind.
 End hydra_ind.
 
 Section hydra_rect.
+
+  (* The Type-bounded eliminator is not needed here
+     but displayed for educational purposes *)
 
   (* We use the nested elimnator hydra_ind to show that 
      the direct sub-hydra relation is well_founded *)
@@ -312,7 +315,7 @@ Section hydra_rect.
 
 End hydra_rect.
 
-(* Like hydra_ind, this is an accepted nested fixpoint *)
+(* Like hydra_ind, this is a guarded nested fixpoint *)
 Fixpoint hydra_ht (h : hydra) : nat :=
   match h with
   | ⟨l⟩ => lmax (map (λ g, 1+⌊g⌋) l)
@@ -336,10 +339,9 @@ Proof.
     rewrite H in H3; now inversion H3.
 Qed.
 
-
-(** Weak variant of the multiset path ordering on hydra
-    one could add two other constructors and stability 
-    under permutations and still keep it wf *)
+(** The list path ordering is a weak variant of the multiset 
+    path ordering on hydra. One could add two other constructors 
+    and stability under permutations and still keep it well-founded *)
 
 Unset Elimination Schemes.
 
@@ -347,6 +349,19 @@ Inductive lpo : hydra → hydra → Prop :=
   | lpo_intro l m : lo lpo l m → lpo ⟨l⟩ ⟨m⟩.
 
 Set Elimination Schemes.
+
+(* We get a very short proof compared to the following sources
+   of inspiration:
+       S. Coupet-Grimmal & W. Delobel
+       https://link.springer.com/article/10.1007/s00200-006-0020-y
+       J. Goubault-Larrecq
+       http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf 
+
+   This path ordering is a be simpler though but it keeps the
+   case nesting of lo.
+
+   Three nested induction on a of the Acc characterization
+   of the list ordering. *)
 
 Theorem wf_lpo h : Acc lpo h.
 Proof. 
@@ -357,9 +372,10 @@ Proof.
   inversion 1; eauto.
 Qed.
 
-#[local] Notation only_copies x c := (∀y, y ∈ c → x = y).
-
 Section hercules.
+
+  (* m contains only copies of x *)
+  Notation only_copies x m := (∀y, y ∈ m → x = y).
 
   Inductive hround_root : hydra → hydra → Prop :=
     | hround_root_0 l r : ⟨l⊣⨸⊢r⟩ ⊳₁ ⟨l⊣⊢r⟩
