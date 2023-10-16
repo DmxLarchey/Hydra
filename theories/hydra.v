@@ -4,7 +4,7 @@
 (*                             [*] Affiliation LORIA -- CNRS  *)
 (**************************************************************)
 (*      This file is distributed under the terms of the       *)
-(*         CeCILL v2.1 FREE SOFTWARE LICENSE AGREEMENT        *)
+(*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
 From Coq Require Import PeanoNat List Relations Wellfounded Utf8.
@@ -88,9 +88,7 @@ End terminating_terminal.
    The proof displayed here is largely inspired from 
    the short outline of Tobias Nipkow and Wilfried Buchholz 
 
-     http://www4.in.tum.de/~nipkow/misc/multiset.ps
-
-*)
+     http://www4.in.tum.de/~nipkow/misc/multiset.ps *)
 
 Section list_order.
 
