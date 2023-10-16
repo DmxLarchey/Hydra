@@ -10,15 +10,15 @@ Hercules tries to kill the Hydra by chopping of heads (ie leaves of the Hydra) b
 the Hydra responds in growing copies of specific sub-trees determined by which
 head was chopped last.
 
-The Hercules and Hydra game consists in Hercules chopping off head of the Hydra until
+The Hercules and Hydra game consists in Hercules chopping off heads of the Hydra until
 the Hydra has no more heads left. In response to a head cut, the Hydra may grow an arbitrary
-number of copies of the sub-tree rooted one level below the head that was last chopped
+number of copies of the sub-tree rooted two levels below the head that was last chopped
 by Hercules.
 
-Importantly, _if Hercules chops a root leaf (ie a leaf just above the root of the Hydra),
-then the Hydra cannot morph in response_, it must wait for the next move of Hercules. Absent 
-of that rule, the game would possibly not end because no rule would force the number of
-nodes to decrease.
+_Importantly_ the previous rule excludes root leaves (ie a leaf just above the root of the Hydra).
+If Hercules chops a root leaf, then the Hydra cannot morph in response: it must wait for the next 
+move of Hercules. Absent of that exclusion, the game would possibly not end because 
+nothing would force the number of nodes to (sometimes) decrease after the response of Hydra.
 
 There are variants of the game where the number of copies that the Hydra makes is
 determined fully by the advancement of the game (eg the number of head that were 
