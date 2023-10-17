@@ -182,8 +182,11 @@ Section list_order.
 
   (* W is closed under [] and x::_ for any accessible x
      so it contains any list composed of accessibles *) 
-  Local Lemma Forall_Acc_lo_step l : Forall (Acc R) l → Acc lo_step l.
-  Proof. induction 1; eauto. Qed.
+  Local Lemma forall_Acc_lo_step l : (∀x, x ∈ l → Acc R x) → Acc lo_step l.
+  Proof.
+    rewrite <- Forall_forall.
+    induction 1; eauto.
+  Qed.
 
   Definition lo := clos_trans lo_step.
 
@@ -244,14 +247,14 @@ Section list_order.
           lo_intro; eauto.
   Qed.
 
-  Hint Resolve Acc_lo_forall Forall_Acc_lo_step Acc_clos_trans : core.
+  Hint Resolve Acc_lo_forall forall_Acc_lo_step Acc_clos_trans : core.
 
   (* This is the main theorem characterizing mso Acc(essibility) *)
-  Theorem Acc_lo_iff l : Acc lo l ↔ Forall (Acc R) l.
-  Proof. unfold lo; split; eauto; rewrite Forall_forall; eauto. Qed.
+  Theorem Acc_lo_iff l : Acc lo l ↔ ∀x, x ∈ l → Acc R x.
+  Proof. unfold lo; split; eauto. Qed.
 
   Corollary wf_mso : well_founded R → well_founded lo.
-  Proof. intros ? ?; apply Acc_lo_iff, Forall_forall; auto. Qed.
+  Proof. intros ? ?; apply Acc_lo_iff; auto. Qed.
 
 End list_order.
 
@@ -368,7 +371,7 @@ Set Elimination Schemes.
 
 Theorem wf_lpo h : Acc lpo h.
 Proof. 
-  induction h as [ l IHl%Forall_forall%Acc_lo_iff ].
+  induction h as [ l IHl%Acc_lo_iff ].
   induction IHl as [ m _ IHm ].
   constructor.
   intro g; induction g.
