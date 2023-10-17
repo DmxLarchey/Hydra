@@ -67,14 +67,15 @@ minimized/tailored to the task given here.
 The tiny well-foundedness proof of the `lpo` displayed here however uses a 
 direct approach (as opposed to relying on Kruskal's tree theorem), inspired 
 by the work of Coupet-Grimal & Delobel (and also Goubault-Larrecq). The instance
-we give here is just five lines of proof scripts which 3 nested inductions.
+we give here is just five lines of proof scripts containing 3 nested inductions.
 
 It however relies on the accessibility characterization of the _list ordering_,
 of which the proof mimics the outline of Nipkow (and Buchholtz)  for the
-well-foundedness of the multiset ordering.
+well-foundedness of the multiset ordering. This proof is beautiful but a bit 
+longer.
 
-It is a quite straightforward exercise to show that the `round` relation is
-included in the reverse of the `lpo`, hence it is also well-founded.
+It is then a quite straightforward exercise to show that the `round` relation is
+included in the reverse of the `lpo`, hence it is strongly terminating.
 
 We only implement termination. We do not show that main result of
 Kirby and Paris contribution, that is the incapacity of Peano arithmetic
