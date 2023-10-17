@@ -1,9 +1,5 @@
 # Hercules kills the Hydra in less the 300 lines of Coq
 
-## The code
-This standalone (one file) proof was implemented by Dominique Larchey-Wendling, 
-see [`hydra.v`](theories/hydra.v). It is distributed under the terms of the [`MPL-2.0`](LICENSE).
-
 ## The battle of Hercules and the Hydra
 The Hydra is mainly a _Rose tree_, that is a finite tree with arbitrary branching.
 Hercules tries to kill the Hydra by chopping of heads (ie leaves of the Hydra) but 
@@ -24,6 +20,10 @@ There are variants of the game where the number of copies that the Hydra makes i
 determined fully by the advancement of the game (eg the number of head that were 
 chopped by Hercules so far) by this does not affect the termination property of the
 game.
+
+## The code
+This standalone (one file) proof was implemented by Dominique Larchey-Wendling, 
+see [`hydra.v`](theories/hydra.v). It is distributed under the terms of the [`MPL-2.0`](LICENSE).
 
 ## Rounds vs. moves
 In the code of [`hydra.v`](theories/hydra.v), we only model a _round_ which is
