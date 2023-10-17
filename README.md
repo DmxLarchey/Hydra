@@ -42,3 +42,59 @@ transmit that information. By combining Hercules move and the Hydra's
 response into the notion of round, the information can be transmitted 
 without requiring external information.
 
+## The Hydra data structures
+
+### Mutual vs. nested
+In this code, we implement hydras as an inductive type _nested_ with lists:
+```
+Inductive hydra := hydra_cons : list hydra → hydra.
+```
+whereas the [Hydra Battles](https://github.com/coq-community/hydra-battles) version chooses
+a mutual inductive type instead:
+```
+  Inductive Hydra :=
+    | Hydra_node  : Hydrae → Hydra
+  with Hydrae :=
+    | Hydrae_nil  : Hydrae
+    | Hydrae_cons : Hydra → Hydrae → Hydrae.
+```
+and we notice that the type `Hydrae` is an isomorphic copy of the type `list Hydra`.
+
+IMHO there is only reason to favor the mutual version `Hydra`/`Hydrae` over the nested
+`hydra`/`list hydra` version: Coq can generate mutual inductive schemes for you and you 
+do not have to deal with mutual or nested fixpoints and the _guard condition_.
+
+On the downside however, the type `Hydrae` is not identical to `list Hydra` and thus
+one cannot use all the generic tools of the `List` library. You basically have to
+rewrite those you need which is really a painful endeavor that unnecessarily 
+lengthen the code base.
+
+On the other hand, working with the nested types `hydra`/`list hydra` requires you
+to handle nested fixpoints because Coq (so far) does not generate powerful enough
+recursors (ie induction principle) for nested types.
+- first of all, this is a good incentive to _learn_ working with guarded fixpoints
+  directly and how actually Coq builds recursor;
+- you can work with `list hydra` using the tools of the `List` library as they are;
+- the code is now much more succinct and if you need to extend the `List` library,
+  your extension can be used elsewhere.
+  
+So apart from the initial difficulty of having to understand the guard condition,
+which is something you should do anyway to become fluent in working with inductive
+types, there are only advantages with the choice of nesting.
+
+### The isomorphism
+To compare and illustrate the practical differences between the mutual and nested
+version, it is a very good exercise to implement the isomorphism between `hydra`
+and `Hydra` in Coq. You will learn how to deal with mutual fixpoints and nested
+fixpoints.
+
+This code contains, as an extra educational contribution, the construction of the
+isomorphism between `hydra` and `Hydra`:
+1. we represent the isomorphism as an inductive relation. This follows the 
+   general approach of the _Braga method_;
+2. we show that this relation is functional and injective;
+3. we realize that relation by fully specified functions in
+   both directions;
+4. then we show that this gives a functional isomorphism. 
+
+

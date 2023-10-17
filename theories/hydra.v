@@ -297,30 +297,6 @@ Section hydra_ind.
 
 End hydra_ind.
 
-Section hydra_rect.
-
-  (* The Type-bounded eliminator is not needed here
-     but displayed for educational purposes *)
-
-  (* We use the nested elimnator hydra_ind to show that 
-     the direct sub-hydra relation is well_founded *)
-  Let sub_hydra_wf : well_founded (λ g h, match h with ⟨l⟩ => g ∈ l end).
-  Proof. intros h; induction h; now constructor. Qed.
-
-  Variables (P : hydra → Type)
-            (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
-
-  (* We use Acc(essibility) for sub_hydra to implement the 
-     hydra_rect eliminator in Type, also avoiding large elimination
-     of Acc by using Acc_inv in Prop context *)
-  Definition hydra_rect h : P h :=
-    (fix loop h a { struct a } :=
-      match h return Acc _ h → P h with
-      | ⟨l⟩ => λ a, HP _ (λ _ H, loop _ (Acc_inv a H))
-      end a) h (sub_hydra_wf h).
-
-End hydra_rect.
-
 (* Like hydra_ind, this is a guarded nested fixpoint *)
 Fixpoint hydra_ht (h : hydra) : nat :=
   match h with
@@ -501,6 +477,31 @@ End hercules.
 Check hercules_hydra_rounds.
 Print Assumptions hercules_hydra_rounds.
 
+Section hydra_rect.
+
+  (* The Type-bounded eliminator/recursor will usefull
+     to build the isomorphism between the nested hydra
+     and the mutual Hydra/Hydrae below *)
+
+  (* We use the nested elimnator hydra_ind to show that 
+     the direct sub-hydra relation is well_founded *)
+  Let sub_hydra_wf : well_founded (λ g h, match h with ⟨l⟩ => g ∈ l end).
+  Proof. intros h; induction h; now constructor. Qed.
+
+  Variables (P : hydra → Type)
+            (HP : ∀l, (∀h, h ∈ l → P h) → P ⟨l⟩).
+
+  (* We use Acc(essibility) for sub_hydra to implement the 
+     hydra_rect eliminator in Type, also avoiding large elimination
+     of Acc by using Acc_inv in Prop context *)
+  Definition hydra_rect h : P h :=
+    (fix loop h a { struct a } :=
+      match h return Acc _ h → P h with
+      | ⟨l⟩ => λ a, HP _ (λ _ H, loop _ (Acc_inv a H))
+      end a) h (sub_hydra_wf h).
+
+End hydra_rect.
+
 Section Hydrae.
 
   Inductive Hydra :=
@@ -560,7 +561,8 @@ Section Hydrae.
       * specialize (IHE2 _ E4); now inversion IHE2.
   Qed.
 
-  (* The relation Hydra_hydra_eq can be realized by a function in both directions *)
+  (* The relation Hydra_hydra_eq can be realized by a function in both directions.
+     This is a mutual fixpoint.*)
 
   Fixpoint Hydra2hydra_pwc H : { h | Hydra_hydra_eq H h }
   with Hydrae2list_hydra_pwc HH : { m | Fall2_Hl Hydra_hydra_eq HH m }.
@@ -575,6 +577,8 @@ Section Hydrae.
         exists (h::m); eauto.
   Qed.
 
+  (* We use that hydra_rect recursor above here, which contains a 
+     fixpoint itself *)
   Definition hydra2Hydra_pwc (h : hydra) : { H | Hydra_hydra_eq H h }.
   Proof.
     induction h as [ m IHm ] using hydra_rect.
@@ -609,14 +613,14 @@ Section Hydrae.
     | Hydrae_cons H HH => f H (fold_Hydrae f x HH)
     end.
 
-  Lemma hydra2Hydra_fix l : hydra2Hydra ⟨l⟩ = Hydra_node (fold_right (fun x => Hydrae_cons (hydra2Hydra x)) Hydrae_nil l).
+  Lemma hydra2Hydra_fix l : hydra2Hydra ⟨l⟩ = Hydra_node (fold_right (λ x HH, Hydrae_cons (hydra2Hydra x) HH) Hydrae_nil l).
   Proof.
     apply Hydra_hydra_eq_inj with (1 := hydra2Hydra_spec _).
     constructor.
     induction l; simpl; eauto.
   Qed.
 
-  Lemma Hydra2hydra_fix HH : Hydra2hydra (Hydra_node HH) = ⟨fold_Hydrae (fun H => cons (Hydra2hydra H)) [] HH⟩.
+  Lemma Hydra2hydra_fix HH : Hydra2hydra (Hydra_node HH) = ⟨fold_Hydrae (λ H l, (Hydra2hydra H)::l) [] HH⟩.
   Proof.
     apply Hydra_hydra_eq_fun with (1 := Hydra2hydra_spec _).
     constructor.
