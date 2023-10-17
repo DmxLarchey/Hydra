@@ -23,7 +23,8 @@ game.
 
 ## The code
 This standalone (one file) proof was implemented by Dominique Larchey-Wendling, 
-see [`hydra.v`](theories/hydra.v). It is distributed under the terms of the [`MPL-2.0`](LICENSE).
+see [`hydra.v`](theories/hydra.v). It is distributed under the terms 
+of the [`MPL-2.0`](LICENSE) Mozilla Public License.
 
 ## Rounds vs. moves
 In the code of [`hydra.v`](theories/hydra.v), we only model a _round_ which is
