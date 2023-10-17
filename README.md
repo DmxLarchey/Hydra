@@ -43,6 +43,43 @@ transmit that information. By combining Hercules move and the Hydra's
 response into the notion of round, the information can be transmitted 
 without requiring external information.
 
+## Termination of the game
+
+As strange as it sounds, _Hercules cannot avoid winning the game_. To be fair,
+he will probably die out of exhaustion, or run out of energy, and if not,
+die of old age, before he actually chops of the last head of the Hydra.
+The game can take so long that possibly the universe itself would have
+contracted to another Big Bang before it ends.
+
+However, in an _ideal_ game, the Hydra is bound to be killed whatever
+strategy Hercules may use to chop of heads. The succession of rounds 
+is strongly terminating and the only terminal point is a killed Hydra.
+
+This is what we prove in the code and it takes less than 300 lines
+of Coq code to do it, not counting the small part of the standard library 
+that we put to contribution.
+
+Contrary to Kirby and Paris' proof implemented in [Hydra Battles](https://github.com/coq-community/hydra-battles), 
+we do not use ordinals to show termination. Instead, we rely on the list path ordering `lpo`, a weak variant 
+of the _recursive path ordering_ pioneered by Dershowitz. By weak, we mean 
+minimized/tailored to the task given here. 
+
+The tiny well-foundedness proof of the displayed here however uses a 
+direct approach (as opposed to relying on Kruskal's tree theorem), inspired 
+by the work of Coupet-Grimal & Delobel (and also Goubault-Larrecq). The instance
+we give here is just five lines of proof scripts which 3 nested inductions.
+
+It however relies on the accessibility characterization of the _list ordering_,
+of which the proof mimics the outline of Nipkow (and Buchholtz)  for the
+well-foundedness of the multiset ordering.
+
+We only implement termination. We do not show that main result of
+Kirby and Paris contribution, that is the incapacity of Peano arithmetic
+to proof the strong termination of the game. This is a much longer
+endeavor that essentially requires showing that the length of a Hydra
+battle is function growing too fast to be represented in (first order)
+Peano arithmetic.
+
 ## The Hydra data structures
 
 ### Mutual vs. nested: my biased point of view
