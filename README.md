@@ -37,7 +37,7 @@ We do not model the moves of Hercules and Hydra independently because:
   sub-hydras depends on the position of this last chopped head.
   
 Modeling this dependency would lengthen the code base because we would need
-to represent position of a head inside the Hydra so that Hercules can
+to represent the position of a head inside the Hydra so that Hercules can
 transmit that information. By combining Hercules move and the Hydra's
 response into the notion of round, the information can be transmitted 
 without requiring external information.
@@ -48,7 +48,7 @@ without requiring external information.
 In this code, we implement hydras as an inductive type _nested_ with lists:
 ```
 Inductive hydra := 
-  |hydra_cons : list hydra → hydra.
+  | hydra_cons : list hydra → hydra.
 ```
 whereas the [Hydra Battles](https://github.com/coq-community/hydra-battles) version favors
 a mutual inductive type instead:
@@ -67,40 +67,43 @@ do not have to deal with mutual or nested fixpoints and intricacies the _guard c
 
 On the downside however, the type `Hydrae` is not identical to `list Hydra` and thus
 one cannot use all the generic tools of the `List` library. You basically have to
-rewrite those tools you need. This is really a painful endeavor that unnecessarily 
-lengthen the code base. Should you defined a variant of `Hydra/Hydrae`, eg by
+rewrite those of the `List` tools you need. This is really a painful endeavor that unnecessarily 
+lengthen the code base. Should you want to define a variant of `Hydra/Hydrae`, eg by
 decorating nodes with data, and you get yet _another_ copy of `list _` which 
 requires another partial rewriting of the `List` library.
 
 On the other hand, working with the nested types `hydra`/`list hydra` requires you
 to master nested fixpoints because Coq (so far) does not generate powerful enough
-recursors (ie induction principles) for nested types.
+recursors (ie induction principles) for nested types. But they can be build _by hand_:
 - first of all, this is _a good incentive to learn_ working with guarded fixpoints
   directly and how Coq actually builds recursors;
 - you can work with `list hydra` using the tools of the `List` library _as they are_;
 - the code is now much more succinct and if you need to extend the `List` library,
   your extension can be used elsewhere. Same remark if you extend `hydra` to
-  `Inductive hydra' X := hydra'_cons : list (hydra' X) → hydra' X`. No need to duplicate
-  everything. 
+  ```
+    Inductive hydra' X :=
+      | hydra'_cons : list (hydra' X) → hydra' X`. 
+  ``` 
+  No need to duplicate everything. 
   
-So apart from the initial difficulty of having to understand the guard condition,
-which is something you should do anyway to become fluent in working with inductive
-types, there are only advantages with the choice of nesting or mutual.
+So apart from the initial difficulty of having to understand how the guard condition
+works, which is btw something you should do anyway to become fluent in working with inductive
+types, there are only advantages with the choice of nesting over mutual.
 
 ### The isomorphism
 To compare and illustrate the practical differences between the mutual and nested
 versions, it is a _very good exercise_ to implement the isomorphism between `hydra`
-and `Hydra` in Coq. You will learn how to deal with mutual fixpoints and nested
-fixpoints.
+and `Hydra` in Coq. You will learn how to deal with nested
+fixpoints _and_  mutual fixpoints.
 
 This code contains, as an extra educational contribution, the construction of the
 isomorphism between `hydra` and `Hydra`:
 1. we first represent the isomorphism as an inductive relation. This follows the 
    general approach of the [_Braga method_](https://github.com/DmxLarchey/The-Braga-Method);
-2. we then show that this relation is functional and injective;
-3. we then realize that relation by fully specified functions in
-   both directions;
-4. finally, we show that this gives a functional isomorphism and derive convenient
+2. we then show that this relation is _functional_ and _injective_;
+3. we then _realize_ that relation by fully specified functions in
+   _both directions_;
+4. finally, we show that this gives a functional bijection, and derive convenient
    fixpoint equations for the isomorphism. 
 
 
