@@ -80,9 +80,10 @@ recursors (ie induction principles) for nested types. But they can be build _by 
 - you can work with `list hydra` using the tools of the `List` library _as they are_;
 - the code is now much more succinct and if you need to extend the `List` library,
   your extension can be used elsewhere. Same remark if you extend `hydra` to
+  decorated roses trees as eg:
   ```
-    Inductive hydra' X :=
-      | hydra'_cons : list (hydra' X) → hydra' X`. 
+    Inductive ltree X :=
+      | ltree_cons : X → list (ltree X) → ltree X. 
   ``` 
   No need to duplicate everything. 
   
