@@ -27,7 +27,7 @@ see [`hydra.v`](theories/hydra.v). It is distributed under the terms
 of the [`MPL-2.0`](LICENSE) Mozilla Public License.
 
 ## Rounds vs. moves
-In the code of [`hydra.v`](theories/hydra.v), we only model a _round_ which is
+In the code of [`hydra.v`](theories/hydra.v), we only model a `round` which is
 the combination of a head cut by Hercules and a conforming response by the Hydra
 (see above).
 We do not model the moves of Hercules and Hydra independently because:
@@ -64,7 +64,7 @@ we do not use ordinals to show termination. Instead, we rely on the list path or
 of the _recursive path ordering_ pioneered by Dershowitz. By weak, we mean 
 minimized/tailored to the task given here. 
 
-The tiny well-foundedness proof of the displayed here however uses a 
+The tiny well-foundedness proof of the `lpo` displayed here however uses a 
 direct approach (as opposed to relying on Kruskal's tree theorem), inspired 
 by the work of Coupet-Grimal & Delobel (and also Goubault-Larrecq). The instance
 we give here is just five lines of proof scripts which 3 nested inductions.
@@ -72,6 +72,9 @@ we give here is just five lines of proof scripts which 3 nested inductions.
 It however relies on the accessibility characterization of the _list ordering_,
 of which the proof mimics the outline of Nipkow (and Buchholtz)  for the
 well-foundedness of the multiset ordering.
+
+It is a quite straightforward exercise to show that the `round` relation is
+included in the reverse of the `lpo`, hence it is also well-founded.
 
 We only implement termination. We do not show that main result of
 Kirby and Paris contribution, that is the incapacity of Peano arithmetic
