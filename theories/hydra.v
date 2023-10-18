@@ -538,6 +538,8 @@ Section hydra_rect.
 
 End hydra_rect.
 
+Definition hydra_rec (P : _ → Set) := hydra_rect P.
+
 Section Hydrae.
 
   Inductive Hydra :=
@@ -835,41 +837,31 @@ End hydra_fall_rect.
 Arguments clos_refl {_}.
 Arguments clos_refl_trans {_}.
 
-Section eps0.
+Fact list_fall_choose X (P Q : X → Prop) l :
+        (∀x, x ∈ l → {P x} + {Q x})
+      → { x | x ∈ l ∧ P x } + { ∀x, x ∈ l → Q x }.
+Proof.
+  induction l as [ | x l IHl ]; intros Hl.
+  + now right.
+  + destruct (Hl x) as [ Hx | Hx ]; eauto.
+    destruct IHl as [ (y & ? & ?) | ? ]; eauto.
+    right; intros ? [<- |]; eauto.
+Qed. 
+
+Section epsilon0.
 
   Inductive olt : hydra → hydra → Prop :=
-    | olt_intro l m : ordered (λ g h, g = h ∨ olt h g) l → ordered (λ g h, g = h ∨ olt h g) m → llt olt l m → olt ⟨l⟩ ⟨m⟩.
+    | olt_intro l m : llt olt l m → olt ⟨l⟩ ⟨m⟩.
 
   Hint Constructors olt : core.
 
-  Definition oge := λ g h, g = h ∨ olt h g.
+  Fact olt_inv l m : olt ⟨l⟩ ⟨m⟩ ↔ llt olt l m.
+  Proof. split; auto; now inversion 1. Qed.
 
-  Fact olt_inv l m : olt ⟨l⟩ ⟨m⟩ ↔ ordered oge l ∧ ordered oge m ∧ llt olt l m.
+  Theorem olt_sdec g h : sdec olt g h.
   Proof.
-    split.
-    + inversion 1; subst; auto.
-    + intros [ ? [] ]; auto.
-  Qed.
-
-  Definition ordinal := hydra_fall (ordered oge).
-
-  Fact ordinal_rect (P : hydra → Type) :
-          (∀l, ordered oge l 
-             → (∀x, x ∈ l → ordinal x)
-             → (∀x, x ∈ l → P x)
-             → P ⟨l⟩)
-        → ∀h, ordinal h → P h.
-  Proof. apply hydra_fall_rect. Qed.
-
-  (** olt is a strongly total strict order on ordinals *)
-
-  Theorem olt_total g h : ordinal g → ordinal h → sdec olt g h.
-  Proof.
-    intros H; revert H h.
-    induction 1 as [ l Hg1 Hg2 IHg ] using ordinal_rect.
-    intros [ m ] [H1 H2]%hydra_fall_fix.
+    revert h; induction g as [ l IHg ]; intros [ m ].
     destruct (@llt_sdec _ olt l m) as [ l m H3 | l | l m H3 ]; eauto.
-    + intros; apply IHg; auto; apply H2; auto.
     + constructor 1; constructor; auto.
     + constructor 2.
     + constructor 3; constructor; auto.
@@ -878,7 +870,7 @@ Section eps0.
   Theorem olt_irrefl h : ~ olt h h.
   Proof.
     induction h as [ l IH ].
-    intros (H3 & H4 & (g & G1 & G2)%llt_irrefl)%olt_inv.
+    intros (g & G1 & G2)%olt_inv%llt_irrefl.
     now apply (IH _ G1).
   Qed.
 
@@ -886,26 +878,75 @@ Section eps0.
   Proof.
     revert g h.
     induction f as [ l IHl ].
-    intros [m] [k] (H1 & H2 & H3)%olt_inv (H4 & H5 & H6)%olt_inv.
+    intros [m] [k] H1%olt_inv H2%olt_inv.
     constructor; try tauto.
-    revert H3 H6; apply llt_trans; eauto.
+    revert H1 H2; apply llt_trans; eauto.
   Qed.
 
-  Hint Resolve olt_trans : core.
+  Hint Resolve olt_trans olt_irrefl : core.
+
+  Fact olt_dec g h : { olt g h } + { ~ olt g h }.
+  Proof.
+    destruct (olt_sdec g h) as [ g h H | h | g h H ].
+    + now left.
+    + now right.
+    + right; intro G; eapply olt_irrefl; eauto.
+  Qed.
 
   Corollary olt_trans' g h : clos_trans olt g h → olt g h.
   Proof. induction 1; eauto. Qed.
 
-  Hint Resolve ordered_cons_inv : core.
+  Definition oge := λ g h, g = h ∨ olt h g.
 
+  Fact oge_dec g h : { oge g h } + { ~ oge g h }.
+  Proof.
+    destruct (olt_sdec g h) as [ g h H | h | g h H ].
+    + right; intros [<-|]; eapply olt_irrefl; eauto.
+    + left; left; auto.
+    + left; right; auto.
+  Qed.
+
+  Fact clos_trans_oge g h : clos_trans oge g h → g = h ∨ olt h g.
+  Proof. induction 1 as [ ? ? [] | ? ? ? _ [] _ [] ]; subst; eauto. Qed.
+
+  Definition E0 := hydra_fall (ordered oge).
+
+  Fact E0_fix l : E0 ⟨l⟩ ↔ ordered oge l ∧ ∀x, x ∈ l → E0 x.
+  Proof. apply hydra_fall_fix. Qed.
+
+  Fact E0_rect (P : hydra → Type) :
+          (∀l, ordered oge l 
+             → (∀x, x ∈ l → E0 x)
+             → (∀x, x ∈ l → P x)
+             → P ⟨l⟩)
+        → ∀h, E0 h → P h.
+  Proof. apply hydra_fall_rect. Qed.
+
+  Hint Resolve oge_dec : core.
+
+  Theorem E0_dec h : { E0 h } + { ~ E0 h }.
+  Proof.
+    induction h as [ l IH ].
+    destruct (ordered_dec oge l) as [ H1 | H1 ]; eauto.
+    2:{ right; intros []%E0_fix; eauto. }
+    destruct list_fall_choose 
+      with (P := fun h => ~ E0 h)
+           (Q := E0) (l := l) 
+      as [ (h & H2 & H3) | H ].
+    + intros ? []%IH; auto.
+    + right; intros []%E0_fix; apply H3; eauto.
+    + left; apply E0_fix; auto.
+  Qed. 
+
+  Hint Resolve ordered_cons_inv : core.
   Hint Constructors clos_refl_trans : core.
 
-  Theorem olt_lpo g h : ordinal g → ordinal h → olt g h → lpo g h.
+  Theorem E0_olt_lpo g h : E0 g → E0 h → olt g h → lpo g h.
   Proof.
     intros H1 H2; revert g H1 h H2.
-    induction 1 as [ l Hg1 Hg2 IHg ] using ordinal_rect.
-    induction 1 as [ m Hh1 Hh2 _ ] using ordinal_rect.
-    intros (_ & _ & H)%olt_inv.
+    induction 1 as [ l Hg1 Hg2 IHg ] using E0_rect.
+    induction 1 as [ m Hh1 Hh2 _ ] using E0_rect.
+    intros H%olt_inv.
     induction H as [ y m | x y l m | x l m H1 IH1 ].
     + constructor.
       apply lo_app_tail with (l := [_]).
@@ -927,34 +968,90 @@ Section eps0.
       apply IH1; eauto.
   Qed.
 
-  Theorem olt_ordinal_dec n : 
-       (    (forall g h, ⌊g⌋ < n -> ⌊h⌋ < n -> { olt g h } + { ~ olt g h })
-        *   (forall h, ⌊h⌋ < n -> {ordinal h} + {~ordinal h}) )%type.
+  Definition power h := ⟨[h]⟩.
+
+  Lemma olt_sons h : E0 h → match h with ⟨l⟩ => ∀g, g ∈ l → olt g h end. 
   Proof.
-    induction n as [ | n (IH1 & IH2) ].
-    + admit.
-    + split.
-      * intros [l] [m].
- Check ordered_dec. 
+    induction 1 as [ m H1 H2 IH ] using E0_rect.
+    intros [l] Hl.
+    constructor.
+    specialize (IH _ Hl); simpl in IH.
+    destruct l as [ | x l ].
+    + destruct m; [ easy | constructor ].
+    + destruct m as [ | y m ]; [ easy | ].
+      destruct Hl as [ -> | Hl ].
+      * constructor 2; eauto.
+      * apply ordered_inv in H1.
+        apply ordered_from_clos_trans with (2 := Hl) in H1.
+        apply clos_trans_oge in H1 as [ -> | H1 ].
+        - constructor 2; auto.
+        - constructor 2.
+          apply olt_trans with (2 := H1); eauto.
+  Qed.
 
-  Theorem ordinal_dec h : { ordinal h } + { ~ ordinal h }.
+  Fact E0_power h : E0 h → E0 (power h).
   Proof.
-    induction h as [ l IHl ] using hydra_rect.
-  Admitted.
+    intros; apply E0_fix; split.
+    + repeat constructor.
+    + now intros ? [ <- | [] ].
+  Qed.
 
+  Hint Resolve E0_power : core.
+ 
+  Fact olt_power h : E0 h → olt h (power h).
+  Proof. intro; apply (olt_sons (power h)); auto. Qed.
 
-  Definition Eps0 := sig ordinal.
+  Definition eps0 h := if E0_dec h then True else False.
 
-  Definition lt_Eps0 (o o' : Eps0) := olt (proj1_sig o) (proj1_sig o').
+  Fact eps0_iff h : eps0 h ↔ E0 h.
+  Proof.
+    unfold eps0.
+    destruct (E0_dec h); tauto.
+  Qed.
 
-  Theorem lt_Eps0_total : ∀ o o', sdec lt_Eps0 o o'.
+  Fact eps0_pirr h (E1 E2 : eps0 h) : E1 = E2.
+  Proof.
+    unfold eps0 in *.
+    destruct (E0_dec h); [ | easy ].
+    now destruct E1; destruct E2.
+  Qed.
+
+  Definition epsilon0 := sig eps0.
+
+  Implicit Type (o : epsilon0). 
+
+  Definition lt_epsilon0 o o' := olt (proj1_sig o) (proj1_sig o').
+
+  Notation lt0 := lt_epsilon0.
+
+  Theorem lt_epsilon0_sdec : ∀ o o', sdec lt0 o o'.
   Proof. 
     intros [g H1] [h H2].
-    destruct (olt_total _ _ H1 H2).
+    destruct (olt_sdec g h).
     + constructor 1; auto.
-    + constructor 2; auto.
+    + rewrite <- (eps0_pirr _ H1 H2); constructor 2.
+    + constructor 3; auto.
+  Qed.
 
-End eps0.
+  Theorem lt_epsilon0_irrefl o : ~ lt0 o o.
+  Proof. destruct o; apply olt_irrefl. Qed.
+
+  Theorem lt_epsilon0_trans o1 o2 o3 :
+       lt0 o1 o2 → lt0 o2 o3 → lt0 o1 o3.
+  Proof. revert o1 o2 o3; intros [] [] []; apply olt_trans. Qed.
+
+  Theorem lt_epsilon0_wf : well_founded lt_epsilon0.
+  Proof. 
+    set (R o o' := lpo (proj1_sig o) (proj1_sig o')).
+    cut (well_founded R).
+    + apply wf_incl.
+      intros [] []; unfold lt0, R; simpl.
+      apply E0_olt_lpo; apply eps0_iff; auto.
+    + unfold R; apply wf_inverse_image.
+      exact wf_lpo.
+   Qed.
+
+End epsilon0.
  
     
     
