@@ -285,20 +285,23 @@ Set Elimination Schemes.
        S. Coupet-Grimmal & W. Delobel
        https://link.springer.com/article/10.1007/s00200-006-0020-y
        J. Goubault-Larrecq
-       http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf 
+       http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf
 
    This path ordering is a bit simpler though but it keeps the
-   case nesting of lo.
+   case of the nesting of the list order "lo".
 
-   Three nested inductions for the proof, then using on the 
-   Acc-characterization of the list ordering. *)
+   Three nested inductions for the proof below, based on
+   the Acc-characterization of the list ordering:
+
+      Acc (lo lpo) l ↔ ∀x, x ∈ l → Acc lpo x
+*)
 
 Theorem wf_lpo h : Acc lpo h.
-Proof. 
-  induction h as [ l IHl%Acc_lo_iff ].
-  induction IHl as [ m _ IHm ].
+Proof.
+  induction h as [ m IHm%Acc_lo_iff ].
+  induction IHm as [ m _ IHm ].
   constructor.
-  intro g; induction g.
+  intro g; induction g as [ l IHl ].
   intros ?%lpo_inv; eauto.
 Qed.
 
