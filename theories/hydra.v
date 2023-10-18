@@ -11,6 +11,8 @@ From Coq Require Import PeanoNat List Relations Wellfounded Utf8.
 
 Import ListNotations.
 
+Set Implicit Arguments.
+
 Arguments clos_trans {_}.
 
 (** Notations for the construction of the list order *)
@@ -47,42 +49,6 @@ Proof. revert l m; now intros [] []. Qed.
 
 Fact sg_eq_insert {X} (x y : X) l r : [x] = l⊣y⊢r → x = y ∧ l = [] ∧ r = [].
 Proof. destruct l as [ | ? [] ]; inversion 1; auto. Qed.
-
-(** Maximum of a list of natural numbers *)
-
-Definition lmax := fold_right max 0.
-
-Lemma lmax_locate m :  m = [] ∨ ∃ l r, m = l++[lmax m]++r.
-Proof.
-  induction m as [ | x m [ -> | (l & r & E) ] ]; eauto; simpl; right.
-  + exists [], []; simpl; f_equal; now rewrite Nat.max_0_r.
-  + destruct (Nat.le_gt_cases x (lmax m)).
-    * rewrite max_r; auto.
-      exists (x::l), r; simpl; f_equal; auto.
-    * rewrite max_l; [|now apply Nat.lt_le_incl].
-      now exists [], m. 
-Qed.
-
-(** Inductive definition (Acc based) of "R is terminating at x" *)
-
-Definition terminating {X} (R : X → X → Prop) := Acc (λ x y, R y x).
-Definition terminal {X} (R : X → X → Prop) x := ∀y, ~ R x y.
-
-Section terminating_terminal.
-
-  Variables (X : Type) (R : X → X → Prop)
-            (p : nat → X) (Hp : ∀n, terminal R (p n) ∨ R (p n) (p (S n))).
-
-  Theorem terminating_terminal : terminating R (p 0) → ∃n, terminal R (p n).
-  Proof.
-    generalize 0.
-    refine (fix loop i a { struct a } := _).
-    destruct (Hp i) as [ Hi | Hi ].
-    + now exists i.
-    + apply (loop (S i)), Acc_inv with (1 := a), Hi.
-  Qed.
-
-End terminating_terminal.
 
 (** The list order is a weak variant of the multiset order on list 
 
@@ -277,6 +243,9 @@ Set Elimination Schemes.
 #[local] Notation "⟨ l ⟩" := (hydra_cons l).
 #[local] Notation "⨸" := ⟨[]⟩.  (* the head hydra *)
 
+Fact hydra_cons_inj l m : ⟨l⟩ = ⟨m⟩ → l = m.
+Proof. now inversion 1. Qed.
+
 Section hydra_ind.
 
   Variables (P : hydra → Prop)
@@ -296,6 +265,144 @@ Section hydra_ind.
   Qed.
 
 End hydra_ind.
+
+(** The list path ordering is a weak variant of the multiset 
+    path ordering on hydra. One could add two other constructors 
+    and stability under permutations and still keep it well-founded *)
+
+Unset Elimination Schemes.
+
+Inductive lpo : hydra → hydra → Prop :=
+  | lpo_intro l m : lo lpo l m → lpo ⟨l⟩ ⟨m⟩.
+
+Fact lpo_inv l m : lpo ⟨l⟩ ⟨m⟩ → lo lpo l m.
+Proof. now inversion 1. Qed.
+
+Set Elimination Schemes.
+
+(* We get a very short proof compared to the following sources
+   of inspiration:
+       S. Coupet-Grimmal & W. Delobel
+       https://link.springer.com/article/10.1007/s00200-006-0020-y
+       J. Goubault-Larrecq
+       http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf 
+
+   This path ordering is a bit simpler though but it keeps the
+   case nesting of lo.
+
+   Three nested inductions for the proof, then using on the 
+   Acc-characterization of the list ordering. *)
+
+Theorem wf_lpo h : Acc lpo h.
+Proof. 
+  induction h as [ l IHl%Acc_lo_iff ].
+  induction IHl as [ m _ IHm ].
+  constructor.
+  intro g; induction g.
+  intros ?%lpo_inv; eauto.
+Qed.
+
+(** Inductive definition (Acc based) of "R is terminating at x" *)
+
+Definition terminating {X} (R : X → X → Prop) := Acc (λ x y, R y x).
+
+Section hercules_hydra_round_terminating.
+
+  (* m contains only copies of x *)
+  Notation only_copies x m := (∀y, y ∈ m → x = y).
+
+  (* A head cut on the root, ie at height 1, no response from the hydra *)
+  Inductive hh_round_root : hydra → hydra → Prop :=
+    | hh_round_root_0 l r : ⟨l⊣⨸⊢r⟩ ⊳₁ ⟨l⊣⊢r⟩
+  where "h ⊳₁ g" := (hh_round_root h g).
+
+  (* A head cut at height ≥ 2, followed by a response of the hydra *)
+  Inductive hh_round_deep : hydra → hydra → Prop :=
+    | hh_round_deep_0 l₀ r₀ l₁ r₁ m : only_copies ⟨l₀⊣⊢r₀⟩ m → ⟨l₁⊣⟨l₀⊣⨸⊢r₀⟩⊢r₁⟩ ⊳₂ ⟨l₁⊣⊢m⊣⊢r₁⟩
+    | hh_round_deep_1 l h g r : h ⊳₂ g  →  ⟨l⊣h⊢r⟩ ⊳₂ ⟨l⊣g⊢r⟩
+  where "h ⊳₂ g" := (hh_round_deep h g).
+
+  (* A round is either a root round or a deep round *)
+  Inductive hh_round : hydra → hydra → Prop :=
+    | hh_round_1 h g : h ⊳₁ g → h ⊳ g
+    | hh_round_2 h g : h ⊳₂ g → h ⊳ g
+  where "h ⊳ g" := (hh_round h g).
+
+  Hint Constructors hh_round_root hh_round_deep hh_round : core.
+
+  Local Fact cut_lpo l r : lpo ⟨l⊣⊢r⟩ ⟨l⊣⨸⊢r⟩.
+  Proof.
+    constructor.
+    change r with ([]⊣⊢r).
+    now apply lo_ctx, lo_intro.
+  Qed.
+
+  Hint Resolve cut_lpo : core.
+
+  Local Fact hh_round_root_lpo h g : h ⊳₁ g → lpo g h.
+  Proof. intros []; auto. Qed.
+
+  Local Lemma hh_round_deep_lpo g h : h ⊳₂ g → lpo g h.
+  Proof.
+    induction 1 as [ l0 r0 l1 r1 m H | l h h' r H IH ].
+    + constructor.
+      rewrite app_ass.
+      apply lo_ctx, lo_intro.
+      intros ? <-%H; auto.
+    + constructor.
+      apply lo_ctx, lo_intro.
+      now intros ? [ <- | [] ].
+  Qed.
+
+  Hint Resolve hh_round_root_lpo hh_round_deep_lpo : core.
+
+  Local Lemma hh_round_lpo g h : h ⊳ g → lpo g h.
+  Proof. induction 1; auto. Qed.
+
+  Hint Resolve hh_round_lpo : core.
+
+  Theorem hh_round_terminating h : terminating hh_round h.
+  Proof. apply wf_incl with (2 := wf_lpo); red; eauto. Qed.
+
+End hercules_hydra_round_terminating.
+
+(** Terminating implies every R-sequence reaches a terminal point *)
+
+Definition terminal {X} (R : X → X → Prop) x := ∀y, ~ R x y.
+
+Section terminating_terminal.
+
+  Variables (X : Type) (R : X → X → Prop)
+            (p : nat → X) 
+            (Hp : ∀n, terminal R (p n) ∨ R (p n) (p (S n))).
+
+  Theorem terminating_terminal : terminating R (p 0) → ∃n, terminal R (p n).
+  Proof.
+    generalize 0.
+    refine (fix loop i a { struct a } := _).
+    destruct (Hp i) as [ Hi | Hi ].
+    + now exists i.
+    + apply (loop (S i)), Acc_inv with (1 := a), Hi.
+  Qed.
+
+End terminating_terminal.
+
+(** Maximum of a list of natural numbers *)
+
+Definition lmax := fold_right max 0.
+
+Lemma lmax_locate m :  m = [] ∨ ∃ l r, m = l++[lmax m]++r.
+Proof.
+  induction m as [ | x m [ -> | (l & r & E) ] ]; eauto; simpl; right.
+  + exists [], []; simpl; f_equal; now rewrite Nat.max_0_r.
+  + destruct (Nat.le_gt_cases x (lmax m)).
+    * rewrite max_r; auto.
+      exists (x::l), r; simpl; f_equal; auto.
+    * rewrite max_l; [|now apply Nat.lt_le_incl].
+      now exists [], m. 
+Qed.
+
+(** Tools using the height of a hydra *)
 
 (* Like hydra_ind, this is a guarded nested fixpoint *)
 Fixpoint hydra_ht (h : hydra) : nat :=
@@ -321,161 +428,84 @@ Proof.
     rewrite H in H3; now inversion H3.
 Qed.
 
-(** The list path ordering is a weak variant of the multiset 
-    path ordering on hydra. One could add two other constructors 
-    and stability under permutations and still keep it well-founded *)
+Fact hydra_ht_1_inv h : ⌊h⌋ = 1 → ∃ l₀ r₀, h = ⟨l₀⊣⨸⊢r₀⟩.
+Proof. intros (? & ? & ? & ? & ?%hydra_ht_0_inv)%hydra_ht_S_inv; subst; eauto. Qed.
 
-Unset Elimination Schemes.
+Fact hydra_ht_2_inv h : ⌊h⌋ = 2 → ∃ l₀ r₀ l₁ r₁, h = ⟨l₁⊣⟨l₀⊣⨸⊢r₀⟩⊢r₁⟩.
+Proof. intros (? & ? & ? & ? & (? & ? & ?)%hydra_ht_1_inv)%hydra_ht_S_inv; subst; eauto. Qed.
 
-Inductive lpo : hydra → hydra → Prop :=
-  | lpo_intro l m : lo lpo l m → lpo ⟨l⟩ ⟨m⟩.
+Section hercules_wins.
 
-Set Elimination Schemes.
+  Infix "⊳₁" := hh_round_root.
+  Infix "⊳₂" := hh_round_deep.
+  Infix "⊳" := hh_round.
 
-(* We get a very short proof compared to the following sources
-   of inspiration:
-       S. Coupet-Grimmal & W. Delobel
-       https://link.springer.com/article/10.1007/s00200-006-0020-y
-       J. Goubault-Larrecq
-       http://www.lsv.ens-cachan.fr/Publis/PAPERS/PDF/JGL-mfcs13.pdf 
+  Hint Constructors hh_round_deep hh_round_root hh_round : core.
 
-   This path ordering is a bit simpler though but it keeps the
-   case nesting of lo.
+  Local Fact hydra_ht_1_hh_round_root h : ⌊h⌋ = 1 → ∃g, h ⊳₁ g.
+  Proof. intros (? & ? & ->)%hydra_ht_1_inv; eauto. Qed.
 
-   Three nested inductions for the proof, then using on the 
-   Acc-characterization of the list ordering. *)
-
-Theorem wf_lpo h : Acc lpo h.
-Proof. 
-  induction h as [ l IHl%Acc_lo_iff ].
-  induction IHl as [ m _ IHm ].
-  constructor.
-  intro g; induction g.
-  inversion 1; eauto.
-Qed.
-
-Section hercules.
-
-  (* m contains only copies of x *)
-  Notation only_copies x m := (∀y, y ∈ m → x = y).
-
-  (* A head cut on the root, ie at height 1, no response from the hydra *)
-  Inductive hround_root : hydra → hydra → Prop :=
-    | hround_root_0 l r : ⟨l⊣⨸⊢r⟩ ⊳₁ ⟨l⊣⊢r⟩
-  where "h ⊳₁ g" := (hround_root h g).
-
-  (* A head cut at height ≥ 2, followed by a response of the hydra *)
-  Inductive hround_deep : hydra → hydra → Prop :=
-    | hround_deep_0 l₀ r₀ l₁ r₁ m : only_copies ⟨l₀⊣⊢r₀⟩ m → ⟨l₁⊣⟨l₀⊣⨸⊢r₀⟩⊢r₁⟩ ⊳₂ ⟨l₁⊣⊢m⊣⊢r₁⟩
-    | hround_deep_1 l h g r : h ⊳₂ g  →  ⟨l⊣h⊢r⟩ ⊳₂ ⟨l⊣g⊢r⟩
-  where "h ⊳₂ g" := (hround_deep h g).
-
-  (* A round is either a root round or a deep round *)
-  Inductive hround : hydra → hydra → Prop :=
-    | hround_1 h g : h ⊳₁ g → h ⊳ g
-    | hround_2 h g : h ⊳₂ g → h ⊳ g
-  where "h ⊳ g" := (hround h g).
-
-  Hint Constructors hround_root hround_deep hround : core.
-
-  Local Fact cut_lpo l r : lpo ⟨l⊣⊢r⟩ ⟨l⊣⨸⊢r⟩.
+  Local Fact hydra_ht_2_hh_round_deep h : ∀n, ⌊h⌋ = S (S n) → ∃g, h ⊳₂ g.
   Proof.
-    constructor.
-    change r with ([]⊣⊢r).
-    now apply lo_ctx, lo_intro.
+    induction h as [ m IH ]; intros [ | n ].
+    + intros (l0 & r0 & l1 & r1 & ->)%hydra_ht_2_inv.
+      exists ⟨l1⊣⊢[]⊣⊢r1⟩; now constructor 1.
+    + intros (? & ? & ? & ->%hydra_cons_inj & []%IH)%hydra_ht_S_inv; eauto.
   Qed.
 
-  Hint Resolve cut_lpo : core.
-
-  Local Fact hround_root_lpo h g : h ⊳₁ g → lpo g h.
-  Proof. intros []; auto. Qed.
-
-  Local Lemma hround_deep_lpo g h : h ⊳₂ g → lpo g h.
-  Proof.
-    induction 1 as [ l0 r0 l1 r1 m H | l h h' r H IH ].
-    + constructor.
-      rewrite app_ass.
-      apply lo_ctx, lo_intro.
-      intros ? <-%H; auto.
-    + constructor.
-      apply lo_ctx, lo_intro.
-      now intros ? [ <- | [] ].
-  Qed.
-
-  Hint Resolve hround_root_lpo hround_deep_lpo : core.
-
-  Local Lemma hround_lpo g h : h ⊳ g → lpo g h.
-  Proof. induction 1; auto. Qed.
-
-  Hint Resolve hround_lpo : core.
-
-  Theorem hround_terminating h : terminating hround h.
-  Proof. apply wf_incl with (2 := wf_lpo); red; eauto. Qed.
-
-  Local Fact hydra_ht_1_hround_root h : ⌊h⌋ = 1 → ∃g, h ⊳₁ g.
-  Proof. intros (? & ? & ? & -> & ->%hydra_ht_0_inv)%hydra_ht_S_inv; eauto. Qed.
-
-  Local Fact hydra_ht_2_hround_deep h : ∀n, ⌊h⌋ = S (S n) → ∃g, h ⊳₂ g.
-  Proof.
-    induction h as [ m IH ]; intros [ | n ] E.
-    + apply hydra_ht_S_inv in E as (l1 & g & r1 & H1 & E).
-      apply hydra_ht_S_inv in E as (l0 & f & r0 & H2 & E).
-      apply hydra_ht_0_inv in E; subst.
-      rewrite H1.
-      exists ⟨l1⊣⊢[]⊣⊢r1⟩.
-      constructor 1; intros _ [].
-    + apply hydra_ht_S_inv in E as (l & g & r & H1 & E).
-      apply IH in E as (f & E).
-      * rewrite H1; exists ⟨l⊣f⊢r⟩; now constructor.
-      * inversion H1; auto.
-  Qed.
-
-  Local Fact hround_root_nil_inv h g : h ⊳₁ g → h ≠ ⨸.
+  Local Fact hh_round_root_nil_inv h g : h ⊳₁ g → h ≠ ⨸.
   Proof. now intros [[] ]. Qed.
 
-  Local Fact hround_deep_nil_inv h g : h ⊳₂ g → h ≠ ⨸.
+  Local Fact hh_round_deep_nil_inv h g : h ⊳₂ g → h ≠ ⨸.
   Proof. now intros [ ? ? [] | [] ]. Qed.
 
-  Hint Resolve hround_root_nil_inv hround_deep_nil_inv : core.
+  Hint Resolve hh_round_root_nil_inv hh_round_deep_nil_inv : core.
 
-  Local Fact hround_nil_inv h g : h ⊳ g → h ≠ ⨸.
+  Local Fact hh_round_nil_inv h g : h ⊳ g → h ≠ ⨸.
   Proof. intros []; eauto. Qed.
 
   (* The single head is the only hydra which cannot be cut further *)
-  Lemma terminal_hround_iff h : terminal hround h ↔ h = ⨸.
+  Lemma terminal_hh_round_iff h : terminal hh_round h ↔ h = ⨸.
   Proof.
     split.
     + intros H. 
       case_eq ⌊h⌋.
       * apply hydra_ht_0_inv.
       * intros [ | n ].
-        - intros (g & ?)%hydra_ht_1_hround_root.
+        - intros (g & ?)%hydra_ht_1_hh_round_root.
           destruct (H g); auto.
-        - intros (g & ?)%hydra_ht_2_hround_deep.
+        - intros (g & ?)%hydra_ht_2_hh_round_deep.
           destruct (H g); eauto.
-    + now intros -> ? []%hround_nil_inv.
+    + now intros -> ? []%hh_round_nil_inv.
   Qed.
 
-  Variables (play : nat → hydra)
-            (Hplay : ∀n, play n = ⨸ ∨ play n ⊳ play (S n)).
+  (** A game is a sequence of stages composed of an hydra.
+      At every stage, either the hydra is dead, or the hydra
+      at the next stage follows from a hercules-hydra round.
 
-  Let Hplay_spec n : terminal hround (play n) ∨ play n ⊳ play (S n).
-  Proof. now rewrite terminal_hround_iff. Qed.
+      Notice that the stage after a dead hydra can be anything,
+      hence can possibly be viewed as the start of a new game. *)
 
-  (* Any play reaches a killed hydra *)
-  Corollary hercules_hydra_rounds : ∃n, play n = ⨸.
+  Variables (game : nat → hydra)
+            (game_spec : ∀n, game n = ⨸ ∨ game n ⊳ game (S n)).
+
+  Let game_term n : terminal hh_round (game n) ∨ game n ⊳ game (S n).
+  Proof. now rewrite terminal_hh_round_iff. Qed.
+
+  (* In any game, there is a stage with a dead hydra *)
+  Corollary hercules_wins : ∃n, game n = ⨸.
   Proof.
     destruct terminating_terminal 
-      with (1 := Hplay_spec)
-           (2 := hround_terminating (play 0))
+      with (1 := game_term)
+           (2 := hh_round_terminating (game 0))
       as (n & Hn).
-    exists n; now apply terminal_hround_iff.
+    exists n; now apply terminal_hh_round_iff.
   Qed.
 
-End hercules.
+End hercules_wins.
 
-Check hercules_hydra_rounds.
-Print Assumptions hercules_hydra_rounds.
+Check hercules_wins.
+Print Assumptions hercules_wins.
 
 Section hydra_rect.
 
