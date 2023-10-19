@@ -672,6 +672,8 @@ Inductive sdec {X} (R : X → X → Prop) : X → X → Type :=
   | sdec_eq x : sdec R x x
   | sdec_gt x y : R y x → sdec R x y.
 
+Definition dec (P : Prop) := {P} + {~P}. 
+
 Section llt.
 
   Variables (X : Type) (R : X → X → Prop).
@@ -803,6 +805,18 @@ Section llt.
   End llt_trans.
 
 End llt.
+
+Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ~ R x x.
+Proof. induction 1 as [ x _ IH ]; intros H; exact (IH _ H H). Qed.
+
+Fact lpo_irrefl h : ~ lpo h h.
+Proof. apply Acc_irrefl with (1 := wf_lpo h). Qed.
+
+Fact lpo_trans : transitive _ lpo.
+Proof.
+  intros [l] [m] [k] ?%lpo_inv ?%lpo_inv.
+  constructor; econstructor 2; eauto.
+Qed.
 
 Fact fold_right_conj {X} (P : X → Prop) l :
          fold_right (λ x, and (P x)) True l ↔ ∀x, x ∈ l → P x.
@@ -941,7 +955,7 @@ Section epsilon0.
   Hint Resolve ordered_cons_inv : core.
   Hint Constructors clos_refl_trans : core.
 
-  Theorem E0_olt_lpo g h : E0 g → E0 h → olt g h → lpo g h.
+  Lemma E0_olt_lpo g h : E0 g → E0 h → olt g h → lpo g h.
   Proof.
     intros H1 H2; revert g H1 h H2.
     induction 1 as [ l Hg1 Hg2 IHg ] using E0_rect.
@@ -967,6 +981,23 @@ Section epsilon0.
       apply lo_cons, lpo_inv.
       apply IH1; eauto.
   Qed.
+
+  (* Since olt is maximal on E0 ... *)
+  Corollary E0_lpo_olt g h : E0 g → E0 h → lpo g h → olt g h.
+  Proof.
+    intros Hg Hh H.
+    destruct (olt_sdec g h) as [ g h G | g | g h G ]; auto.
+    + contradict H; apply lpo_irrefl.
+    + apply E0_olt_lpo in G; auto.
+      destruct (@lpo_irrefl h).
+      eapply lpo_trans; eauto.
+  Qed.
+
+  Hint Resolve E0_olt_lpo E0_lpo_olt : core.
+
+  (** lpo and olt are IDENTICAL on E0 *)
+  Theorem E0_olt_lpo_iff g h : E0 g → E0 h → olt g h ↔ lpo g h.
+  Proof. split; auto. Qed.
 
   Definition power h := ⟨[h]⟩.
 
