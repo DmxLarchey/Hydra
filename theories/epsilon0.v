@@ -27,8 +27,8 @@ Fact list_fall_choose X (P Q : X → Prop) l :
 Proof.
   induction l as [ | x l IHl ]; intros Hl.
   + now right.
-  + destruct (Hl x) as [ Hx | Hx ]; eauto.
-    destruct IHl as [ (y & ? & ?) | ? ]; eauto.
+  + destruct (Hl x); eauto.
+    destruct IHl as [ (? & []) | ]; eauto.
     right; intros ? [<- |]; eauto.
 Qed. 
 
@@ -52,6 +52,9 @@ Section llt.
     | ordered_cons x l : ordered_from x l → ordered (x::l).
 
   Hint Constructors ordered_from ordered : core.
+
+  Fact ordered_from_inv x y l : ordered_from x (y::l) → R x y ∧ ordered_from y l.
+  Proof. inversion 1; auto. Qed.
 
   Fact ordered_inv x l : ordered (x::l) → ordered_from x l.
   Proof. now inversion 1. Qed.
@@ -171,6 +174,81 @@ Section llt.
 
 End llt.
 
+Fact Acc_llt_nil X P (R : X → X → Prop) : Acc (λ l m, P l ∧ llt R l m) [].
+Proof. constructor; intros [] (? & []%llt_inv). Qed.
+
+#[local] Hint Resolve Acc_llt_nil : core.
+
+Notation ge R := (λ x y, x = y ∨ R y x).
+
+
+Require Import Lia Arith.
+Section llt_wf.
+
+  Variables (X : Type) (R : X → X → Prop).
+
+  Implicit Type (x : X).
+
+  Hint Constructors ordered_from : core.
+
+  Inductive nprefix x n : list X -> Prop :=
+    | nprefix_0 h : Forall (eq x) h -> length h = n -> nprefix x n h
+    | nprefix_1 y h m : Forall (eq x) h -> length h = n -> R y x -> ordered_from (ge R) y m -> nprefix x n (h++m).
+
+  Fact ordered_from_nprefix x l : ordered_from (ge R) x l -> exists n, nprefix x n l.
+  Proof.
+    induction 1 as [ | x y l [ <- | H1 ] H2 (n & Hn) ].
+    + exists 0; constructor 1; auto.
+    + exists (S n).
+      destruct Hn as [ l H3 H4 | y h m H3 H4 H5 H6 ].
+      * constructor 1; simpl; auto.
+      * constructor 2 with (h := _::_) (y := y); simpl; auto.
+    + exists 0.
+      destruct Hn as [ l H3 H4 | z h m H3 H4 H5 H6 ];
+        constructor 2 with (y := y) (h := []); simpl; eauto.
+  Qed.
+
+  Fact ordered_from_ge_inv x l : ordered_from (ge R) x l -> Forall (eq x) l \/ exists y h m, R y x /\ l = h++m /\ Forall (eq x) h /\ ordered_from (ge R) y m.
+  Proof.
+    induction 1 as [ | x y l [ <- | H1 ] H2 IH2 ]; eauto.
+    + destruct IH2 as [ ? | (y & h & m & ? & -> & ? & ?) ]; auto; right.
+      exists y, (x::h), m; simpl; auto.
+    + right; destruct IH2 as [ ? | (z & h & m & ? & -> & ? & ?) ].
+      * exists y, [], (y::l); simpl; repeat split;eauto.
+      * exists y, [], (y::h++m); repeat split; auto.
+  Qed.
+
+  Fact llt_nprefix_inv l m x n : 
+              llt R l m -> nprefix x n m -> ordered (ge R) l -> (exists p, p < n /\ nprefix x p l) \/ exists y k, R y x /\ nprefix y k l.
+  Proof.
+
+  Admitted.
+
+  Lemma llt_Acc_prefix x n l : Acc R x -> nprefix x n l -> Acc (λ l m, ordered (ge R) l ∧ llt R l m) l.
+  Proof.
+    intros H; revert H n l.
+    induction 1 as [ x Hx IHx ].
+    induction n as [n IHn] using (well_founded_induction lt_wf).
+    intros m Hm; constructor; intros l (Hl & H).
+    destruct (llt_nprefix_inv H Hm Hl) as [ (p & ? & ?) | (y & k & ? & ?) ]; eauto.
+  Qed.
+
+  Hint Resolve llt_Acc_prefix : core.
+
+  Lemma llt_Acc_ordered_from x l : Acc R x -> ordered_from (ge R) x l -> Acc (λ l m, ordered (ge R) l ∧ llt R l m) l.
+  Proof. intros ? (? & ?)%ordered_from_nprefix; eauto. Qed.
+
+  Hint Resolve llt_Acc_ordered_from : core.
+
+  Theorem llt_Acc P l :
+        Forall P l
+     -> Forall (Acc (λ x y, P x ∧ R x y)) l 
+     -> ordered (ge R) l 
+     -> Acc (λ l m, Forall P l ∧ ordered (ge R) l ∧ llt R l m) l.
+  Proof. Admitted.
+
+End llt_wf.
+
 Section epsilon0.
 
   Inductive olt : hydra → hydra → Prop :=
@@ -244,6 +322,19 @@ Section epsilon0.
              → P ⟨l⟩)
         → ∀h, E0 h → P h.
   Proof. apply hydra_fall_rect. Qed.
+
+  Lemma olt_E0_wf h : E0 h → Acc (λ s t, E0 s ∧ olt s t) h.
+  Proof.
+    induction 1 as [ l H1 H2 IH2 ] using E0_rect.
+    assert (Acc (λ l m, Forall E0 l /\ ordered oge l ∧ llt olt l m) l).
+    + apply llt_Acc; auto; now apply Forall_forall.
+    + clear H2 IH2; revert H H1.
+      induction 1 as [ m Hm IHm ].
+      constructor.
+      intros [l] ((H2 & H3)%E0_fix & H4%olt_inv).
+      apply IHm; auto.
+      rewrite Forall_forall; auto.
+  Qed.
 
   Hint Resolve oge_dec : core.
 
@@ -392,9 +483,7 @@ Section epsilon0.
    Qed.
 
 End epsilon0.
- 
-    
-    
+
 
 
 
