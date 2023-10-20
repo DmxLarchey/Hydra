@@ -195,6 +195,17 @@ Section llt_wf.
     | nprefix_0 h : Forall (eq x) h -> length h = n -> nprefix x n h
     | nprefix_1 y h m : Forall (eq x) h -> length h = n -> R y x -> ordered_from (ge R) y m -> nprefix x n (h++m).
 
+  Hint Constructors nprefix : core.
+
+  Fact nprefix_S x n l : nprefix x n l -> nprefix x (S n) (x::l).
+  Proof.
+    intros [ h H1 H2 | y h m H1 H2 H3 ].
+    + constructor 1; simpl; eauto.
+    + constructor 2 with (y := y) (h := _::_); simpl; eauto.
+  Qed.
+
+  Hint Resolve nprefix_S : core.
+
   Fact ordered_from_nprefix x l : ordered_from (ge R) x l -> exists n, nprefix x n l.
   Proof.
     induction 1 as [ | x y l [ <- | H1 ] H2 (n & Hn) ].
@@ -218,10 +229,28 @@ Section llt_wf.
       * exists y, [], (y::h++m); repeat split; auto.
   Qed.
 
+  Hint Resolve ordered_from_ordered : core.
+
+  (* False : Counter-example ltt [3;1] [3;2] *)  
   Fact llt_nprefix_inv l m x n : 
               llt R l m -> nprefix x n m -> ordered (ge R) l -> (exists p, p < n /\ nprefix x p l) \/ exists y k, R y x /\ nprefix y k l.
   Proof.
-
+    intros H1 H2; revert H2 H1.
+    intros [ h H1 H2 | y h m' H1 H2 H3 ].
+    + clear m. 
+      intros H3; revert H3 x n H1 H2.
+      induction 1 as [ y h | x y l m H1 | x l m H1 IH1 ]; intros z n G1 G2 G3.
+      * left; exists 0; subst; simpl; split; auto; lia.
+      * right; exists x.
+        apply ordered_inv, ordered_from_nprefix in G3 as (k & Hk).
+        apply Forall_cons_iff in G1 as [ -> G1 ].
+        exists (S k); split; auto.
+      * apply Forall_cons_iff in G1 as [ -> G1 ].
+        apply ordered_inv in G3.
+        destruct (IH1 _ _ G1 eq_refl)
+          as [ (p & G4 & G5) | (y & k & G4 & G5) ]; eauto.
+        - left; exists (S p); split; eauto.
+          subst; simpl; lia.
   Admitted.
 
   Lemma llt_Acc_prefix x n l : Acc R x -> nprefix x n l -> Acc (λ l m, ordered (ge R) l ∧ llt R l m) l.
@@ -235,7 +264,8 @@ Section llt_wf.
 
   Hint Resolve llt_Acc_prefix : core.
 
-  Lemma llt_Acc_ordered_from x l : Acc R x -> ordered_from (ge R) x l -> Acc (λ l m, ordered (ge R) l ∧ llt R l m) l.
+  (* This is the lemma we want to show but the proof is not going to work that way *)
+  Lemma llt_Acc_ordered_from x l : Acc R x → ordered_from (ge R) x l → Acc (λ l m, ordered (ge R) l ∧ llt R l m) l.
   Proof. intros ? (? & ?)%ordered_from_nprefix; eauto. Qed.
 
   Hint Resolve llt_Acc_ordered_from : core.
