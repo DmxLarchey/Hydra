@@ -68,6 +68,20 @@ Section ordered.
   Fact ordered_cons_inv x l : ordered (x::l) → ordered l.
   Proof. eauto. Qed.
 
+  Fact ordered_from_app x l m : ordered_from x (l++m) → ordered_from x l.
+  Proof.
+    induction l as [ | y l IHl ] in x |- *; simpl; auto.
+    intros []%ordered_from_inv; eauto.
+  Qed.
+
+  Hint Resolve ordered_from_app : core.
+
+  Fact ordered_app l m : ordered (l++m) → ordered l.
+  Proof.
+    destruct l; auto; simpl.
+    intros ?%ordered_inv; eauto.
+  Qed. 
+
   Hint Constructors clos_trans : core.
 
   Fact ordered_from_clos_trans x l : ordered_from x l → ∀ y, y ∈ l → clos_trans R x y.
@@ -383,7 +397,7 @@ End squash.
 
 Section list_sig.
 
-  Variables (X : Type) (P : X -> Prop).
+  Variables (X : Type) (P : X → Prop).
 
   Fact list_sig_proj1 (l : list (sig P)) :
         ∀x, x ∈ map (@proj1_sig _ _) l → P x.
@@ -409,6 +423,19 @@ Section list_sig.
   Qed.
 
 End list_sig.
+
+Theorem list_snoc_rect {X} (P : list X → Type) :
+           P []
+         → (∀ l x, P l → P (l++[x]))
+         → ∀ l, P l.
+Proof.
+  intros H1 H2 l; revert P H1 H2.
+  induction l as [ | x l IHl ]; auto.
+  intros P H1 H2.
+  apply (IHl (fun l => P (x::l))).
+  + apply (H2 []), H1.
+  + intros ? ?; apply (H2 (_::_)).
+Qed.
 
 Section epsilon0.
 
@@ -603,6 +630,70 @@ Section epsilon0.
   Fact olt_power h : eps0 h → olt h (power h).
   Proof. intro; apply (olt_sons (power h)); auto. Qed.
 
+  Definition hydra_succ h := 
+    match h with
+    | ⟨l⟩ => ⟨l++[⨸]⟩
+    end.
+
+  Hint Constructors ordered_from ordered : core.
+
+  Fact eps0_zero : eps0 ⨸.
+  Proof. apply eps0_fix; split; eauto; easy. Qed.
+
+  Fact zero_smallest h : oge h ⨸.
+  Proof.
+    destruct h as [ [ | x l ] ]; [ left | right ]; auto.
+    do 2 constructor.
+  Qed.
+
+  Hint Resolve eps0_zero zero_smallest : core.
+
+  Fact zero_smallest' h : ~ olt h ⨸.
+  Proof.
+    destruct (zero_smallest h) as [ <- | H ].
+    + apply olt_irrefl.
+    + intro; eapply olt_irrefl, olt_trans; eauto.
+  Qed.
+
+  Fact ordered_snoc_zero l : ordered oge l → ordered oge l⊣⊢[⨸].
+  Proof.
+    induction 1 as [ | x l H ]; simpl; eauto.
+    constructor.
+    induction H; simpl; eauto.
+  Qed.
+
+  Hint Resolve ordered_snoc_zero : core.
+
+  Fact eps0_hydra_succ h : eps0 h → eps0 (hydra_succ h).
+  Proof.
+    revert h; intros [l]; simpl.
+    rewrite !eps0_fix.
+    intros [H1 H2]; split; auto.
+    intros ? [ | [<- | []]]%in_app_iff; auto.
+  Qed.
+
+  (** Every ordinal is either a successor, 
+      or a limit, ie forall x < lim, succ x < lim *)
+
+  Theorem succ_or_limit h : eps0 h → { p | eps0 p ∧ h = hydra_succ p }
+                                   + { ∀p, eps0 p → olt p h → olt (hydra_succ p) h }.
+  Proof.
+    induction 1 as [ l H1 H2 IH ] using eps0_rect.
+    destruct l as [ | l p _ ] using list_snoc_rect.
+    + right; intros p _ []%zero_smallest'.
+    + destruct p as [m].
+      destruct m as [ | m h _ ] using list_snoc_rect.
+      * left; exists ⟨l⟩; split; auto.
+        apply eps0_fix; split; eauto.
+        now apply ordered_app in H1.
+      * right.
+        intros [k] (H3 & H4)%eps0_fix H5%olt_inv.
+        constructor.
+        admit.
+  Admitted.
+
+  (* We want to build the fundamental sequence *)
+
   Definition epsilon0 := sig eps0.
 
   Implicit Type (o : epsilon0).
@@ -648,7 +739,7 @@ Section epsilon0.
       exact wf_lpo.
    Qed.
 
-  Hint Constructors ordered_from ordered : core.
+ 
 
   Definition epsilon0_cons l : ordered (ge lt_epsilon0) l → epsilon0.
   Proof.
