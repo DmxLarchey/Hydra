@@ -381,6 +381,35 @@ Section squash.
 
 End squash.
 
+Section list_sig.
+
+  Variables (X : Type) (P : X -> Prop).
+
+  Fact list_sig_proj1 (l : list (sig P)) :
+        ∀x, x ∈ map (@proj1_sig _ _) l → P x.
+  Proof.
+    induction l as [ | [] ]; simpl; [ easy | ].
+    intros ? [ <- | ]; eauto.
+  Qed.
+
+  Definition list_sig_list : list (sig P) → { l | ∀x, x ∈ l → P x }.
+  Proof.
+    intros l.
+    exists (map (@proj1_sig _ _) l).
+    apply list_sig_proj1.
+  Defined.
+
+  Fact list_forall_reif l : (∀x, x ∈ l → P x) → { m : list (sig P) | l = map (@proj1_sig _ _) m }.
+  Proof.
+    induction l as [ | x l IHl ]; intros Hl.
+    + exists []; auto.
+    + destruct IHl as (m & Hm); eauto.
+      assert (P x) as Hx by eauto.
+      exists ((exist _ x Hx)::m); simpl; f_equal; auto.
+  Qed.
+
+End list_sig.
+
 Section epsilon0.
 
   Inductive olt : hydra → hydra → Prop :=
@@ -618,6 +647,41 @@ Section epsilon0.
     + unfold R; apply wf_inverse_image.
       exact wf_lpo.
    Qed.
+
+  Hint Constructors ordered_from ordered : core.
+
+  Definition epsilon0_cons l : ordered (ge lt_epsilon0) l → epsilon0.
+  Proof.
+    intros Hl.
+    exists ⟨map (@proj1_sig _ _) l⟩.
+    apply eps0_fix; split.
+    + induction Hl as [ | x l Hxl ]; simpl; constructor.
+      induction Hxl as [ | [] [] l []]; simpl in *; constructor; auto.
+      * apply epsilon0_eq_iff in H; simpl in H; subst; now left.
+      * right; auto.
+    + apply list_sig_proj1.
+  Defined.
+
+  Arguments epsilon0_cons : clear implicits.
+
+  Notation e0cons := epsilon0_cons.
+
+  Section epsilon0_rect.
+
+    Variables (P : epsilon0 → Type)
+              (HP : ∀ l ol, (∀o, o ∈ l → P o) → P (e0cons l ol)).
+
+    Theorem epsilon0_rect o : P o.
+    Proof.
+      destruct o as (h & H); revert h H.
+      induction h as [ l IHl ]; intros H.
+      generalize H.
+      apply eps0_fix in H as [ H1 H2 ].
+      Check fun h H => IHl h H (H2 _ H).
+      destruct (list_forall_reif _ _ H2) as (m & Hm).
+
+    case_eq (list_sig_list l); intros m Hm.
+    
 
 End epsilon0.
 
