@@ -246,6 +246,8 @@ Set Elimination Schemes.
 #[local] Notation "⟨ l ⟩" := (hydra_cons l).
 #[local] Notation "⨸" := ⟨[]⟩.  (* the head hydra *)
 
+Definition hydra_sons h := match h with ⟨l⟩ => l end.
+
 Fact hydra_cons_inj l m : ⟨l⟩ = ⟨m⟩ → l = m.
 Proof. now inversion 1. Qed.
 

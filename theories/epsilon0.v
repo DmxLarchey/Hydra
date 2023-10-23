@@ -883,6 +883,52 @@ Section epsilon0.
       * constructor; apply lex_list_app_head; auto.
   Qed.
 
+  Fact fseq_inv h n g :
+         fseq h n g → (∃ l, h = ⟨[⟨l++[⨸]⟩]⟩ ∧ g = ⟨repeat ⟨l⟩ n⟩)
+                    ∨ (∃ l h' g', h = ⟨[⟨l++[h']⟩]⟩ ∧ g = ⟨[g']⟩ ∧ olt ⨸ h' ∧ fseq ⟨l++[h']⟩ n g')
+                    ∨ (∃ l h' g', h = ⟨l++[h']⟩ ∧ g = ⟨l++g'⟩ ∧ l ≠ [] ∧ fseq ⟨[h']⟩ n ⟨g'⟩).
+  Proof. 
+    induction 1 as [ | l h n g H1 H2 _ | l h n g H1 H2 _ ]; eauto.
+    + right; left; exists l, h, g; eauto.
+    + right; right; exists l, h, g; eauto.
+  Qed.
+
+  Fact fseq_zero_inv l n g : fseq ⟨[⟨l++[⨸]⟩]⟩ n g → g = ⟨repeat ⟨l⟩ n⟩.
+  Proof.
+    intros [(l' & E1 & E2) | [ (l' & h' & g' & E1 & E2 & H1 & H2) | (l' & h' & g' & E1 & E2 & H1 & H2) ] ]%fseq_inv.
+    + now apply hydra_cons_inj, cons_inj in E1 as ((-> & _)%hydra_cons_inj%app_inj_tail & _).
+    + apply hydra_cons_inj, cons_inj in E1 as ((-> & <-)%hydra_cons_inj%app_inj_tail & _).
+      exfalso; revert H1; apply olt_irrefl.
+    + now apply hydra_cons_inj, (app_inj_tail []) in E1 as (<- & <-).
+  Qed.
+
+  Fact fseq_olt_inv l h n g : olt ⨸ h → fseq ⟨[⟨l++[h]⟩]⟩ n g → ∃g', g = ⟨[g']⟩ ∧ fseq ⟨l++[h]⟩ n g'.
+  Proof.
+    intros H0 [(l' & E1 & E2) | [ (l' & h' & g' & E1 & E2 & H1 & H2) | (l' & h' & g' & E1 & E2 & H1 & H2) ] ]%fseq_inv.
+    + apply hydra_cons_inj, cons_inj in E1 as ((-> & ->)%hydra_cons_inj%app_inj_tail & _).
+      exfalso; revert H0; apply olt_irrefl.
+    + exists g'; split; auto.
+      now apply hydra_cons_inj, cons_inj in E1 as ((-> & ->)%hydra_cons_inj%app_inj_tail & _).
+    + now apply hydra_cons_inj, (app_inj_tail []) in E1 as (<- & _).
+  Qed.
+
+  Fact fseq_seq_inv l h n g : l ≠ [] → fseq ⟨l++[h]⟩ n g → ∃g', g = ⟨l++g'⟩ ∧ fseq ⟨[h]⟩ n ⟨g'⟩.
+  Proof.
+    intros H0 [(l' & E1 & E2) | [ (l' & h' & g' & E1 & E2 & H1 & H2) | (l' & h' & g' & E1 & E2 & H1 & H2) ] ]%fseq_inv.
+    1,2: now apply hydra_cons_inj, (app_inj_tail _ []) in E1 as (-> & _).
+    apply hydra_cons_inj, app_inj_tail in E1 as (<- & <-); eauto.
+  Qed.
+
+  Lemma fseq_fun h n g1 g2 : fseq h n g1 → fseq h n g2 → g1 = g2.
+  Proof.
+    intros H1; revert H1 g2.
+    induction 1 as [ l n | l h n g H1 H2 IH2 | l h n g H1 H2 IH2 ].
+    + now intros ? ->%fseq_zero_inv.
+    + intros ? (g' & -> & ?)%fseq_olt_inv; auto.
+      do 2 f_equal; eauto.
+    + intros ? (g' & -> & ->%IH2%hydra_cons_inj)%fseq_seq_inv; auto.
+  Qed.
+
   Definition epsilon0 := sig eps0.
 
   Implicit Type (o : epsilon0).
@@ -931,15 +977,17 @@ Section epsilon0.
   Section olt_rect.
 
     Variables (P : hydra → Type)
-              (HP : forall h, eps0 h → (forall g, eps0 g → olt g h → P g) → P h).
+              (HP : ∀h, eps0 h → (∀g, eps0 g → olt g h → P g) → P h).
 
     Let Q o := P (proj1_sig o).
     Let HQ o : Q o.
     Proof.
-      induction o as [ [ h e ] IH ] using (well_founded_induction_type lt_epsilon0_wf); unfold Q; simpl.
+      induction o as [ [ h e ] IH ]
+        using (well_founded_induction_type lt_epsilon0_wf);
+        unfold Q; simpl.
       apply HP; auto.
-      intros g H1 H2.
-      apply (IH (exist _ g H1)); auto.
+      intros g H ?.
+      apply (IH (exist _ g H)); auto.
     Qed.
 
     Theorem olt_rect h : eps0 h → P h.
@@ -967,11 +1015,69 @@ Section epsilon0.
     + apply eps0_fix in H1 as (H1 & H4).
       destruct (IH ⟨[h]⟩) as ([g] & Hg); eauto.
       * apply eps0_fix; split; eauto.
-      * admit.
+      * constructor.
+        destruct m as [ | x m ]; [ easy | ].
+        simpl in H1; apply ordered_inv in H1.
+        assert (oge x h) as [ -> | H ].
+        1:{ apply clos_trans_ge; auto.
+            apply (ordered_from_clos_trans H1); eauto. }
+        - simpl; constructor 3.
+          destruct m; now constructor 1.
+        - now constructor 2.
       * easy.
-      * admit.
+      * apply eps0_limit_tail with (l := []); simpl; auto.
+        apply eps0_fix; split; eauto.
       * exists ⟨m++g⟩; constructor; auto.
-  Admitted.
+  Qed.
+
+  Section fund_seq.
+
+    Variables (h : hydra) (n : nat)
+              (e1 : eps0 h)
+              (e2 : h ≠ ⨸)
+              (e3 : eps0_limit h).
+
+    Definition fund_seq := proj1_sig (build_fseq n e1 e2 e3).
+
+    Local Fact fund_seq_spec : fseq h n fund_seq.
+    Proof. apply (proj2_sig _). Qed.
+
+    Fact fund_seq_eps0 : eps0 fund_seq.
+    Proof. now apply fseq_eps0 with (2 := fund_seq_spec). Qed.
+
+    Fact fund_seq_olt : olt fund_seq h.
+    Proof. now apply fseq_eps0 with (2 := fund_seq_spec). Qed.
+
+  End fund_seq.
+
+  Arguments fund_seq : clear implicits.
+
+  Fact fund_seq_fix_0 l n e1 e2 e3 :
+        fund_seq ⟨[⟨l++[⨸]⟩]⟩ n e1 e2 e3 = ⟨repeat ⟨l⟩ n⟩.
+  Proof.
+    apply fseq_fun with (1 := fund_seq_spec _ _ _ _); constructor.
+  Qed.
+
+  Fact fund_seq_fix_1 l h n e1 e2 e3 f1 f2 f3 :
+         olt ⨸ h
+       → fund_seq ⟨[⟨l++[h]⟩]⟩ n e1 e2 e3 = ⟨[fund_seq ⟨l++[h]⟩ n f1 f2 f3]⟩.
+  Proof.
+    intros H; apply fseq_fun with (1 := fund_seq_spec _ _ _ _); constructor; auto.
+    apply fund_seq_spec.
+  Qed.
+
+  Fact fund_seq_fix_2 l h n e1 e2 e3 f1 f2 f3 :
+         l ≠ []
+       → fund_seq ⟨l++[h]⟩ n e1 e2 e3 = ⟨l++hydra_sons (fund_seq ⟨[h]⟩ n f1 f2 f3)⟩.
+  Proof.
+    intros H; apply fseq_fun with (1 := fund_seq_spec _ _ _ _).
+    case_eq (fund_seq ⟨[h]⟩ n f1 f2 f3); intros g Hg; simpl.
+    constructor 3; auto.
+    rewrite <- Hg.
+    apply fund_seq_spec.
+  Qed.
+
+  (* We define the type of ordinals upto eps0 *)
 
   Definition epsilon0_cons l : ordered (ge lt_epsilon0) l → epsilon0.
   Proof.
