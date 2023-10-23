@@ -522,6 +522,9 @@ End repeat.
 Fact list_nil_choose X (l : list X) : (l = []) + (l <> []).
 Proof. destruct l; eauto; now right. Qed.
 
+Definition iter {X} (f : X → X) :=
+  fix loop n x := match n with 0 => x | S n => loop n (f x) end.
+
 Section epsilon0.
 
   Inductive olt : hydra → hydra → Prop :=
@@ -756,6 +759,11 @@ Section epsilon0.
     intros [H1 H2]; split; auto.
     intros ? [ | [<- | []]]%in_app_iff; auto.
   Qed.
+
+  Hint Resolve ordered_app_head : core.
+
+  Fact eps0_rem_tail l h : eps0 ⟨l++[h]⟩ → eps0 ⟨l⟩.
+  Proof. rewrite !eps0_fix; intros []; split; eauto. Qed.
 
   Fact oge_zero_dec h : { h = ⨸ } + { olt ⨸ h }.
   Proof.
@@ -1076,6 +1084,32 @@ Section epsilon0.
     rewrite <- Hg.
     apply fund_seq_spec.
   Qed.
+
+  Definition wainer h : eps0 h → nat → nat.
+  Proof.
+    induction 1 as [ [l] Hl IH ] using olt_rect; intros n.
+    destruct l as [ | l h _ ] using list_snoc_rect.
+    + exact (S n).
+    + assert (eps0 ⟨l⟩) as H1.
+      1: eapply eps0_rem_tail; eauto.
+      assert (⟨l⊣⊢[h]⟩ <> ⨸) as H2 by now destruct l.
+      destruct (oge_zero_dec h) as [ -> | H ] .
+      * assert (olt ⟨l⟩ ⟨l⊣⊢[⨸]⟩) as H4.
+        1:{ constructor.
+            rewrite (app_nil_end l) at 1.
+            apply lex_list_app_head.
+            constructor. }
+        specialize (IH _ H1 H4).
+        exact (iter IH n n).
+      * generalize (eps0_limit_tail _ Hl H); intros H3.
+        apply (IH (fund_seq _ n Hl H2 H3)).
+        - apply fund_seq_eps0.
+        - apply fund_seq_olt.
+        - exact n.
+  Qed.
+
+  Definition Wainer : epsilon0 → nat → nat.
+  Proof. intros (h & e); revert h e; apply wainer. Qed.
 
   (* We define the type of ordinals upto eps0 *)
 
