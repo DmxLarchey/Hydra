@@ -22,6 +22,54 @@ Arguments transitive {_}.
 #[local] Hint Resolve Acc_inv Acc_intro 
                       in_cons in_eq in_elt in_or_app : core.
 
+Definition iter {X} (f : X → X) :=
+  fix loop n x := match n with 0 => x | S n => loop n (f x) end.
+
+Section squash.
+
+  (* Squashing map a (strongly) decidable predicate into
+     an equivalent proof irrelevant one *)
+
+  Variables (P : Prop) (d : {P}+{~P}).
+
+  Definition squash := if d then True else False.
+
+  Fact squash_iff : squash ↔ P.
+  Proof. unfold squash; destruct d; tauto. Qed.
+
+  Fact squash_pirr : ∀ p1 p2 : squash, p1 = p2.
+  Proof. unfold squash; destruct d; now intros [] []. Qed.
+
+End squash.
+
+Notation ge R := (λ x y, x = y ∨ R y x).
+
+Section clos_trans.
+
+  Variables (X : Type).
+
+  Implicit Type (R : X → X → Prop).
+
+  Hint Constructors clos_refl_trans : core.
+
+  Fact clos_t_rt R x y z :
+       clos_trans R x y → clos_refl_trans R y z → clos_trans R x z.
+  Proof. induction 2; eauto. Qed.
+
+  Fact clos_trans_ge R : transitive R → ∀ x y, clos_trans (ge R) x y → ge R x y.
+  Proof. 
+    intros HR; red in HR.
+    induction 1 as [ ? ? [] | ? ? ? _ [] _ [] ]; subst; eauto.
+  Qed.
+
+  Fact clos_t_ge_rt R x y : clos_trans (ge R) x y → clos_refl_trans R y x.
+  Proof. induction 1 as [ ? ? [ <- | ] | ]; eauto. Qed.
+
+End clos_trans.
+
+Fact list_nil_choose X (l : list X) : {l = []} + {l ≠ []}.
+Proof. destruct l; eauto; now right. Qed.
+
 Fact list_fall_choose X (P Q : X → Prop) l :
         (∀x, x ∈ l → {P x} + {Q x})
       → { x | x ∈ l ∧ P x } + { ∀x, x ∈ l → Q x }.
@@ -31,7 +79,51 @@ Proof.
   + destruct (Hl x); eauto.
     destruct IHl as [ (? & []) | ]; eauto.
     right; intros ? [<- |]; eauto.
-Qed. 
+Qed.
+
+Fact list_snoc_rect {X} (P : list X → Type) :
+           P []
+         → (∀ l x, P l → P (l++[x]))
+         → ∀ l, P l.
+Proof.
+  intros H1 H2 l; revert P H1 H2.
+  induction l as [ | x l IHl ]; auto.
+  intros P H1 H2.
+  apply (IHl (fun l => P (x::l))).
+  + apply (H2 []), H1.
+  + intros ? ?; apply (H2 (_::_)).
+Qed.
+
+Section list_sig.
+
+  Variables (X : Type) (P : X → Prop).
+
+  Implicit Type (l : list (sig P)).
+
+  Fact list_sig_proj1 l : ∀x, x ∈ map (@proj1_sig _ _) l → P x.
+  Proof.
+    induction l as [ | [] ]; simpl; [ easy | ].
+    intros ? [ <- | ]; eauto.
+  Qed.
+
+  Definition list_sig_list l : { m | ∀x, x ∈ m → P x }.
+  Proof.
+    exists (map (@proj1_sig _ _) l).
+    apply list_sig_proj1.
+  Defined.
+
+  Fact list_forall_reif m : (∀x, x ∈ m → P x) → { l : list (sig P)| m = map (@proj1_sig _ _) l }.
+  Proof.
+    induction m as [ | x m IHm ]; intros Hm.
+    + exists []; auto.
+    + destruct IHm as (l & Hl); eauto.
+      eexists ((exist _ x _)::l); eauto.
+      simpl; f_equal; auto.
+      Unshelve.
+      eauto.
+  Qed.
+
+End list_sig.
 
 Inductive sdec {X} (R : X → X → Prop) : X → X → Type :=
   | sdec_lt x y : R x y → sdec R x y
@@ -146,6 +238,9 @@ Section ordered.
 
 End ordered.
 
+Fact ordered_from_ge_Acc X R (x : X) l : ordered_from (ge R) x l → Acc R x → ∀y, y ∈ l → Acc R y.
+Proof. induction 1 as [ | ? ? ? [ <- | ] ]; intros ? ? []; subst; eauto. Qed.
+
 Fact ordered_map X Y (f : X -> Y) R T :
          (forall a b, R a b <-> T (f a) (f b))
       -> forall l, ordered R l <-> ordered T (map f l).
@@ -158,6 +253,24 @@ Proof.
   1: split; constructor.
   now rewrite !ordered_from_inv_iff, E, IHl.
 Qed.
+
+Section repeat.
+
+  Variables (X : Type) (x : X).
+
+  Definition repeat :=
+    fix loop n := match n with 0 => [] | S n => x::loop n end.
+
+  Fact In_repeat n y : y ∈ repeat n → x = y.
+  Proof. induction n; simpl; intros []; auto. Qed.
+
+  Fact ordered_repeat R n : ordered (ge R) (repeat n).
+  Proof.
+    destruct n as [ | n ]; simpl; constructor.
+    induction n; simpl; constructor; eauto.
+  Qed.
+
+End repeat.
 
 Section lex_list.
 
@@ -201,6 +314,16 @@ Section lex_list.
 
   Fact lex_list_app_head c l m : lex_list l m → lex_list (c++l) (c++m).
   Proof. induction c; simpl; eauto. Qed.
+
+  Fact lex_list_prefix p l : l <> [] → lex_list p (p++l).
+  Proof. 
+    destruct l; [ easy | intros _ ].
+    rewrite (app_nil_end p) at 1.
+    apply lex_list_app_head; auto.
+  Qed.
+
+  Fact lex_list_snoc h l : lex_list l (l++[h]).
+  Proof. now apply lex_list_prefix. Qed.
 
   Section lex_list_total.
 
@@ -261,30 +384,28 @@ Proof. constructor; intros [] (? & []%lex_list_inv). Qed.
 
 #[local] Hint Resolve Acc_lex_list_nil : core.
 
-Notation ge R := (λ x y, x = y ∨ R y x).
+Section lex_list_sim.
 
+  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
+            (sim : X → Y → Prop)
+            (sim_fun : ∀ x y y', sim x y → sim x y' → y = y')
+            (Hsim : ∀ x y x' y', sim x y → sim x' y' → R x x' → T y y').
 
-Section clos_trans.
+  Hint Constructors lex_list : core.
 
-  Variables (X : Type).
-
-  Implicit Type (R : X → X → Prop).
-
-  Hint Constructors clos_refl_trans : core.
-
-  Fact clos_trans_ge R : transitive R → ∀ x y, clos_trans (ge R) x y → ge R x y.
-  Proof. 
-    intros HR; red in HR.
-    induction 1 as [ ? ? [] | ? ? ? _ [] _ [] ]; subst; eauto.
+  Theorem lex_list_sim l l' m m' :
+            Forall2 sim l m
+          → Forall2 sim l' m'
+          → lex_list R l l'
+          → lex_list T m m'.
+  Proof.
+    intros H1 H2 H3; revert H3 m m' H1 H2.
+    induction 1 as [ x l' | x x' l l' | x l l' ];
+      do 2 inversion 1; subst; eauto.
+    match goal with |- lex_list _ (?a::_) (?b::_) => assert (a=b) as ->; eauto end.
   Qed.
 
-  Fact clos_t_ge_rt R x y : clos_trans (ge R) x y → clos_refl_trans R y x.
-  Proof. induction 1 as [ ? ? [ <- | ] | ]; eauto. Qed.
-
-  Fact ordered_from_ge_Acc R x l : ordered_from (ge R) x l → Acc R x → ∀y, y ∈ l → Acc R y.
-  Proof. induction 1 as [ | ? ? ? [ <- | ] ]; intros ? ? []; subst; eauto. Qed.
-
-End clos_trans.
+End lex_list_sim. 
 
 Section lex_list_wf.
 
@@ -294,9 +415,9 @@ Section lex_list_wf.
 
   Hint Constructors ordered_from clos_refl_trans : core.
 
-  Hint Resolve ordered_from_clos_trans : core.
-
-  Hint Resolve clos_t_ge_rt clos_rt_t ordered_cons_inv : core.
+  Hint Resolve ordered_from_clos_trans
+               clos_t_ge_rt clos_rt_t 
+               ordered_cons_inv : core.
 
   Fact ordered_lex_list_lo l m : ordered (ge R) l → lex_list R l m → lo (clos_trans R) l m.
   Proof.
@@ -342,6 +463,8 @@ Section lex_list_wf.
 
   Hint Resolve ordered_lex_list_lo_restr : core.
 
+  (*
+
   Lemma lex_list_Acc_ordered_from_restr P x l :
              Acc (λ x y, P x ∧ R x y) x
            → Forall P l
@@ -365,6 +488,8 @@ Section lex_list_wf.
         intros []%Forall_cons_iff; constructor; eauto; tauto.
   Admitted.
 
+  *)
+
   Theorem lex_list_Acc_ordered l : Forall (Acc R) l → ordered (ge R) l → Acc (λ l m, ordered (ge R) l ∧ lex_list R l m) l.
   Proof.
     intros H1 H2; revert H2 H1.
@@ -372,6 +497,8 @@ Section lex_list_wf.
     apply lex_list_Acc_ordered_from with x; eauto.
     eapply Forall_forall; eauto.
   Qed.
+ 
+  (*
 
   Theorem lex_list_Acc_ordered_restr P l :
            Forall P l 
@@ -384,6 +511,8 @@ Section lex_list_wf.
     apply lex_list_Acc_ordered_from_restr with x; eauto.
     eapply Forall_forall; eauto.
   Qed.
+
+  *)
 
 End lex_list_wf.
 
@@ -437,93 +566,6 @@ Section mono.
   Proof. intro; apply clos_trans_mono; eauto. Qed.
 
 End mono.
-
-Section squash.
-
-  (* Squashing map a (strongly) decidable predicate into
-     an equivalent proof irrelevant one *)
-
-  Variables (P : Prop) (d : {P}+{~P}).
-
-  Definition squash := if d then True else False.
-
-  Fact squash_iff : squash ↔ P.
-  Proof. unfold squash; destruct d; tauto. Qed.
-
-  Fact squash_pirr : ∀ p1 p2 : squash, p1 = p2.
-  Proof. unfold squash; destruct d; now intros [] []. Qed.
-
-End squash.
-
-Section list_sig.
-
-  Variables (X : Type) (P : X → Prop).
-
-  Fact list_sig_proj1 (l : list (sig P)) :
-        ∀x, x ∈ map (@proj1_sig _ _) l → P x.
-  Proof.
-    induction l as [ | [] ]; simpl; [ easy | ].
-    intros ? [ <- | ]; eauto.
-  Qed.
-
-  Definition list_sig_list : list (sig P) → { l | ∀x, x ∈ l → P x }.
-  Proof.
-    intros l.
-    exists (map (@proj1_sig _ _) l).
-    apply list_sig_proj1.
-  Defined.
-
-  Fact list_forall_reif l : (∀x, x ∈ l → P x) → { m : list (sig P) | l = map (@proj1_sig _ _) m }.
-  Proof.
-    induction l as [ | x l IHl ]; intros Hl.
-    + exists []; auto.
-    + destruct IHl as (m & Hm); eauto.
-      assert (P x) as Hx by eauto.
-      exists ((exist _ x Hx)::m); simpl; f_equal; auto.
-  Qed.
-
-End list_sig.
-
-Theorem list_snoc_rect {X} (P : list X → Type) :
-           P []
-         → (∀ l x, P l → P (l++[x]))
-         → ∀ l, P l.
-Proof.
-  intros H1 H2 l; revert P H1 H2.
-  induction l as [ | x l IHl ]; auto.
-  intros P H1 H2.
-  apply (IHl (fun l => P (x::l))).
-  + apply (H2 []), H1.
-  + intros ? ?; apply (H2 (_::_)).
-Qed.
-
-Fact clos_t_rt X (R : X → X → Prop) x y z :
-       clos_trans R x y → clos_refl_trans R y z → clos_trans R x z.
-Proof. induction 2; eauto. Qed.
-
-Section repeat.
-
-  Variables (X : Type) (x : X).
-
-  Definition repeat :=
-    fix loop n := match n with 0 => [] | S n => x::loop n end.
-
-  Fact In_repeat n y : y ∈ repeat n → x = y.
-  Proof. induction n; simpl; intros []; auto. Qed.
-
-  Fact ordered_repeat R n : ordered (ge R) (repeat n).
-  Proof.
-    destruct n as [ | n ]; simpl; constructor.
-    induction n; simpl; constructor; eauto.
-  Qed.
-
-End repeat.
-
-Fact list_nil_choose X (l : list X) : (l = []) + (l <> []).
-Proof. destruct l; eauto; now right. Qed.
-
-Definition iter {X} (f : X → X) :=
-  fix loop n x := match n with 0 => x | S n => loop n (f x) end.
 
 Section epsilon0.
 
@@ -630,6 +672,8 @@ Section epsilon0.
     intros; apply eps0_iff, H2; auto.
   Qed.
 
+  (*
+
   (* This proof relies on llt_Acc_ordered_restr which is not proved yet
      There is completed an indirect proof below *)
   Lemma olt_eps0_wf h : eps0 h → Acc (λ s t, eps0 s ∧ olt s t) h.
@@ -644,6 +688,8 @@ Section epsilon0.
       apply IHm; auto.
       rewrite Forall_forall; auto.
   Qed.
+
+  *)
 
   Hint Resolve ordered_cons_inv lpo_trans : core.
   Hint Constructors clos_refl_trans : core.
@@ -771,6 +817,8 @@ Section epsilon0.
     right; do 2 constructor.
   Qed.
 
+  Hint Resolve lex_list_prefix lex_list_snoc : core.
+
   Lemma lex_list_olt_tail l m x y :
            olt x y 
          → ordered oge m⊣⊢[y]
@@ -781,7 +829,8 @@ Section epsilon0.
     + destruct q as [ | q z _ ] using list_snoc_rect; [ easy | clear H5 ].
       rewrite <- app_ass in H6.
       apply app_inj_tail in H6 as (-> & <-).
-      rewrite app_ass in H2 |- *; apply lex_list_app_head.
+      rewrite app_ass in H2 |- *. 
+      apply lex_list_app_head.
       apply ordered_app_tail in H2.
       destruct q as [ | z q ]; constructor 2; auto.
       simpl in H2; apply ordered_inv in H2.
@@ -792,6 +841,55 @@ Section epsilon0.
     + rewrite H6, !app_ass.
       apply lex_list_app_head.
       now constructor 2.
+  Qed.
+
+  Lemma olt_inv_snoc_right g m h : 
+           olt g ⟨m++[h]⟩ 
+        → (∃ c x y p q, olt x y ∧ g = ⟨c++[x]++p⟩ ∧ m = c++[y]++q)
+        ∨ (∃ x p, olt x h ∧ g = ⟨m++[x]++p⟩)
+        ∨ (∃ p q, g = ⟨p⟩ ∧ m = p++q).
+  Proof.
+    destruct g as [l]; intros [(k & H1 & H2)| (c & x & y & p & q & H1 & H2 & H3)]%olt_inv%lex_list_invert.
+    + destruct k as [ | k y _ ] using list_snoc_rect; [ easy | clear H1 ].
+      rewrite <- app_ass in H2.
+      apply app_inj_tail in H2 as (-> & <-).
+      right; eauto.
+    + destruct q as [ | q z _ ] using list_snoc_rect.
+      * rewrite <- app_nil_end in H2.
+        apply app_inj_tail in H2 as (<- & <-); subst l.
+        right; left; eauto.
+      * rewrite <- !app_ass in H2.
+        apply app_inj_tail in H2 as (H2 & <-).
+        rewrite app_ass in H2; subst.
+        left; exists c, x, y, p, q; auto.
+   Qed.
+
+  Corollary olt_succ_inv g l : olt g ⟨l++[⨸]⟩ → g = ⟨l⟩ ∨ olt g ⟨l⟩.
+  Proof.
+    intros [ (c & x & y & p & q & H1 & H2 & H3) 
+        |[ (x & p & H1 & H2)
+         | (p & q & H1 & H2) ] ]%olt_inv_snoc_right.
+    + subst; right; constructor.
+      apply lex_list_app_head; constructor 2; auto.
+    + now apply zero_smallest' in H1.
+    + subst; destruct q; [ left | right ].
+      * now rewrite <- app_nil_end.
+      * constructor.
+        now apply lex_list_prefix.
+  Qed.
+
+  Lemma olt_inv_single_right g h : 
+          olt g ⟨[h]⟩ 
+        → g = ⨸ ∨ ∃ x p, olt x h ∧ g = ⟨[x]++p⟩.
+  Proof.
+    intros H.
+    apply olt_inv_snoc_right with (m := []) in H
+      as [ (c & x & y & p & q & _ & _ & H) 
+        |[ (x & p & H1 & H2)
+         | (p & q & H1 & H2) ] ].
+    + now destruct c.
+    + subst; right; simpl; eauto.
+    + left; subst; now destruct p.
   Qed.
 
   (** Every ordinal is either a successor, 
@@ -823,9 +921,6 @@ Section epsilon0.
     intros H1 H2.
     destruct (@olt_irrefl ⟨l⊣⊢[⨸]⟩).
     apply H2 with (p := ⟨l⟩); auto.
-    constructor.
-    rewrite (app_nil_end l) at 1.
-    apply lex_list_app_head; constructor.
   Qed.
 
   Fact eps0_limit_iff h : eps0 h → eps0_limit h → h ≠ ⨸ → { l : _ & { g | h = ⟨l++[g]⟩ /\ olt ⨸ g } }.
@@ -865,9 +960,7 @@ Section epsilon0.
       * simpl; constructor.
         destruct n as [ | n]; simpl.
         - constructor.
-        - constructor 2; constructor.
-          rewrite (app_nil_end l) at 1.
-          apply lex_list_app_head; constructor.
+        - constructor 2; constructor; eauto.
     + destruct IH2 as (H5 & H6); eauto.
       rewrite eps0_fix; split; [ split | ].
       * repeat constructor.
@@ -937,6 +1030,69 @@ Section epsilon0.
     + intros ? (g' & -> & ->%IH2%hydra_cons_inj)%fseq_seq_inv; auto.
   Qed.
 
+  (* The "set" P intersects ]g,h[ for any g < h, ie P is as close
+     to h as one could wish *)
+  Definition is_limit (P : hydra → Prop) h :=
+    forall g, eps0 g → olt g h → exists u, P u ∧ olt g u ∧ olt u h.
+
+  Lemma olt_repeat_snoc l n h : olt ⟨repeat ⟨l⟩ n⟩ ⟨[⟨l++[h]⟩]⟩.
+  Proof. 
+    constructor; destruct n as [ | n ]; simpl.
+    + constructor.
+    + constructor 2; constructor; auto.
+  Qed.
+
+  Hint Resolve olt_repeat_snoc : core.
+
+  Fact ordered_from_oge_olt x l y : oge y x -> ordered_from oge x l -> olt ⟨x::l⟩ ⟨repeat y (2+length l)⟩.
+  Proof.
+    intros [ -> | H ] G; constructor; revert G.
+    + induction 1 as [ | x y l [ <- | H ] ]; simpl.
+      * constructor 3; constructor.
+      * constructor 3; auto.
+      * constructor 3; constructor 2; auto.
+    + constructor 2; auto.
+  Qed.
+
+  Lemma is_limit_repeat l : ordered oge l → is_limit (fun u => exists n, u = ⟨repeat ⟨l⟩ n⟩) ⟨[⟨l++[⨸]⟩]⟩.
+  Proof.
+    intros ol h.
+    induction 1 as [ m E1 E2 _ ] using eps0_rect.
+    intros [(k & H1 & H2)| (c & x & y & p & q & H1 & H2 & H3)]%olt_inv%lex_list_invert.
+    + destruct k as [ | k g _ ] using list_snoc_rect; [ easy | clear H1 ].
+      rewrite <- app_ass in H2.
+      apply app_inj_tail with (x := []) in H2 as (H2 & <-).
+      destruct m; [ | easy ]; simpl in H2; subst.
+      exists ⟨repeat ⟨l⟩ 1⟩; repeat split; eauto; simpl; repeat constructor; auto.
+    + destruct c as [ | ? [ | ? [] ] ]; try easy.
+      apply cons_inj in H2 as (<- & <-); simpl in H1; subst m.
+      destruct x as [m].
+      apply olt_inv in H3 as [(q & H3 & H4)|(c & x & y & u & v & H4 & H5 & H6)]%lex_list_invert.
+      * destruct q as [ | q g _ ] using list_snoc_rect; [ easy | clear H3 ].
+        rewrite <- app_ass in H4.
+        apply app_inj_tail in H4 as (-> & <-).
+        apply ordered_inv in E1.
+        exists ⟨repeat ⟨m++q⟩ (2+length p)⟩; split; eauto.
+        split; auto.
+        apply ordered_from_oge_olt; auto.
+        destruct q; [ left | right ].
+        1: now rewrite <- app_nil_end.
+        constructor; auto.
+        now apply lex_list_prefix.
+      * destruct v as [ | v' ? _ ] using list_snoc_rect.
+        - rewrite <- app_nil_end in H5.
+          apply app_inj_tail in H5 as (<- & <-); subst.
+          apply zero_smallest' in H6 as [].
+        - rewrite <- !app_ass in H5.
+          apply app_inj_tail in H5 as (H5 & <-).
+          rewrite app_ass in H5.
+          exists ⟨repeat ⟨l⟩ 1⟩; split; eauto. 
+          split; auto; simpl.
+          constructor; constructor 2; subst.
+          constructor; apply lex_list_app_head.
+          constructor 2; auto.
+  Qed.
+
   Definition epsilon0 := sig eps0.
 
   Implicit Type (o : epsilon0).
@@ -982,7 +1138,13 @@ Section epsilon0.
       exact wf_lpo.
   Qed.
 
-  Section olt_rect.
+  (* Transfinite induction principle for epsilon0 *)
+  Definition epsilon0_trans_rect (P : epsilon0 → Type) :
+              (∀o, (∀o', lt0 o' o → P o') → P o)
+             → ∀o, P o.
+  Proof. exact (well_founded_induction_type lt_epsilon0_wf P). Qed.
+
+  Section eps0_trans_rect.
 
     Variables (P : hydra → Type)
               (HP : ∀h, eps0 h → (∀g, eps0 g → olt g h → P g) → P h).
@@ -990,53 +1152,130 @@ Section epsilon0.
     Let Q o := P (proj1_sig o).
     Let HQ o : Q o.
     Proof.
-      induction o as [ [ h e ] IH ]
-        using (well_founded_induction_type lt_epsilon0_wf);
+      induction o as [ [ h e ] IH ] using epsilon0_trans_rect;
         unfold Q; simpl.
       apply HP; auto.
       intros g H ?.
       apply (IH (exist _ g H)); auto.
     Qed.
 
-    Theorem olt_rect h : eps0 h → P h.
+    Theorem eps0_trans_rect h : eps0 h → P h.
     Proof. intros H; apply (HQ (exist _ _ H)). Qed.
 
-  End olt_rect.
+  End eps0_trans_rect.
+
+  Section fseq_special_rect.
+
+    Variables (P : hydra -> Type)
+              (HP0 : forall l, eps0 ⟨l⊣⊢[⨸]⟩ -> P ⟨[⟨l⊣⊢[⨸]⟩]⟩)
+              (HP1 : forall l h, eps0 ⟨l⊣⊢[h]⟩ -> olt ⨸ h -> P ⟨l⊣⊢[h]⟩ -> P ⟨[⟨l⊣⊢[h]⟩]⟩)
+              (HP2 : forall l h, eps0 ⟨l⊣⊢[h]⟩ -> olt ⨸ h -> l <> [] -> P ⟨[h]⟩ -> P ⟨l⊣⊢[h]⟩).
+
+    Theorem fseq_special_rect h : eps0 h → h ≠ ⨸ → eps0_limit h → P h.
+    Proof.
+      induction 1 as [ [l] H1 IH ] using eps0_trans_rect; intros H2 H3.
+      destruct (eps0_limit_iff H1 H3 H2) as (m & h & H4 & H5).
+      inversion H4; subst l; clear H4.
+      destruct (list_nil_choose m) as [ -> | Hm ]; simpl.
+      + destruct h as [ l ].
+        destruct l as [ | l h _ ] using list_snoc_rect.
+        * apply olt_irrefl in H5 as [].
+        * destruct (oge_zero_dec h) as [ -> | H6 ].
+          - apply HP0.
+            simpl in H1; apply eps0_fix in H1 as []; eauto.
+          - simpl in H1; apply eps0_fix in H1 as []; eauto.
+            apply HP1; eauto.
+            apply IH; eauto.
+            ++ simpl in *; auto.
+               apply olt_power; auto.
+            ++ intros ?%hydra_cons_inj; now destruct l.
+      + apply HP2; eauto.
+        apply eps0_fix in H1 as (H1 & H4).
+        apply IH; eauto.
+        * apply eps0_fix; auto.
+        * constructor.
+          destruct m as [ | x m ]; [ easy | ].
+          simpl in H1; apply ordered_inv in H1.
+          assert (oge x h) as [ -> | H ].
+          1:{ apply clos_trans_ge; auto.
+              apply (ordered_from_clos_trans H1); eauto. }
+          - simpl; constructor 3.
+            destruct m; now constructor 1.
+          - now constructor 2.
+        * easy.
+        * apply eps0_limit_tail with (l := []); simpl; auto.
+          apply eps0_fix; split; eauto.
+    Qed.
+
+  End fseq_special_rect.
 
   Definition build_fseq h n : eps0 h → h ≠ ⨸ → eps0_limit h → sig (fseq h n).
   Proof.
-    induction 1 as [ [l] H1 IH ] using olt_rect; intros H2 H3.
-    destruct (eps0_limit_iff H1 H3 H2) as (m & h & H4 & H5).
-    inversion H4; subst l; clear H4. 
-    destruct (list_nil_choose m) as [ -> | Hm ]; simpl.
-    + destruct h as [ l ].
-      destruct l as [ | l h _ ] using list_snoc_rect.
-      * apply eps0_succ_not_limit in H3 as [].
-        apply eps0_zero.
-      * destruct (oge_zero_dec h) as [ -> | H6 ].
-        - exists ⟨repeat ⟨l⟩ n⟩; constructor.
-        - simpl in H1; apply eps0_fix in H1 as [H0 H1].
-          destruct (IH ⟨l++[h]⟩) as (g & Hg); auto.
-          ++ simpl; apply olt_power; auto.
-          ++ now destruct l.
-          ++ exists ⟨[g]⟩; now constructor.
-    + apply eps0_fix in H1 as (H1 & H4).
-      destruct (IH ⟨[h]⟩) as ([g] & Hg); eauto.
-      * apply eps0_fix; split; eauto.
-      * constructor.
-        destruct m as [ | x m ]; [ easy | ].
-        simpl in H1; apply ordered_inv in H1.
-        assert (oge x h) as [ -> | H ].
-        1:{ apply clos_trans_ge; auto.
-            apply (ordered_from_clos_trans H1); eauto. }
-        - simpl; constructor 3.
-          destruct m; now constructor 1.
-        - now constructor 2.
-      * easy.
-      * apply eps0_limit_tail with (l := []); simpl; auto.
-        apply eps0_fix; split; eauto.
-      * exists ⟨m++g⟩; constructor; auto.
+    revert h.
+    apply fseq_special_rect.
+    + intros l ?; exists ⟨repeat ⟨l⟩ n⟩; constructor.
+    + intros ? ? ? ? (g & ?); exists ⟨[g]⟩; now constructor.
+    + intros l ? ? ? ? ([g] & ?); exists ⟨l++g⟩; constructor; auto.
   Qed.
+
+  (* The fundamental sequence of a limit ordinal has this ordinal for limit *) 
+  Theorem is_limit_fseq h : eps0 h → h ≠ ⨸ → eps0_limit h → is_limit (λ g, ∃n, fseq h n g)  h.
+  Proof.
+    revert h; apply fseq_special_rect.
+    + intros l Hl h H1 H2.
+      apply olt_inv_single_right in H2 as [ -> | (g & m & H2 & ->) ].
+      * exists ⟨repeat ⟨l⟩ 1⟩; split; [ | split; auto ].
+        - exists 1; constructor.
+        - simpl; repeat constructor.
+      * apply olt_succ_inv in H2 as [ -> | H2 ].
+        - exists ⟨repeat ⟨l⟩ (2+length m)⟩; split; [ | split; auto ].
+          ++ exists (2+length m); constructor.
+          ++ apply ordered_from_oge_olt.
+             ** left; auto.
+             ** now apply eps0_fix in H1 as (H1%ordered_inv & _).
+        - exists ⟨repeat ⟨l⟩ 1⟩; split; [ | split; auto ].
+          ++ exists 1; constructor.
+          ++ simpl; repeat constructor; auto.
+    + intros l h H1 H2 H3 g G1 G2.
+      apply olt_inv_single_right in G2 as [ -> | (k & m & G2 & ->) ].
+      * destruct (H3 ⨸) as (g & (n & Eg) & E2 & E3); eauto.
+        - constructor; destruct l; constructor.
+        - exists ⟨[g]⟩; repeat split.
+          ++ exists n; constructor 2; auto.
+          ++ constructor.
+          ++ constructor 2; auto.
+      * destruct H3 with (2 := G2) as (g & (n & Eg) & E2 & E3); eauto.
+        - apply eps0_fix in G1 as []; eauto.
+        - exists ⟨[g]⟩; repeat split.
+          ++ exists n; constructor; auto.
+          ++ constructor 2; auto.
+          ++ constructor 2; auto.
+    + intros l h H1 H2 H3 H4 g G1 G2.
+      apply olt_inv_snoc_right in G2
+       as [ (c & x & y & p & q & G2 & G3 & G4)
+         |[ (x & p & G2 & ->) 
+          | G2 ] ].
+      * destruct (H4 ⨸) as ([k] & (n & En) & E2 & E3); eauto.
+        - repeat constructor.
+        - exists ⟨l⊣⊢k⟩; repeat split.
+          ++ exists n; constructor; auto.
+          ++ subst; constructor.
+             rewrite !app_ass.
+             apply lex_list_app_head; constructor 2; auto.
+          ++ apply olt_inv in E3.
+             now apply lex_list_app_head.
+      * destruct (H4 ⟨[x]⟩) as ([k] & (n & En) & E2 & E3); eauto.
+        - apply eps0_fix in G1 as [G1 G3]; apply eps0_fix; split; eauto.
+          intros ? ?; apply G3; eauto.
+        - constructor; constructor 2; auto.
+        - exists ⟨l⊣⊢k⟩; repeat split.
+          ** exists n; constructor; auto.
+          ** apply lex_list_app_head.
+             apply olt_inv in E2.
+             admit.
+  Admitted.
+
+
 
   Section fund_seq.
 
@@ -1087,7 +1326,7 @@ Section epsilon0.
 
   Definition wainer h : eps0 h → nat → nat.
   Proof.
-    induction 1 as [ [l] Hl IH ] using olt_rect; intros n.
+    induction 1 as [ [l] Hl IH ] using eps0_trans_rect; intros n.
     destruct l as [ | l h _ ] using list_snoc_rect.
     + exact (S n).
     + assert (eps0 ⟨l⟩) as H1.
@@ -1113,30 +1352,54 @@ Section epsilon0.
 
   (* We define the type of ordinals upto eps0 *)
 
-  Definition epsilon0_cons l : ordered (ge lt_epsilon0) l → epsilon0.
+  Local Fact epsilon0_cons_spec l : ordered (ge lt_epsilon0) l → eps0 ⟨map (@proj1_sig _ _) l⟩.
   Proof.
     intros Hl.
-    exists ⟨map (@proj1_sig _ _) l⟩.
     apply eps0_fix; split.
     + induction Hl as [ | x l Hxl ]; simpl; constructor.
       induction Hxl as [ | [] [] l []]; simpl in *; constructor; auto.
       * apply epsilon0_eq_iff in H; simpl in H; subst; now left.
       * right; auto.
     + apply list_sig_proj1.
+  Qed.
+
+  Definition epsilon0_cons l : ordered (ge lt_epsilon0) l → epsilon0.
+  Proof. 
+    exists ⟨map (@proj1_sig _ _) l⟩.
+    now apply epsilon0_cons_spec.
   Defined.
 
   Arguments epsilon0_cons : clear implicits.
 
   Notation e0cons := epsilon0_cons.
 
+  Fact lt0_cons_iff l l' ol ol' : lt0 (e0cons l ol) (e0cons l' ol') ↔ lex_list lt0 l l'.
+  Proof.
+    unfold e0cons, lt0; simpl.
+    rewrite olt_inv.
+    split.
+    + apply lex_list_sim with (sim := fun x y => x = proj1_sig y).
+      * intros ? ? ? ->; apply epsilon0_eq_iff.
+      * intros; subst; auto.
+      * clear l' ol ol'; induction l as [  | [] ? ?]; simpl; constructor; auto.
+      * clear l ol ol'; induction l' as [  | [] ? ?]; simpl; constructor; auto.
+    + apply lex_list_sim with (sim := fun x y => proj1_sig x = y).
+      * intros; subst; auto.
+      * intros; subst; auto.
+      * clear l' ol ol'; induction l as [  | [] ? ?]; simpl; constructor; auto.
+      * clear l ol ol'; induction l' as [  | [] ? ?]; simpl; constructor; auto.
+  Qed.
+
   Section epsilon0_rect.
+
+    (* Structural induction principle for epislon0 *)
 
     Variables (P : epsilon0 → Type)
               (HP : ∀ l ol, (∀o, o ∈ l → P o) → P (e0cons l ol)).
 
     Theorem epsilon0_rect o : P o.
     Proof.
-      induction o as [ ([l] & H) IH ] using (well_founded_induction_type lt_epsilon0_wf).
+      induction o as [ ([l] & H) IH ] using epsilon0_trans_rect.
       revert IH; generalize H.
       apply eps0_fix in H as (H1 & H2).
       destruct list_forall_reif with (1 := H2) as (m & Hm).
@@ -1156,6 +1419,11 @@ Section epsilon0.
     Qed.
 
   End epsilon0_rect.
+
+
+  Check lt0.
+    Search map proj1_sig.
+    Search lex_list.
 
 End epsilon0.
 
