@@ -2,4 +2,6 @@
 
 hydra.v
 Hydra.v
+ordered.v
+lex_list.v
 epsilon0.v
