@@ -516,9 +516,6 @@ Section epsilon0.
   Hint Constructors fseq_shape : core.
 
   Fact fseq_inv h n g : fseq h n g → fseq_shape n h g.
-   (*      fseq h n g → (∃ l, h = ⟨[⟨l++[⨸]⟩]⟩ ∧ g = ⟨repeat ⟨l⟩ n⟩)
-                    ∨ (∃ l h' g', h = ⟨[⟨l++[h']⟩]⟩ ∧ g = ⟨[g']⟩ ∧ olt ⨸ h' ∧ fseq ⟨l++[h']⟩ n g')
-                    ∨ (∃ l h' g', h = ⟨l++[h']⟩ ∧ g = ⟨l++g'⟩ ∧ l ≠ [] ∧ fseq ⟨[h']⟩ n ⟨g'⟩). *)
   Proof. induction 1; eauto. Qed.
 
   Fact fseq_zero_inv l n g : fseq ⟨[⟨l++[⨸]⟩]⟩ n g → g = ⟨repeat ⟨l⟩ n⟩.
@@ -548,27 +545,23 @@ Section epsilon0.
     intros [-> ->]%hydra_cons_inj%app_inj_tail; eauto.
   Qed.
 
-  Lemma fseq_fun h n g1 g2 : fseq h n g1 → fseq h n g2 → g1 = g2.
+  Lemma fseq_fun h n g₁ g₂ : fseq h n g₁ → fseq h n g₂ → g₁ = g₂.
   Proof.
-    intros H1; revert H1 g2.
+    intros H1; revert H1 g₂.
     induction 1 as [ l n | l h n g H1 H2 IH2 | l h n g H1 H2 IH2 ].
     + now intros ? ->%fseq_zero_inv.
-    + intros ? (g' & -> & ?)%fseq_olt_inv; auto.
+    + intros ? (? & -> & ?)%fseq_olt_inv; auto.
       do 2 f_equal; eauto.
-    + intros ? (g' & -> & ->%IH2%hydra_cons_inj)%fseq_seq_inv; auto.
+    + intros ? (? & -> & ->%IH2%hydra_cons_inj)%fseq_seq_inv; auto.
   Qed.
 
   (* The "set" P intersects ]g,h[ for any g < h, ie P is as close
      to h as one could wish *)
   Definition is_limit (P : hydra → Prop) h :=
-    forall g, eps0 g → olt g h → exists u, P u ∧ olt g u ∧ olt u h.
+    ∀g, eps0 g → olt g h → ∃u, P u ∧ olt g u ∧ olt u h.
 
   Lemma olt_repeat_snoc l n h : olt ⟨repeat ⟨l⟩ n⟩ ⟨[⟨l++[h]⟩]⟩.
-  Proof. 
-    constructor; destruct n as [ | n ]; simpl.
-    + constructor.
-    + constructor 2; constructor; auto.
-  Qed.
+  Proof. constructor; destruct n; simpl; eauto. Qed.
 
   Fact ordered_from_oge_olt x l y : oge y x -> ordered_from oge x l -> olt ⟨x::l⟩ ⟨repeat y (2+length l)⟩.
   Proof.
@@ -717,6 +710,7 @@ Section epsilon0.
 
   End fseq_special_rect.
 
+  (* The fundemental sequence can be computed in Coq *)
   Local Lemma compute_fseq h n : eps0 h → h ≠ ⨸ → eps0_limit h → sig (fseq h n).
   Proof.
     revert h; apply fseq_special_rect.
@@ -812,8 +806,7 @@ Section epsilon0.
   Arguments fund_seq : clear implicits.
 
   Fact fund_seq_pirr h n e1 f1 e2 f2 e3 f3 :
-           fund_seq h n e1 e2 e3
-         = fund_seq h n f1 f2 f3.
+           fund_seq h n e1 e2 e3 = fund_seq h n f1 f2 f3.
   Proof. apply fseq_fun with h n; apply fund_seq_spec. Qed.
 
   Fact fund_sec_olt_inc h n e1 e2 e3 :
@@ -960,13 +953,13 @@ Section epsilon0.
     + apply lex_list_sim with (sim := fun x y => x = proj1_sig y).
       * intros ? ? ? ->; apply epsilon0_eq_iff.
       * intros; subst; auto.
-      * clear l' ol ol'; induction l as [  | [] ? ?]; simpl; constructor; auto.
-      * clear l ol ol'; induction l' as [  | [] ? ?]; simpl; constructor; auto.
+      * clear l' ol ol'; induction l as [|[]]; simpl; constructor; auto.
+      * clear l ol ol'; induction l' as [|[]]; simpl; constructor; auto.
     + apply lex_list_sim with (sim := fun x y => proj1_sig x = y).
       * intros; subst; auto.
       * intros; subst; auto.
-      * clear l' ol ol'; induction l as [  | [] ? ?]; simpl; constructor; auto.
-      * clear l ol ol'; induction l' as [  | [] ? ?]; simpl; constructor; auto.
+      * clear l' ol ol'; induction l as [|[]]; simpl; constructor; auto.
+      * clear l ol ol'; induction l' as [|[]]; simpl; constructor; auto.
   Qed.
 
   Section epsilon0_rect.
