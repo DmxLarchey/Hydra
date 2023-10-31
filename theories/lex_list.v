@@ -63,10 +63,10 @@ Proof.
   + intros ? ?; apply (H2 (_::_)).
 Qed.
 
-Inductive list_snoc_inv_t X : list X → Type :=
-  | in_list_snoc_inv_t l x : list_snoc_inv_t (l++[x]).
+Inductive list_snoc_inv_shape X : list X → Type :=
+  | in_list_snoc_inv_shape l x : list_snoc_inv_shape (l++[x]).
 
-Fact list_snoc_inv X (l : list X) : l ≠ [] → list_snoc_inv_t l.
+Fact list_snoc_inv X (l : list X) : l ≠ [] → list_snoc_inv_shape l.
 Proof.
   destruct l as [ | l x ] using list_snoc_rect.
   + now intros [].
@@ -85,18 +85,38 @@ Section lex_list.
 
   Hint Constructors lex_list : core.
 
-  Inductive lex_list_inv_t l m : X → X → Prop :=
-    | in_lex_list_inv_t0 x y : R x y → lex_list_inv_t l m x y
-    | in_lex_list_inv_t1 x : lex_list l m → lex_list_inv_t l m x x.
+  (* introduction lemmas *)
 
-  Hint Constructors lex_list_inv_t : core.
+  Fact lex_list_app_head c l m : lex_list l m → lex_list (c++l) (c++m).
+  Proof. induction c; simpl; eauto. Qed.
+
+  Hint Resolve lex_list_app_head : core.
+
+  Fact lex_list_prefix' p x l : lex_list p (p++x::l).
+  Proof. rewrite (app_nil_end p) at 1; auto. Qed.
+
+  Hint Resolve lex_list_prefix' : core.
+
+  Fact lex_list_prefix p l : l <> [] → lex_list p (p++l).
+  Proof. destruct l; [ easy | auto ]. Qed. 
+
+  Fact lex_list_snoc h l : lex_list l (l++[h]).
+  Proof. now apply lex_list_prefix. Qed.
+
+  (* inversion lemmas *)
+
+  Inductive lex_list_inv_shape l m : X → X → Prop :=
+    | in_lex_list_inv_shape0 x y : R x y → lex_list_inv_shape l m x y
+    | in_lex_list_inv_shape1 x : lex_list l m → lex_list_inv_shape l m x x.
+
+  Hint Constructors lex_list_inv_shape : core.
 
   Fact lex_list_inv l m :
          lex_list l m 
        ↔ match l, m with 
          | _, []      => False
          | [], _      => True
-         | x::l, y::m => lex_list_inv_t l m x y
+         | x::l, y::m => lex_list_inv_shape l m x y
          end.
   Proof. 
     split.
@@ -104,13 +124,13 @@ Section lex_list.
     + revert l m; intros [] [] []; eauto.
   Qed.
 
-  Inductive lex_list_invert_t : list X → list X → Prop :=
-    | in_lex_list_invert_t0 k l : k ≠ [] → lex_list_invert_t l (l++k)
-    | in_lex_list_invert_t1 p x y l m : R x y → lex_list_invert_t (p++[x]++l) (p++[y]++m).
+  Inductive lex_list_invert_shape : list X → list X → Prop :=
+    | in_lex_list_invert_shape0 k l : k ≠ [] → lex_list_invert_shape l (l++k)
+    | in_lex_list_invert_shape1 p x y l m : R x y → lex_list_invert_shape (p++[x]++l) (p++[y]++m).
 
-  Hint Constructors lex_list_invert_t : core.
+  Hint Constructors lex_list_invert_shape : core.
 
-  Lemma lex_list_invert l m : lex_list l m → lex_list_invert_t l m.
+  Lemma lex_list_invert l m : lex_list l m → lex_list_invert_shape l m.
   Proof.
     induction 1 as [ x m | x y l m H | z l m _ [] ].
     + now constructor 1 with (l := []).
@@ -119,12 +139,12 @@ Section lex_list.
     + now constructor 2 with (p := _::_).
   Qed.
 
-  Inductive lex_list_snoc_inv_t y : list X → list X → Prop :=
-    | in_lex_list_snoc_inv_t0 l m : lex_list_snoc_inv_t y l (l++m)
-    | in_lex_list_snoc_inv_t1 x l m : R x y → lex_list_snoc_inv_t y (l++[x]++m) l
-    | in_lex_list_snoc_inv_t2 p u v l m : R u v → lex_list_snoc_inv_t y (p++[u]++l) (p++[v]++m).
+  Inductive lex_list_snoc_inv_shape y : list X → list X → Prop :=
+    | in_lex_list_snoc_inv_shape0 l m : lex_list_snoc_inv_shape y l (l++m)
+    | in_lex_list_snoc_inv_shape1 x l m : R x y → lex_list_snoc_inv_shape y (l++[x]++m) l
+    | in_lex_list_snoc_inv_shape2 p u v l m : R u v → lex_list_snoc_inv_shape y (p++[u]++l) (p++[v]++m).
 
-  Local Lemma lex_list_snoc_inv_rec l m' : lex_list l m' → ∀ m y, m' = m++[y] → lex_list_snoc_inv_t y l m.
+  Local Lemma lex_list_snoc_inv_rec l m' : lex_list l m' → ∀ m y, m' = m++[y] → lex_list_snoc_inv_shape y l m.
   Proof.
     intros [ ? m [k x]%list_snoc_inv | ]%lex_list_invert.
     + intros ? ?; rewrite <- app_ass; intros [ <- <- ]%app_inj_tail; constructor.
@@ -133,14 +153,14 @@ Section lex_list.
       * intros ? ?; rewrite <- !app_ass; intros [ <- <- ]%app_inj_tail; rewrite !app_ass; now constructor.
   Qed.
 
-  Lemma lex_list_snoc_inv l y m : lex_list l (m++[y]) → lex_list_snoc_inv_t y l m.
+  Lemma lex_list_snoc_inv l y m : lex_list l (m++[y]) → lex_list_snoc_inv_shape y l m.
   Proof. intros; eapply lex_list_snoc_inv_rec; eauto. Qed.
 
-  Inductive lex_list_sg_inv_right_t y : list X → Prop :=
-    | in_lex_list_sg_inv_right_t0 : lex_list_sg_inv_right_t y []
-    | in_lex_list_sg_inv_right_t1 x l : R x y → lex_list_sg_inv_right_t y (x::l).
+  Inductive lex_list_sg_inv_right_shape y : list X → Prop :=
+    | in_lex_list_sg_inv_right_shape0 : lex_list_sg_inv_right_shape y []
+    | in_lex_list_sg_inv_right_shape1 x l : R x y → lex_list_sg_inv_right_shape y (x::l).
 
-  Lemma lex_list_sg_inv_right l y : lex_list l [y] → lex_list_sg_inv_right_t y l.
+  Lemma lex_list_sg_inv_right l y : lex_list l [y] → lex_list_sg_inv_right_shape y l.
   Proof.
     revert l; intros [ | x l ].
     + intros []%lex_list_inv; constructor.
@@ -148,44 +168,13 @@ Section lex_list.
       now destruct l.
   Qed.
 
-  Fact lex_list_app_head c l m : lex_list l m → lex_list (c++l) (c++m).
-  Proof. induction c; simpl; eauto. Qed.
-
-  Fact lex_list_prefix p l : l <> [] → lex_list p (p++l).
-  Proof. 
-    destruct l; [ easy | intros _ ].
-    rewrite (app_nil_end p) at 1.
-    apply lex_list_app_head; auto.
-  Qed.
-
-  Fact lex_list_snoc h l : lex_list l (l++[h]).
-  Proof. now apply lex_list_prefix. Qed.
-
-  Hint Constructors sdec : core.
-
-  Section lex_list_total.
-
-    Variables (l m : list X)
-              (Hlm : ∀ x y, x ∈ l → y ∈ m → sdec R x y).
-
-    Theorem lex_list_sdec : sdec lex_list l m.
-    Proof.
-      revert m Hlm.
-      rename l into l'.
-      induction l' as [ | x l IHl ]; intros [ | y m ] Hlm; eauto.
-      destruct (Hlm x y) as [ x y H | x | x y H ]; eauto.
-      destruct (IHl m); eauto.
-    Qed.
-
-  End lex_list_total.
-
   Section lex_list_irrefl.
 
     Let ll_irrefl_rec l m : lex_list l m → l = m → ∃x, x ∈ l ∧ R x x.
     Proof.
       induction 1 as [ | | x l m H IH ]; try easy.
       * inversion 1; subst; eauto.
-      * injection 1; intros (? & ? & ?)%IH; eauto.
+      * injection 1; intros (? & [])%IH; eauto.
     Qed.
 
     Lemma lex_list_irrefl l : lex_list l l → ∃x, x ∈ l ∧ R x x.
@@ -208,14 +197,58 @@ Section lex_list.
 
   End lex_list_trans.
 
+  Hint Constructors sdec : core.
+
+  Section lex_list_total.
+
+    Variables (l m : list X)
+              (Hlm : ∀ x y, x ∈ l → y ∈ m → sdec R x y).
+
+    Theorem lex_list_sdec : sdec lex_list l m.
+    Proof.
+      revert m Hlm.
+      rename l into l'.
+      induction l' as [ | x l IHl ]; intros [ | y m ] Hlm; eauto.
+      destruct (Hlm x y) as [ x y H | x | x y H ]; eauto.
+      destruct (IHl m); eauto.
+    Qed.
+
+  End lex_list_total.
+
 End lex_list.
 
-Fact Acc_lex_list_nil X P (R : X → X → Prop) : Acc (λ l m, P l ∧ lex_list R l m) [].
-Proof. constructor; intros [] (? & []%lex_list_inv). Qed.
+Section mono.
 
-#[local] Hint Resolve Acc_lex_list_nil : core.
+  Hint Constructors lex_list : core.
+
+  Variables (X : Type) (R T : X → X → Prop).
+
+  Fact lex_list_mono l m : 
+          (∀ x y, x ∈ l → y ∈ m → R x y → T x y)
+        → lex_list R l m → lex_list T l m.
+  Proof.
+    intros H.
+    induction 1 as [ | | x l m H1 IH1 ]; eauto.
+    constructor 3; eauto.
+  Qed.
+
+  Fact lo_step_mono :
+          (∀ x y, R x y → T x y)
+        → (∀ l m, lo_step R l m → lo_step T l m).
+  Proof. induction 2; constructor; eauto. Qed.
+
+  Hint Resolve lo_step_mono : core.
+
+  Fact lo_mono :
+          (∀ x y, R x y → T x y)
+        → (∀ l m, lo R l m → lo T l m).
+  Proof. intro; apply clos_trans_mono; eauto. Qed.
+
+End mono.
 
 Section lex_list_sim.
+
+  (* Simulation *)
 
   Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
             (sim : X → Y → Prop)
@@ -237,6 +270,12 @@ Section lex_list_sim.
   Qed.
 
 End lex_list_sim. 
+
+
+Fact Acc_lex_list_nil X P (R : X → X → Prop) : Acc (λ l m, P l ∧ lex_list R l m) [].
+Proof. constructor; intros [] (? & []%lex_list_inv). Qed.
+
+#[local] Hint Resolve Acc_lex_list_nil : core.
 
 Section lex_list_wf.
 
@@ -346,32 +385,3 @@ Section lex_list_wf.
   *)
 
 End lex_list_wf.
-
-Section mono.
-
-  Hint Constructors lex_list : core.
-
-  Variables (X : Type) (R T : X → X → Prop).
-
-  Fact lex_list_mono l m : 
-          (∀ x y, x ∈ l → y ∈ m → R x y → T x y)
-        → lex_list R l m → lex_list T l m.
-  Proof.
-    intros H.
-    induction 1 as [ | | x l m H1 IH1 ]; eauto.
-    constructor 3; eauto.
-  Qed.
-
-  Fact lo_step_mono :
-          (∀ x y, R x y → T x y)
-        → (∀ l m, lo_step R l m → lo_step T l m).
-  Proof. induction 2; constructor; eauto. Qed.
-
-  Hint Resolve lo_step_mono : core.
-
-  Fact lo_mono :
-          (∀ x y, R x y → T x y)
-        → (∀ l m, lo R l m → lo T l m).
-  Proof. intro; apply clos_trans_mono; eauto. Qed.
-
-End mono.
