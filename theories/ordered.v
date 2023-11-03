@@ -170,3 +170,124 @@ Section mono.
 
 End mono.
 
+Section list_plus.
+
+  Variables (X : Type) (R : X → X → Prop).
+
+  Inductive list_plus_rel : list X → list X → list X → Prop :=
+    | list_plus_rel_nil_l m : list_plus_rel [] m m
+    | list_plus_rel_nil_r l : list_plus_rel l [] l
+    | list_plus_rel_stop x y l m : R x y → list_plus_rel (x::l) (y::m) (y::m)
+    | list_plus_rel_next x y l m k : ge R x y → list_plus_rel l (y::m) k → list_plus_rel (x::l) (y::m) (x::k).
+
+  Hint Constructors list_plus_rel : core.
+
+  Fact list_plus_rel_In l m k : list_plus_rel l m k → ∀x, x ∈ k → x ∈ l ∨ x ∈ m.
+  Proof. 
+    induction 1 as [ | | | w y l m k H1 H2 IH2 ]; eauto.
+    intros ? [<- | []%IH2 ]; eauto.
+  Qed.
+
+  Section list_plus_fun.
+
+    Hypothesis R_anti : ∀ x y, R x y → ge R x y → False.
+
+    Fact list_plus_rel_fun l m k1 k2 : list_plus_rel l m k1 → list_plus_rel l m k2 → k1 = k2.
+    Proof.
+      intros H; revert H k2.
+      induction 1; inversion 1; subst; eauto.
+      3: f_equal; eauto.
+      all: now destruct (@R_anti x y).
+    Qed.
+
+  End list_plus_fun.
+
+  Hint Constructors ordered_from ordered : core.
+
+  Section list_plus_ordered.
+
+    (* Those two proofs need cleanup beacuse they are ugly *)
+
+    Lemma list_plus_rel_ordered_from x l y m k : 
+               ordered_from (ge R) x l
+             → ordered_from (ge R) y m
+             → list_plus_rel l (y::m) k
+             → ge R x y
+             → ordered_from (ge R) x k.
+    Proof. intros H1 H2; induction H1 in k |- *; inversion 1; subst; eauto. Qed.
+
+    Theorem list_plus_rel_ordered l m k : list_plus_rel l m k → ordered (ge R) l → ordered (ge R) m → ordered (ge R) k.
+    Proof.
+      intros H1 H2 H3.
+      induction H3 as [ | y m H3 ].
+      1: inversion H1; now subst.
+      destruct H2 as [ | x l H2 ].
+      1: inversion H1; now constructor.
+      inversion H1; subst.
+      1: now constructor.
+      constructor.
+      eapply list_plus_rel_ordered_from; eauto.
+   Qed.
+
+  End list_plus_ordered.
+
+  Section list_plus_compute.
+
+    Variables R_dec : ∀ x y, { R x y } + { ge R x y }.
+
+    Definition list_plus_compute l m : sig (list_plus_rel l m).
+    Proof.
+      destruct m as [ | y ]; eauto.
+      induction l as [ | x ]; eauto.
+      destruct (R_dec x y); eauto.
+      destruct IHl; eauto.
+    Qed.
+
+    Definition list_plus l m := proj1_sig (list_plus_compute l m).
+
+    Fact list_plus_spec l m : list_plus_rel l m (list_plus l m).
+    Proof. apply (proj2_sig _). Qed.
+
+    Hint Resolve list_plus_spec list_plus_rel_fun : core.
+
+    Fact list_plus_ordered l m : ordered (ge R) l → ordered (ge R) m → ordered (ge R) (list_plus l m).
+    Proof. now apply list_plus_rel_ordered. Qed. 
+
+    Hypothesis R_anti : ∀ x y, R x y → ge R x y → False.
+
+    Fact list_plus_fix0 m : list_plus [] m = m.     Proof. eauto. Qed.
+    Fact list_plus_fix1 l : list_plus l [] = l.     Proof. eauto. Qed.
+
+    Fact list_plus_fix2 x y l m : R x y → list_plus (x::l) (y::m) = y::m.
+    Proof. eauto. Qed.
+
+    Fact list_plus_fix3 x y l m : ge R x y → list_plus (x::l) (y::m) = x::list_plus l (y::m).
+    Proof. eauto. Qed.
+
+    Lemma list_plus_assoc l m p : list_plus l (list_plus m p) = list_plus l (list_plus m p).
+    Proof.
+      destruct p as [ | z p ].
+      1: now rewrite list_plus_fix1.
+      induction l as [ | x l IHl ] in m |- *.
+      1: now rewrite list_plus_fix0.
+      induction m as [ | y m IHm ].
+      1: now rewrite list_plus_fix0.
+      destruct (R_dec y z) as [ H1 | H1 ].
+      1: rewrite !(list_plus_fix2 _ _ H1); eauto.
+      rewrite !(list_plus_fix3 _ _ H1).
+      destruct (R_dec x y) as [ H2 | H2 ].
+      1: rewrite !(list_plus_fix2 _ _ H2); eauto.
+      now rewrite !(list_plus_fix3 _ _ H2).
+    Qed.
+
+    Fact list_plus_In l m x : x ∈ list_plus l m → x ∈ l ∨ x ∈ m.
+    Proof. now apply list_plus_rel_In. Qed.
+
+  End list_plus_compute.
+
+End list_plus.
+
+Check list_plus_ordered.
+
+Arguments list_plus {_ _}.
+

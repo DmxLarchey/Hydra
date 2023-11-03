@@ -922,6 +922,44 @@ Section epsilon0.
   Fact fast_growing_hierarchy_spec e : fastgrow_spec (proj1_sig e) (fast_growing_hierarchy e).
   Proof. destruct e as (h & e); simpl; apply (proj2_sig _). Qed.
 
+  Fact olt_oge_dec g h : { olt g h } + { oge g h }.
+  Proof. destruct (olt_sdec g h); subst; eauto; right; red; eauto. Qed.
+
+  Definition hydra_plus g h :=
+    match g, h with
+    | ⟨l⟩, ⟨m⟩ => ⟨list_plus olt_oge_dec l m⟩
+    end.
+
+  Fact olt_oge_absurd g h : olt g h -> oge g h -> False.
+  Proof.
+    intros H1 [<- |H2].
+    + revert H1; apply olt_irrefl.
+    + eapply (@olt_irrefl g); eauto.
+  Qed.
+
+  Hint Resolve olt_oge_absurd : core.
+
+  Fact eps0_hydra_plus g h : eps0 g → eps0 h → eps0 (hydra_plus g h).
+  Proof.
+    revert g h; intros [l] [m] []%eps0_fix []%eps0_fix; apply eps0_fix; split.
+    + now apply list_plus_ordered.
+    + intros ? []%list_plus_In; eauto.
+  Qed.
+
+  Fact hydra_plus_zero_l h : hydra_plus ⨸ h = h.
+  Proof.
+    destruct h as [l]; simpl.
+    rewrite list_plus_fix0; eauto.
+  Qed.
+
+  Fact hydra_plus_zero_r h : hydra_plus h ⨸ = h.
+  Proof.
+    destruct h as [l]; simpl.
+    rewrite list_plus_fix1; eauto.
+  Qed.
+
+  (* We want to show that hydra_plus has the succ and limit property ... *)
+
   (* We define the type of ordinals upto eps0 *)
 
   Local Fact epsilon0_cons_spec l : ordered (ge lt_epsilon0) l → eps0 ⟨map (@proj1_sig _ _) l⟩.
