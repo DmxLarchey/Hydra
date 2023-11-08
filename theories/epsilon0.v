@@ -111,6 +111,8 @@ Section repeat.
 
 End repeat.
 
+Require Import Arith.
+
 Section epsilon0.
 
   Hint Constructors lex_list sdec ordered ordered_from : core.
@@ -164,6 +166,11 @@ Section epsilon0.
     + left; left; auto.
     + left; right; auto.
   Qed.
+
+  Hint Resolve olt_trans : core.
+
+  Fact oge_trans : transitive oge.
+  Proof. intros ? ? ? [->|] [->|]; red; auto; right; eauto. Qed.
 
   Definition E0 := hydra_fall (ordered oge).
 
@@ -341,6 +348,9 @@ Section epsilon0.
     intros ? [ | [<- | []]]%in_app_iff; auto.
   Qed.
 
+  Fact olt_hydra_succ h : olt h (hydra_succ h).
+  Proof. revert h; intros []; constructor; apply lex_list_snoc. Qed.
+
   Hint Resolve ordered_app_head : core.
 
   Fact eps0_rem_tail l h : eps0 ⟨l++[h]⟩ → eps0 ⟨l⟩.
@@ -386,6 +396,25 @@ Section epsilon0.
     + left; exists p, x, y, l, m; auto.
     + right; left; now exists x, m.
     + right; right; eauto.
+  Qed.
+
+  Lemma olt_inv_snoc_right'' g m h :
+           olt g ⟨m++[h]⟩ 
+         ↔ oge ⟨m⟩ g ∨ (∃ x p, olt x h ∧ g = ⟨m++[x]++p⟩).
+  Proof.
+    split.
+    + revert g m.
+      intros _ _ [ p x y l m | x l m | l m ]%olt_inv_snoc_right.
+      * left; right; constructor; apply lex_list_app_head; now constructor 2.
+      * right; exists x, m; auto.
+      * left; destruct m; [ left | right ].
+        - now rewrite <- app_nil_end.
+        - constructor; now apply lex_list_prefix.
+    + intros [ [ <- | H ] | (x & p & ? & ->) ].
+      * constructor; now apply lex_list_prefix.
+      * apply olt_trans with (1 := H).
+        constructor; now apply lex_list_prefix.
+      * constructor; apply lex_list_app_head; now constructor.
   Qed.
 
   Hint Resolve lex_list_app_head lex_list_prefix' : core.
@@ -501,7 +530,7 @@ Section epsilon0.
         - apply ordered_comp; auto.
           eapply ordered_tail; eauto.
           apply lex_list_inv in H6.
-          destruct H6 as [ x h H | h ?%lex_list_inv ].
+          destruct H6 as [ x H | ?%lex_list_inv ].
           2: now destruct g.
           intros ? [ <- | ]; right; eauto.
       * intros ? [ ]%in_app_iff; eauto.
@@ -563,7 +592,7 @@ Section epsilon0.
   Lemma olt_repeat_snoc l n h : olt ⟨repeat ⟨l⟩ n⟩ ⟨[⟨l++[h]⟩]⟩.
   Proof. constructor; destruct n; simpl; eauto. Qed.
 
-  Fact ordered_from_oge_olt x l y : oge y x -> ordered_from oge x l -> olt ⟨x::l⟩ ⟨repeat y (2+length l)⟩.
+  Fact ordered_from_oge_olt x l y : oge y x → ordered_from oge x l → olt ⟨x::l⟩ ⟨repeat y (2+length l)⟩.
   Proof.
     intros [ -> | ] G; constructor; revert G; simpl; eauto.
     induction 1 as [ | ? ? ? [ <- | ] ]; simpl; eauto.
@@ -773,6 +802,14 @@ Section epsilon0.
           revert E2; apply olt_irrefl.
   Qed.
 
+  Corollary is_limit_dense h g : eps0 h → h ≠ ⨸ → eps0_limit h → eps0 g → olt g h → ∃k, eps0 k ∧ olt g k ∧ olt k h.
+  Proof.
+    intros H1 H2 H3 G1 G2.
+    destruct (is_limit_fseq H1 H2 H3 G1 G2) as (q & (n & Hn) & ? & ?).
+    exists q; split; auto.
+    now apply fseq_eps0 with (2 := Hn).
+  Qed.
+
   Lemma fseq_S_olt h n g g': h ≠ ⨸ → fseq h n g → fseq h (S n) g' → olt g g'.
   Proof.
     intros _ H2; revert H2 g'.
@@ -783,7 +820,7 @@ Section epsilon0.
     + intros (? & -> & ?%IH2%olt_inv)%fseq_seq_inv; auto.
   Qed.
 
-  Section fund_seq.
+  Section fundamental_sequence.
 
     Variables (h : hydra) (n : nat)
               (e1 : eps0 h)
@@ -801,7 +838,7 @@ Section epsilon0.
     Fact fund_seq_olt : olt fund_seq h.
     Proof. now apply fseq_eps0 with (2 := fund_seq_spec). Qed.
 
-  End fund_seq.
+  End fundamental_sequence.
 
   Arguments fund_seq : clear implicits.
 
@@ -930,7 +967,7 @@ Section epsilon0.
     | ⟨l⟩, ⟨m⟩ => ⟨list_plus olt_oge_dec l m⟩
     end.
 
-  Fact olt_oge_absurd g h : olt g h -> oge g h -> False.
+  Fact olt_oge_absurd g h : olt g h → oge g h → False.
   Proof.
     intros H1 [<- |H2].
     + revert H1; apply olt_irrefl.
@@ -958,7 +995,292 @@ Section epsilon0.
     rewrite list_plus_fix1; eauto.
   Qed.
 
-  (* We want to show that hydra_plus has the succ and limit property ... *)
+  Fact hydra_plus_assoc g h k : hydra_plus (hydra_plus g h) k = hydra_plus g (hydra_plus h k).
+  Proof. revert g h k; intros [] [] []; simpl; f_equal; apply list_plus_assoc; eauto. Qed.
+
+  Fact hydra_plus_succ g h : hydra_plus g (hydra_succ h) = hydra_succ (hydra_plus g h).
+  Proof.
+    revert g h; intros [] []; simpl; f_equal.
+    apply list_plus_app_tail; eauto.
+    intros; apply zero_smallest.
+  Qed.
+
+  Tactic Notation "compare" hyp(x) "and" hyp(y) "then" "rewrite" :=
+     destruct (olt_oge_dec x y); [ rewrite !list_plus_fix2 | rewrite !list_plus_fix3]; eauto.
+
+  Fact hydra_plus_smono g h k : olt h k → olt (hydra_plus g h) (hydra_plus g k).
+  Proof.
+    revert g h k; intros [l] [m] [p] ?%olt_inv; simpl; constructor.
+    revert l.
+    induction H as [ z p | y z m p | y m p ]; intros l.
+    + rewrite list_plus_fix1; eauto.
+      induction l as [ | x l IHl ].
+      * rewrite list_plus_fix0; eauto.
+      * compare x and z then rewrite.
+    + induction l as [ | x l IHl ].
+      * rewrite !list_plus_fix0; eauto.
+      * destruct (olt_oge_dec x y).
+        - rewrite !list_plus_fix2; eauto.
+        - rewrite list_plus_fix3; eauto.
+          compare x and z then rewrite.
+    + induction l as [ | x l IHl ].
+      * rewrite !list_plus_fix0; eauto.
+      * compare x and y then rewrite.
+  Qed.
+
+  Lemma hydra_plus_dense k h u :
+          eps0 k
+       -> eps0 h
+       -> eps0 u
+       -> h <> ⨸
+       -> eps0_limit h
+       -> olt u (hydra_plus k h)
+       -> exists h', olt h' h /\ olt u (hydra_plus k h').
+  Proof.
+    revert k h u.
+    intros [k] h u Hk Hh Hu H1 H2.
+    destruct (eps0_limit_iff Hh H2 H1) as [ l h ].
+    simpl hydra_plus at 1.
+    destruct l as [ | g l ].
+    + simpl app in *.
+      destruct (list_search_choice _ olt_oge_dec olt_oge_absurd k h)
+        as (k1 & k2 & -> & G2 & G3 & G4).
+      rewrite Forall_list_plus, G4; eauto.
+      intros [ G1 | (g' & r & F1 & ->) ]%olt_inv_snoc_right''.
+      * exists ⟨[⨸]⟩; split.
+        - now repeat constructor.
+        - destruct G1 as [ <- | G1 ]; [ | apply olt_trans with (1 := G1) ].
+          ++ constructor; rewrite Forall_list_plus; eauto.
+             ** apply lex_list_prefix. admit.
+             ** revert G2; apply Forall_impl; intros ? [ -> | ]; eauto.
+          ++ admit. (*same as the previous ++ *)
+      * exists ⟨repeat g' (2+length r)⟩; split.
+        - now repeat constructor.
+        - simpl.
+          rewrite Forall_list_plus; eauto.
+          ++ destruct (list_search_choice _ olt_oge_dec olt_oge_absurd k2 g')
+               as (q1 & q2 & -> & F2 & F3 & F4).
+             rewrite Forall_list_plus, F4; eauto.
+             constructor.
+             apply lex_list_app_head.
+             admit.
+          ++ revert G2; apply Forall_impl; intros ? [ -> | ]; eauto.
+    + destruct (list_search_choice _ olt_oge_dec olt_oge_absurd k g)
+        as (k1 & k2 & -> & G2 & G3 & G4).
+      simpl app; rewrite Forall_list_plus, G4; eauto.
+      replace (k1++g::l++[h]) with ((k1++g::l)++[h]) by now rewrite app_ass.
+      intros [ G1 | (g' & r & F1 & ->) ] %olt_inv_snoc_right''.
+      * exists ⟨g :: l⊣⊢[⨸]⟩; split.
+        - constructor.
+          apply lex_list_app_head with (c := _::_).
+          now constructor.
+        - simpl; rewrite Forall_list_plus, G4; eauto.
+          destruct G1 as [ <- | G1 ]; [ | apply olt_trans with (1 := G1) ].
+          all: constructor; now apply lex_list_app_head, lex_list_prefix with (p := _::_).
+      * exists ⟨g :: l⊣⊢(repeat g' (2+length r))⟩; split.
+        - constructor.
+          apply lex_list_app_head with (c := _::_).
+          now constructor.
+        - simpl; rewrite Forall_list_plus, G4; eauto.
+          constructor.
+          rewrite app_ass.
+          apply lex_list_app_head.
+          apply lex_list_app_head with (c := _::_).
+          apply olt_inv, ordered_from_oge_olt.
+          ++ now left.
+          ++ now apply eps0_fix, proj1, ordered_app_tail, ordered_inv in Hu.
+  Admitted.
+
+  Fact hydra_plus_mono g h k : olt g h → oge (hydra_plus h k) (hydra_plus g k).
+  Proof.
+    revert g h k; intros [l] [m] [[|z k]] ?%olt_inv.
+    1: rewrite !hydra_plus_zero_r; now right.
+    induction H as [ y m | x y l m | x l m ].
+    + rewrite hydra_plus_zero_l; simpl.
+      generalize (y::m); clear y m; intros m.
+      (* need the fact that z::k is ordered otherwise not true *)
+      admit.
+    + destruct (olt_oge_dec y z); simpl.
+      * rewrite !list_plus_fix2; eauto; now left.
+      * rewrite list_plus_fix3; eauto.
+  Admitted.
+
+  Definition is_lub (P : hydra → Prop) l :=
+        eps0 l 
+      ∧ ∀m, eps0 m → (∀x, eps0 x → P x → oge m x) ↔ oge m l.
+
+  Lemma hydra_plus_is_limit g h : is_limit (λ k, ∃p, olt p h ∧ k = hydra_plus g p) (hydra_plus g h).
+  Proof.
+    intros k Hk.
+  Admitted.
+        
+  (* We want to show that hydra_plus has the succ and limit property ... which then
+     proves that we have a correct definition of hydra_plus according to the set-theoretic
+     version, which proceeds by strong induction. We cannot do that constructivelly 
+     because we cannot show that lubs exists in epsilon0, even bounded lubs? Can we
+     show decidable lubs exist ? If one can show that for P : nat -> Prop 
+     embedded into eps0, (hence bounded by omega), its lub exists, then, the lub is
+     omega iff P is unbounded (in nat). This property is not decidable.  *)
+
+  Fact hydra_succ_smono g h : olt (hydra_succ g) (hydra_succ h) ↔ olt g h.
+  Proof.
+    split.
+    + revert g h; intros [l] [m] H%olt_inv; constructor.
+      revert m H.
+      induction l as [ | x l IH ]; intros [ | y m ]; simpl.
+      * now intros [ ? []%zero_smallest' | ]%lex_list_inv.
+      * constructor.
+      * intros [ ? []%zero_smallest' | H%lex_list_inv ]%lex_list_inv.
+        now destruct l.
+      * intros []%lex_list_inv; eauto.
+    + revert g h; intros [l] [m] H%olt_inv; constructor; revert H.
+      induction 1 as [ y m | x y l m | x l m ]; simpl.
+      * destruct (oge_zero_dec y) as [ -> | ].
+        - constructor 3; destruct m; constructor.
+        - now constructor 2.
+      * now constructor 2.
+      * now constructor 3.
+  Qed.
+
+  Section no_arbitrary_lubs.
+
+(*
+    Definition is_lub (P : hydra → Prop) l := 
+           eps0 l
+        ∧ (∀x, P x → eps0 x → oge l x)
+        ∧  ∀m, eps0 m → (∀x, P x → eps0 x → oge m x) → oge m l.
+*)
+
+    Let nat2eps0 := nat_rec _ ⨸ (fun _ => hydra_succ).
+
+    Hint Resolve eps0_hydra_succ : core.
+
+    Local Fact nat2eps0_eps0 n : eps0 (nat2eps0 n).
+    Proof. induction n; simpl; eauto. Qed.
+
+    Local Fact nat2eps_eq n : nat2eps0 n = ⟨repeat ⨸ n⟩.
+    Proof.
+      induction n; simpl; f_equal.
+      rewrite IHn; simpl; f_equal.
+      now rewrite <- repeat_S.
+    Qed.
+
+    Local Fact nat2eps_smono_rev n m : olt (nat2eps0 n) (nat2eps0 m) → n < m.
+    Proof.
+      revert m; induction n as [ | n IHn ]; intros [ | m ]; simpl.
+      1,3: intros []%zero_smallest'.
+      + intros _; apply PeanoNat.Nat.lt_0_succ.
+      + now intros ?%hydra_succ_smono%IHn%PeanoNat.Nat.succ_lt_mono.
+    Qed.
+
+    Local Fact nat2eps_mono n m : n ≤ m → oge (nat2eps0 m) (nat2eps0 n).
+    Proof.
+      induction 1 as [ | m _ IH ].
+      + now left.
+      + apply oge_trans with (2 := IH); right; apply olt_hydra_succ.
+    Qed.
+
+    Local Fact nat2eps_smono n m : n < m → olt (nat2eps0 n) (nat2eps0 m).
+    Proof.
+      intros [->|H]%nat2eps_mono.
+      + apply olt_hydra_succ.
+      + apply olt_trans with (2 := H), olt_hydra_succ.
+    Qed. 
+
+    Local Fact nat2eps_inj n m : nat2eps0 n = nat2eps0 m → n = m.
+    Proof.
+      intros E.
+      destruct (PeanoNat.Nat.lt_trichotomy n m) as [ H | [ ? | H ] ]; auto.
+      all: apply nat2eps_smono in H; rewrite E in H; now apply olt_irrefl in H.
+    Qed.
+
+    Local Fact nat2eps_mono_rev n m : oge (nat2eps0 m) (nat2eps0 n) → n ≤ m.
+    Proof.
+      intros H.
+      destruct (le_lt_dec n m) as [ | C%nat2eps_smono ]; auto.
+      exfalso; revert C H; apply olt_oge_absurd.
+    Qed.
+    
+    (* 0 = ⨸ ; 1 = w^⨸; w = w^1 *)
+    Let omega := ⟨[⟨[⨸]⟩]⟩.
+
+    Fact eps0_zero_one_or_more g : { g = ⨸ } + { g = ⟨[⨸]⟩ } + { olt ⟨[⨸]⟩ g }.
+    Proof.
+      destruct g as [ [|[[]] []] ]; auto.
+      all: do 2 right; constructor; constructor 2; constructor; auto.
+    Qed.
+
+    Fact eps0_nat_omega g : eps0 g → { n | g = nat2eps0 n } + oge g omega.
+    Proof.
+      induction 1 as [ l H1 H2 _ ] using eps0_rect.
+      induction l as [ | g l IHl ].
+      + left; exists 0; auto.
+      + destruct IHl as [ (n & Hn) | H ]; eauto.
+        * destruct (eps0_zero_one_or_more g) as [ [ -> | -> ] | Hg ].
+          - left; exists (S n); rewrite nat2eps_eq in Hn |- *.
+            simpl; do 2 f_equal; now inversion Hn.
+          - right; destruct l.
+            ++ left; auto.
+            ++ right; constructor; constructor 3; eauto.
+          - right; right; constructor; now constructor 2.
+        * right.
+          revert H; apply oge_trans; right.
+          constructor.
+          apply ordered_inv in H1; revert H1.
+          clear H2.
+          induction 1 as [ | ? ? ? [] ]; subst.
+          - constructor.
+          - constructor 3; auto.
+          - constructor 2; auto.
+    Qed.
+
+    Fact olt_nat2eps0_omega n : olt (nat2eps0 n) omega.
+    Proof.
+      rewrite nat2eps_eq.
+      destruct n; simpl; constructor.
+      + constructor.
+      + constructor 2; constructor; eauto.
+    Qed.
+
+    Hint Resolve nat2eps0_eps0 olt_nat2eps0_omega : core.
+
+    Hypothesis lub_exists : ∀Q, ex (is_lub Q).
+
+    Definition bounded (P : nat → Prop) := ∃n, ∀k, P k → k <= n.
+
+    (* If the lub exists in eps0 then boundedness is weakly decidable 
+       and this property is not weakly decidable in general.  *)
+
+    Lemma lub_exists_bounded_wdec (P : nat → Prop) : bounded P ∨ ~ bounded P.
+    Proof.
+      destruct (lub_exists (λ k, ∃n, k = nat2eps0 n ∧ P n))
+        as (l & H1 & H2).
+      destruct eps0_nat_omega with (1 := H1) as [ (n & ->) | H ].
+      + left; exists n.
+        intros k Hk.
+        apply nat2eps_mono_rev, H2; eauto; now left.
+      + right; intros (m & Hm).
+        apply (@olt_oge_absurd (nat2eps0 m) l).
+        * destruct H as [ -> | H ]; auto.
+          eapply olt_trans; eauto.
+        * rewrite <- H2; eauto.
+          now intros ? ? (n & -> & Hn%Hm%nat2eps_mono).
+    Qed.
+
+    Corollary lub_exists_wXM P : ~~ P ∨ ~ P.
+    Proof.
+      destruct lub_exists_bounded_wdec with (P := fun _ : nat => P)
+        as [ H | H ].
+      + right; intros C.
+        destruct H as (k & Hk).
+        now apply (Hk (S k)), Nat.lt_irrefl in C.
+      + left; contradict H.
+        exists 0; intros; tauto.
+    Qed.
+
+  End no_arbitrary_lubs.
+
+  Check lub_exists_wXM.
 
   (* We define the type of ordinals upto eps0 *)
 

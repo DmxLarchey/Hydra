@@ -258,30 +258,117 @@ Section list_plus.
     Fact list_plus_fix0 m : list_plus [] m = m.     Proof. eauto. Qed.
     Fact list_plus_fix1 l : list_plus l [] = l.     Proof. eauto. Qed.
 
-    Fact list_plus_fix2 x y l m : R x y → list_plus (x::l) (y::m) = y::m.
+    Fact list_plus_fix2 {x y l m} : R x y → list_plus (x::l) (y::m) = y::m.
     Proof. eauto. Qed.
 
-    Fact list_plus_fix3 x y l m : ge R x y → list_plus (x::l) (y::m) = x::list_plus l (y::m).
+    Fact list_plus_fix3 {x y l m} : ge R x y → list_plus (x::l) (y::m) = x::list_plus l (y::m).
     Proof. eauto. Qed.
 
-    Lemma list_plus_assoc l m p : list_plus l (list_plus m p) = list_plus l (list_plus m p).
+    Fact list_plus_app_tail l m z k : 
+              (∀x, x ∈ l → ge R x z)
+            → list_plus l (m++[z]++k) = (list_plus l m)++[z]++k.
+    Proof.
+      intros Hl.
+      destruct m as [ | y m ].
+      + simpl; rewrite list_plus_fix1.
+        revert Hl; rewrite <- Forall_forall.
+        induction 1.
+        * now rewrite list_plus_fix0.
+        * rewrite list_plus_fix3; simpl; auto; f_equal; eauto.
+      + clear Hl.
+        induction l as [ | x ]; simpl.
+        * now rewrite !list_plus_fix0.
+        * destruct (R_dec x y).
+          - rewrite !list_plus_fix2; auto.
+          - rewrite !list_plus_fix3; auto; simpl; f_equal; auto.
+    Qed.
+
+    Hypothesis Rtrans : ∀ x y z, R x y → R y z → R x z.
+
+    Lemma list_plus_assoc l m p : list_plus (list_plus l m) p = list_plus l (list_plus m p).
     Proof.
       destruct p as [ | z p ].
-      1: now rewrite list_plus_fix1.
+      1: now rewrite !list_plus_fix1.
       induction l as [ | x l IHl ] in m |- *.
-      1: now rewrite list_plus_fix0.
-      induction m as [ | y m IHm ].
-      1: now rewrite list_plus_fix0.
-      destruct (R_dec y z) as [ H1 | H1 ].
-      1: rewrite !(list_plus_fix2 _ _ H1); eauto.
-      rewrite !(list_plus_fix3 _ _ H1).
-      destruct (R_dec x y) as [ H2 | H2 ].
-      1: rewrite !(list_plus_fix2 _ _ H2); eauto.
-      now rewrite !(list_plus_fix3 _ _ H2).
+      1: now rewrite !list_plus_fix0.
+      destruct m as [ | y m ].
+      1: now rewrite list_plus_fix0, list_plus_fix1.
+      destruct (R_dec x y) as [ Hxy | Hxy ].
+      + rewrite (list_plus_fix2 Hxy).
+        destruct (R_dec y z) as [ Hyz | Hyz ].
+        * rewrite !list_plus_fix2; eauto.
+        * now rewrite (list_plus_fix3 Hyz), (list_plus_fix2 Hxy).
+      + rewrite (list_plus_fix3 Hxy).
+        destruct (R_dec x z) as [ Hxz | Hxz ].
+        * rewrite (list_plus_fix2 Hxz).
+          rewrite !list_plus_fix2; auto.
+          destruct Hxy as [ <- | ]; eauto.
+        * rewrite (list_plus_fix3 Hxz), IHl.
+          destruct (R_dec y z) as [ Hyz | Hyz ].
+          - rewrite (list_plus_fix2 Hyz), list_plus_fix3; auto.
+          - now rewrite (list_plus_fix3 Hyz), (list_plus_fix3 Hxy).
     Qed.
 
     Fact list_plus_In l m x : x ∈ list_plus l m → x ∈ l ∨ x ∈ m.
     Proof. now apply list_plus_rel_In. Qed.
+
+    Fact list_plus_cons_app l x m r : list_plus l (x::m++r) = list_plus l (x::m) ++ r.
+    Proof.
+      induction l as [ | y l IHl ].
+      + now rewrite !list_plus_fix0.
+      + destruct (R_dec y x) as [ H | H ].
+        * rewrite !list_plus_fix2; auto.
+        * rewrite !list_plus_fix3; simpl; auto; f_equal; auto.
+    Qed.
+ 
+    Fact list_search_choice m x : { l : _ & { r | m = l++r ∧ Forall (λ y, ge R y x) l ∧ match r with [] => True | y::_ => R y x end /\ forall k, list_plus r (x::k) = x::k } }.
+    Proof.
+      induction m as [ | y m IHm ].
+      + exists [], []; simpl; repeat split; auto.
+        intros; now rewrite list_plus_fix0.
+      + destruct  (R_dec y x) as [ H | H ].
+        * exists [], (y::m); simpl; repeat split; auto.
+          intro; now rewrite list_plus_fix2.
+        * destruct IHm as (l & r & -> & H2 & H3).
+          exists (y::l), r; simpl; auto.
+    Qed.
+
+    Fact Forall_list_plus l r x m : Forall (λ y, ge R y x) l → list_plus (l++r) (x::m) = l++list_plus r (x::m).
+    Proof. induction 1; simpl; auto; rewrite list_plus_fix3; f_equal; auto. Qed.
+
+(*
+    Fact list_plus_snoc l m x : list_plus l (m++[x]) = (list_plus l m)++[x] 
+                             \/ m = [] /\ exists l' y r', R y x /\ Forall (λ y, ge R y x) l' ∧ l = l'++[y]++r' /\ list_plus l [x] = l'++[x].
+    Proof.
+      destruct m; simpl.
+      2: left; apply list_plus_cons_app.
+      destruct (list_search_choice l x) as (l' & r' & -> & H1 & H2).
+      destruct r' as [ | y r' ].
+      + left; rewrite <- app_nil_end.
+        rewrite (app_nil_end l') at 1.
+        rewrite Forall_list_plus, list_plus_fix0, list_plus_fix1; auto.
+      + right; split; auto.
+        exists l', y, r'; repeat split; auto.
+        rewrite Forall_list_plus; auto.
+        now rewrite list_plus_fix2.
+    Qed.
+
+    Fact list_plus_special m l :
+              (forall k, list_plus m (l++k) = list_plus (m++l) k)
+           \/ exists m1 x m2 y l', l = y::l' /\ m = m1++[x]++m2 /\ Forall (λ x, ge R x y) m1 /\ R x y.
+    Proof.
+      destruct l as [ | y l ].
+      1: left; rewrite <- app_nil_end; auto.
+      destruct (list_search_choice m y) as (m1 & [ | x m2 ] & G1 & G2 & G3).
+      + subst m.
+
+ left; intro. 
+        rewrite app_ass; simpl.
+        rewrite Forall_list_plus, list_plus_fix0; auto.
+        rewrite 
+rewrite <- app_nil_end.
+        intros; simpl. rewrite Forall_list_plus.
+*)
 
   End list_plus_compute.
 

@@ -105,9 +105,9 @@ Section lex_list.
 
   (* inversion lemmas *)
 
-  Inductive lex_list_inv_shape l m : X → X → Prop :=
-    | in_lex_list_inv_shape0 x y : R x y → lex_list_inv_shape l m x y
-    | in_lex_list_inv_shape1 x : lex_list l m → lex_list_inv_shape l m x x.
+  Inductive lex_list_inv_shape l m y : X → Prop :=
+    | in_lex_list_inv_shape0 x : R x y → lex_list_inv_shape l m y x
+    | in_lex_list_inv_shape1 : lex_list l m → lex_list_inv_shape l m y y.
 
   Hint Constructors lex_list_inv_shape : core.
 
@@ -116,7 +116,7 @@ Section lex_list.
        ↔ match l, m with 
          | _, []      => False
          | [], _      => True
-         | x::l, y::m => lex_list_inv_shape l m x y
+         | x::l, y::m => lex_list_inv_shape l m y x
          end.
   Proof. 
     split.
@@ -164,7 +164,7 @@ Section lex_list.
   Proof.
     revert l; intros [ | x l ].
     + intros []%lex_list_inv; constructor.
-    + intros [ | ? ?%lex_list_inv ]%lex_list_inv; constructor; auto.
+    + intros [ | H%lex_list_inv ]%lex_list_inv; constructor; auto.
       now destruct l.
   Qed.
 
