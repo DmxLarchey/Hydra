@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Wellfounded Utf8.
+From Coq Require Import List Relations Wellfounded Utf8 Arith Lia.
 From Hydra Require Import hydra ordered.
 
 Import ListNotations.
@@ -214,6 +214,17 @@ Section lex_list.
     Qed.
 
   End lex_list_total.
+
+  Lemma lex_list_ge_length l m : 
+           (∀ x y, x ∈ l → y ∈ m → ge R y x)
+         → length l < length m
+         → lex_list l m.
+  Proof.
+    revert m; induction l as [ | x l IHl ]; intros [ | y m ]; simpl; (lia || eauto).
+    intros H0 H1.
+    destruct (H0 x y) as [ -> | ? ]; eauto.
+    constructor 3; apply IHl; (lia || eauto).
+  Qed.
 
 End lex_list.
 

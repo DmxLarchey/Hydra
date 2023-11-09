@@ -188,6 +188,9 @@ Section list_plus.
     intros ? [<- | []%IH2 ]; eauto.
   Qed.
 
+  Fact list_plus_rel_nil_inv l m : list_plus_rel l m [] → l = [] ∧ m = [].
+  Proof. now inversion 1. Qed.
+
   Section list_plus_fun.
 
     Hypothesis R_anti : ∀ x y, R x y → ge R x y → False.
@@ -335,6 +338,9 @@ Section list_plus.
 
     Fact Forall_list_plus l r x m : Forall (λ y, ge R y x) l → list_plus (l++r) (x::m) = l++list_plus r (x::m).
     Proof. induction 1; simpl; auto; rewrite list_plus_fix3; f_equal; auto. Qed.
+
+    Fact list_plus_nil_inv l m : list_plus l m = [] -> l = [] ∧ m = [].
+    Proof. intros E; generalize (list_plus_spec l m); rewrite E; apply list_plus_rel_nil_inv. Qed.
 
 (*
     Fact list_plus_snoc l m x : list_plus l (m++[x]) = (list_plus l m)++[x] 
