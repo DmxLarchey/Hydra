@@ -101,6 +101,16 @@ Section ordered.
     intros ? [ <- | ? ]; eauto.
   Qed.
 
+  Fact ordered_app_clos_trans l m : ordered (l++m) → ∀ x y, x ∈ l → y ∈ m → clos_trans R x y.
+  Proof.
+    destruct l as [ | x l ]; simpl.
+    1: easy.
+    intros H%ordered_inv; revert H.
+    induction l in x |- *; simpl.
+    + intros ? ? ? [ <- | [] ]; now apply ordered_from_clos_trans.
+    + intros []%ordered_from_inv ? ? [ <- | ] ?; eauto.
+  Qed.
+
   Fact ordered_from_dec x l : 
         (∀ u v, u ∈ x::l → v ∈ x::l → { R u v } + { ~ R u v })
       → { ordered_from x l } + { ~ ordered_from x l }.

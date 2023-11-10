@@ -504,6 +504,15 @@ Section epsilon0.
     now apply eps0_succ_not_limit in H2 as [].
   Qed.
 
+  Fact eps0_limit_charac h : eps0 h → h ≠ ⨸ → eps0_limit h ↔ ∃ l g, h = ⟨l⊣⊢[g]⟩ ∧ olt ⨸ g.
+  Proof.
+    intros H1 H2; split.
+    + intros H3.
+      destruct (eps0_limit_iff H1 H3 H2); eauto.
+    + intros (l & g & -> & ?).
+      now apply eps0_limit_tail.
+  Qed.
+
   Theorem succ_or_limit h : eps0 h → { p | eps0 p ∧ h = hydra_succ p } + { eps0_limit h }.
   Proof. intros []%eps0_zero_succ_or_limit; eauto. Qed.
 
@@ -973,6 +982,29 @@ Section epsilon0.
   Fact fast_growing_hierarchy_spec e : fastgrow_spec (proj1_sig e) (fast_growing_hierarchy e).
   Proof. destruct e as (h & e); simpl; apply (proj2_sig _). Qed.
 
+  Inductive slowgrow_spec n : hydra → nat → Prop :=
+    | slowgrow_spec_0 :                slowgrow_spec n ⨸ 0
+    | slowgrow_spec_1 l k :            slowgrow_spec n ⟨l⟩ k
+                                     → slowgrow_spec n ⟨l++[⨸]⟩ (S k)
+    | slowgrow_spec_2 h e1 e2 e3 k :   slowgrow_spec n (fund_seq h n e1 e2 e3) k
+                                     → slowgrow_spec n h k.
+
+  Definition slowgrow n h : eps0 h → sig (slowgrow_spec n h).
+  Proof.
+    induction 1 as [ | l _ (k & Hk) | h e1 e2 e3 k ] using eps0_wainer_rect.
+    + exists 0; now constructor.
+    + exists (S k); now constructor.
+    + exists (proj1_sig (k n)).
+      constructor 3 with e1 e2 e3.
+      apply (proj2_sig (k n)).
+  Qed.
+
+  Definition slow_growing_hierarchy : nat → epsilon0 → nat.
+  Proof. intros n (h & e); apply (proj1_sig (slowgrow n h e)). Defined.
+
+  Fact slow_growing_hierarchy_spec n e : slowgrow_spec n (proj1_sig e) (slow_growing_hierarchy n e).
+  Proof. destruct e as (h & e); simpl; apply (proj2_sig _). Qed.
+
   Fact olt_oge_dec g h : { olt g h } + { oge g h }.
   Proof. destruct (olt_sdec g h); subst; eauto; right; red; eauto. Qed.
 
@@ -1198,6 +1230,78 @@ Section epsilon0.
       * now constructor 2.
       * now constructor 3.
   Qed.
+
+  Fact hydra_plus_app l g h m : eps0 ⟨l++[g]⟩ → eps0 ⟨h::m⟩ → oge g h → hydra_plus ⟨l++[g]⟩ ⟨h::m⟩ = ⟨l++[g]++[h]++m⟩.
+  Proof.
+    intros [H1 H2]%eps0_fix [H3 H4]%eps0_fix H5; simpl; f_equal.
+    rewrite Forall_list_plus; eauto.
+    + f_equal; rewrite list_plus_fix3, list_plus_fix0; eauto.
+    + apply Forall_forall.
+      assert (ordered oge (l++g::h::m)) as H6.
+      * apply ordered_comp; auto.
+        do 2 constructor; auto.
+        now apply ordered_inv.
+      * intros; apply oge_trans', ordered_app_clos_trans with (1 := H6); eauto.
+  Qed.
+
+  (** if alpha = ⟨l++[g]⟩ and beta = ⟨h::m⟩ and alpha >= beta
+      then the fundamental sequence of alpha+beta is 
+      n => alpha+beta{n} *)
+
+  Section hydra_plus_app_seq.
+
+    (* This equation will allow us to show Lemma 1
+       in 
+
+           A Short Proof of Two Recently Discovered Independence Results Using Recursion Theoretic Methods
+           by Adam Cichon *)
+
+    Variables (l m : list hydra)
+              (g h : hydra)
+              (Hl : eps0 ⟨l++[g]⟩)
+              (Hm : eps0 ⟨h::m⟩)
+              (Hgh : oge g h)
+              (e0 : eps0 ⟨l++[g]++[h]++m⟩)
+              (e1 : ⟨l++[g]++[h]++m⟩ <> ⨸)
+              (e2 : eps0_limit ⟨l++[g]++[h]++m⟩)
+              (f0 : eps0 ⟨h::m⟩)
+              (f1 : ⟨h::m⟩ <> ⨸)
+              (f2 : eps0_limit ⟨[h]++m⟩)
+              (n : nat).
+
+    Lemma fund_seq_hydra_plus : fund_seq _ n e0 e1 e2 = ⟨l++[g]++hydra_sons (fund_seq _ n f0 f1 f2)⟩.
+    Proof.
+      destruct m as [ | m' k _ ] using (list_snoc_rect).
+      + revert e0 e1 e2; simpl app.
+        replace (l⊣⊢[g; h]) with ((l++[g])++[h]) by apply app_ass.
+        intros e0 e1 e2.
+        rewrite fund_seq_fix_2 with (f1 := f0) (f2 := f1) (f3 := f2).
+        * now rewrite app_ass.
+        * now destruct l.
+      + revert e0 e1 e2.
+        replace (l⊣g⊢([h]⊣⊢(m'⊣⊢[k]))) with ((l++[g;h]++m')++[k]) by now rewrite !app_ass.
+        intros e0 e1 e2.
+        revert f0 f1 f2.
+        simpl; change (h::m'++[k]) with ((h::m')++[k]).
+        intros f0 f1 f2.
+        assert (g0 : eps0 ⟨[k]⟩).
+        1:{ apply eps0_fix, proj2 in e0.
+            apply eps0_fix; split.
+            + repeat constructor.
+            + intros ? [ <- | [] ]; apply e0; auto. } 
+        assert (g1 : ⟨[k]⟩ ≠ ⨸) by easy.
+        assert (g2 : eps0_limit ⟨[k]⟩).
+        1:{ apply eps0_limit_charac; eauto.
+            exists [], k; split; auto.
+            apply eps0_limit_charac in f2; eauto.
+            now destruct f2 as (l' & g' & [_ ->]%hydra_cons_inj%app_inj_tail & ?). }
+        rewrite fund_seq_fix_2 with (f1 := g0) (f2 := g1) (f3 := g2).
+        2: now destruct l.
+        rewrite fund_seq_fix_2 with (f1 := g0) (f2 := g1) (f3 := g2); try easy.
+        simpl; f_equal; rewrite app_ass; simpl; auto.
+    Qed.
+
+  End hydra_plus_app_seq.
 
   (* Constructivelly, we cannot prove that (even decidable ?) subsets of
      eps0 have a lub.  Constructivelly 
