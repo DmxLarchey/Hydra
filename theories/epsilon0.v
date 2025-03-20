@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Wellfounded Utf8 Arith Lia.
+From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
 From Hydra Require Import hydra ordered lex_list.
 
 Import ListNotations hydra_notations.
@@ -114,7 +114,19 @@ Section repeat.
 
 End repeat.
 
-Require Import Arith.
+Fact ordered_from_lmax x l : ordered_from (λ n m, m ≤ n) x l → lmax l ≤ x.
+Proof. induction 1; simpl; lia. Qed.
+
+Fact ordered_lmax l :
+    ordered (λ n m, m ≤ n) l
+  → match l with
+    | []   => True
+    | x::l => lmax (x::l) = x
+    end.
+Proof. induction 1 as [ | ? ? ?%ordered_from_lmax ]; simpl; lia. Qed.
+
+Fact ordered_lmax_cons x l : ordered (λ n m, m ≤ n) (x::l) → lmax (x::l) = x.
+Proof. exact (@ordered_lmax (_::_)). Qed.
 
 Section epsilon0.
 
@@ -208,6 +220,44 @@ Section epsilon0.
     + left; apply E0_fix; auto.
   Qed.
 
+  Local Lemma olt_hydra_ht_rec n g h : ⌊g⌋ < n → ⌊h⌋ < n → E0 g → E0 h → olt g h → ⌊g⌋ ≤ ⌊h⌋.
+  Proof.
+    revert g h; induction n as [ | n IHn ].
+    + intros; lia.
+    + intros [ l ] [ m ] Hl Hm (Hl1 & Hl2)%E0_fix (Hm1 & Hm2)%E0_fix Hlm%olt_inv; simpl.
+      induction Hlm as [ x m | x y l m H | x l m H IH ].
+      * simpl; lia.
+      * simpl map; rewrite !ordered_lmax_cons.
+        - rewrite hydra_ht_cons in Hl, Hm; try lia.
+          apply le_n_S, IHn; eauto; lia.
+        - apply ordered_mono_map with (f := λ g, S ⌊g⌋) (l := _::_) (R := oge); auto.
+          intros a b H1 H2 [ <- | H3 ]; auto.
+          apply le_n_S, IHn; eauto.
+          ++ apply hydra_ht_in in H2; lia.
+          ++ apply hydra_ht_in in H1; lia.
+        - apply ordered_mono_map with (f := λ g, S ⌊g⌋) (l := _::_) (R := oge); auto.
+          intros a b H1 H2 [ <- | H3 ]; auto.
+          apply le_n_S, IHn; eauto.
+          ++ apply hydra_ht_in in H2; lia.
+          ++ apply hydra_ht_in in H1; lia.
+      * simpl map; rewrite !ordered_lmax_cons.
+        - rewrite hydra_ht_cons in Hl, Hm; try lia.
+        - apply ordered_mono_map with (f := λ g, S ⌊g⌋) (l := _::_) (R := oge); auto.
+          intros a b H1 H2 [ <- | H3 ]; auto.
+          apply le_n_S, IHn; eauto.
+          ++ apply hydra_ht_in in H2; lia.
+          ++ apply hydra_ht_in in H1; lia.
+        - apply ordered_mono_map with (f := λ g, S ⌊g⌋) (l := _::_) (R := oge); auto.
+          intros a b H1 H2 [ <- | H3 ]; auto.
+          apply le_n_S, IHn; eauto.
+          ++ apply hydra_ht_in in H2; lia.
+          ++ apply hydra_ht_in in H1; lia.
+  Qed.
+
+  (** On E0, if g is strictly less that h then the height of g is lesser than that of h *) 
+  Theorem olt_hydra_ht g h : E0 g → E0 h → olt g h → ⌊g⌋ ≤ ⌊h⌋.
+  Proof. apply olt_hydra_ht_rec with (n := ⌊g⌋+⌊h⌋+1); lia. Qed.
+
   (* We convert E0 into an equivalent proof irrelevant predicate *)
   Definition eps0 h := squash (E0_dec h).
   Fact eps0_iff h : eps0 h ↔ E0 h.              Proof. apply squash_iff. Qed.
@@ -254,6 +304,8 @@ Section epsilon0.
   Qed.
 
   *)
+
+  About lpo.
 
   Hint Resolve ordered_cons_inv lpo_trans : core.
   Hint Constructors clos_refl_trans : core.
@@ -1509,7 +1561,7 @@ Section epsilon0.
       apply eps0_fix in H as (H1 & H2).
       destruct list_forall_reif with (1 := H2) as (m & Hm).
       assert (Hm' : ordered (ge lt0) m).
-      1:{ revert H1; subst l; apply ordered_map with (f := @proj1_sig _ _).
+      1:{ revert H1; subst l; apply ordered_map_iff with (f := @proj1_sig _ _).
           intros [] []; simpl; rewrite epsilon0_eq_iff; unfold lt0, oge; simpl; tauto. }
       intros H3 H4.
       assert (Hm'' : ∀ o, o ∈ m → P o).

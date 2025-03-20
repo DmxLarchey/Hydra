@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import PeanoNat List Relations Wellfounded Utf8.
+From Coq Require Import PeanoNat Lia List Relations Wellfounded Utf8.
 
 Import ListNotations.
 
@@ -32,8 +32,8 @@ Arguments clos_trans {_}.
 
 (** Notations for lists insertion patterns *)
 #[local] Infix "∈" := In (at level 70, no associativity).
-#[local] Notation  "l ⊣ x ⊢ r" := (l++[x]++r) (at level 1, format "l ⊣ x ⊢ r").
-#[local] Notation "l '⊣⊢' r" := (l++r) (at level 1, format "l ⊣⊢ r").
+#[global] Notation  "l ⊣ x ⊢ r" := (l++[x]++r) (at level 1, format "l ⊣ x ⊢ r").
+#[global] Notation "l '⊣⊢' r" := (l++r) (at level 1, format "l ⊣⊢ r").
 
 #[local] Hint Constructors clos_trans : core.
 #[local] Hint Resolve Acc_inv Acc_intro 
@@ -118,7 +118,7 @@ Section list_order.
     Local Fact Acc_lo_step_nil : W [].
     Proof. constructor 1; intros _ []%lo_step_nil_inv. Qed.
 
-    Let W_app_bound y r :
+    Local Fact W_app_bound y r :
         (∀x, x ≺ y → ∀l, W l → W (x::l))
        → W r 
        → ∀l, l ≺ₗ y → W (l++r).
@@ -128,15 +128,21 @@ Section list_order.
       intros; apply hy; eauto.
     Qed.
 
-    Let W_cons_rec y m :
+    Hint Resolve W_app_bound : core.
+
+    Local Fact W_cons_rec y m :
            (∀x, x ≺ y → ∀l, W l → W (x::l))
          → W m
          → (∀l, l ⊏ m → W (y::l))
          → W (y::m).
     Proof. constructor; intros ? [ (? & -> & ?) | (? & ? & ? & ? & -> & -> & ?) ]%lo_step_cons_right_inv; eauto. Qed.
 
-    Let W_cons y : (∀x, x ≺ y → ∀l, W l → W (x::l)) → ∀l, W l → W (y::l).
+    Hint Resolve W_cons_rec : core.
+
+    Local Fact W_cons y : (∀x, x ≺ y → ∀l, W l → W (x::l)) → ∀l, W l → W (y::l).
     Proof. induction 2; eauto. Qed.
+
+    Hint Resolve W_cons : core.
 
     Local Lemma Acc_lo_step_cons x : Acc R x → ∀l, W l → W (x::l).
     Proof. induction 1; eauto. Qed.
@@ -243,8 +249,8 @@ Inductive hydra := hydra_cons : list hydra → hydra.
 
 Set Elimination Schemes.
 
-#[local] Notation "⟨ l ⟩" := (hydra_cons l).
-#[local] Notation "⨸" := ⟨[]⟩.  (* the head hydra *)
+#[global] Notation "⟨ l ⟩" := (hydra_cons l).
+#[global] Notation "⨸" := ⟨[]⟩.  (* the head hydra *)
 
 Definition hydra_sons h := match h with ⟨l⟩ => l end.
 
@@ -422,6 +428,12 @@ Proof.
       now exists [], m. 
 Qed.
 
+Fact lmax_in x l : x ∈ l → x ≤ lmax l.
+Proof.
+  induction l as [ | y l IHl ]; simpl; try tauto. 
+  intros [ | ?%IHl ]; subst; simpl; tauto || lia.
+Qed.
+
 (** Tools using the height of a hydra *)
 
 (* Like hydra_ind, this is a guarded nested fixpoint *)
@@ -430,6 +442,12 @@ Fixpoint hydra_ht (h : hydra) : nat :=
   | ⟨l⟩ => lmax (map (λ g, 1+⌊g⌋) l)
   end
 where "⌊ h ⌋" := (hydra_ht h).
+
+Fact hydra_ht_cons h l : ⌊⟨h::l⟩⌋ = max (1+⌊h⌋) ⌊⟨l⟩⌋.
+Proof. reflexivity. Qed.
+
+Fact hydra_ht_in h l : h ∈ l → 1+⌊h⌋ ≤ ⌊⟨l⟩⌋.
+Proof. intros H; simpl; apply lmax_in, in_map_iff; eauto. Qed.
 
 Fact hydra_ht_0_inv h : ⌊h⌋ = 0 → h = ⨸.
 Proof.

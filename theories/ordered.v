@@ -138,7 +138,20 @@ End ordered.
 Fact ordered_from_ge_Acc X R (x : X) l : ordered_from (ge R) x l → Acc R x → ∀y, y ∈ l → Acc R y.
 Proof. induction 1 as [ | ? ? ? [ <- | ] ]; intros ? ? []; subst; eauto. Qed.
 
-Fact ordered_map X Y (f : X -> Y) R T :
+Fact ordered_mono_map X Y (f : X → Y) (R : X → X → Prop) (T : Y → Y → Prop) l :
+         (∀ a b, a ∈ l → b ∈ l → R a b → T (f a) (f b))
+        → ordered R l → ordered T (map f l).
+Proof.
+  intros H1 H2; revert H2 H1.
+  induction 1 as [ | x l H1 ]; [ constructor | ].
+  intros H2; simpl; constructor 2.
+  revert H1 H2.
+  induction 1 as [ x | x y l H1 IH1 ]; simpl; intros H2.
+  + constructor 1.
+  + constructor 2; auto.
+Qed.
+
+Fact ordered_map_iff X Y (f : X -> Y) R T :
          (∀ a b, R a b ↔ T (f a) (f b))
         → ∀l, ordered R l ↔ ordered T (map f l).
 Proof.
@@ -179,6 +192,7 @@ Section mono.
   Proof. induction 2; eauto. Qed.
 
 End mono.
+
 
 Section list_plus.
 
