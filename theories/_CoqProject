@@ -4,4 +4,5 @@ hydra.v
 Hydra.v
 ordered.v
 lex_list.v
+eps0.v
 epsilon0.v
