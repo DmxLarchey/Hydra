@@ -193,6 +193,34 @@ Section mono.
 
 End mono.
 
+Section ordered_morphism.
+
+  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
+            (f : X → Y → Prop).
+
+  Fact ordered_from_morphism x l y m : 
+      (∀ x₁ x₂ y₁ y₂, x₁ ∈ x::l → x₂ ∈ x::l → f x₁ y₁ → f x₂ y₂ → R x₁ x₂ → T y₁ y₂)
+    → f x y 
+    → Forall2 f l m
+    → ordered_from R x l
+    → ordered_from T y m. 
+  Proof.
+    intros f_morph H1 H2 H3; revert H3 y m H1 H2.
+    induction 1.
+    + inversion 2; constructor.
+    + inversion 2; subst; constructor 2; eauto.
+  Qed.
+
+  Hint Resolve ordered_from_morphism : core.
+ 
+  Fact ordered_morphism l m :
+      (∀ x₁ x₂ y₁ y₂, x₁ ∈ l → x₂ ∈ l → f x₁ y₁ → f x₂ y₂ → R x₁ x₂ → T y₁ y₂)
+    → Forall2 f l m
+    → ordered R l
+    → ordered T m.
+  Proof. intros ? H; induction 1; inversion H; subst; constructor; eauto. Qed.
+
+End ordered_morphism.
 
 Section list_plus.
 

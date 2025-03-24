@@ -99,122 +99,83 @@ Section E0_fall_rect.
 
 End E0_fall_rect.
 
-Section lex_ilist.
+Section lex2.
 
   Variables (X I : Type) (RX : X → X → Prop) (RI : I → I → Prop).
 
-  (* lexicographic order on lists, head is most significant *)
-  Inductive lex_ilist : list (X*I) → list (X*I) → Prop :=
-    | lex_ilist_nil xi m       : lex_ilist [] (xi::m)
-    | lex_ilist_RX x i y j l m : RX x y → lex_ilist ((x,i)::l) ((y,j)::m)
-    | lex_ilist_RI x i j l m   : RI i j → lex_ilist ((x,i)::l) ((x,j)::m)
-    | lex_ilist_cons xi l m    : lex_ilist l m → lex_ilist (xi::l) (xi::m).
+  Inductive lex2 : X*I → X*I → Prop :=
+    | lex2_left x i y j : RX x y → lex2 (x,i) (y,j)
+    | lex2_right x i j  : RI i j → lex2 (x,i) (x,j).
 
-  Hint Constructors lex_ilist : core.
+  Hint Constructors lex2 : core.
 
-  (* introduction lemmas *)
+  Fact lex2_inv xi yj :
+      lex2 xi yj
+    → match xi, yj with
+      | (x,i), (y,j) => RX x y ∨ x = y ∧ RI i j
+      end.
+  Proof. destruct 1; eauto. Qed.
 
-  Fact lex_ilist_app_head c l m : lex_ilist l m → lex_ilist (c++l) (c++m).
-  Proof. induction c; simpl; eauto. Qed.
+  Lemma lex2_irrefl xi : lex2 xi xi → RX (fst xi) (fst xi) ∨ RI (snd xi) (snd xi).
+  Proof. revert xi; intros []?%lex2_inv; simpl; tauto. Qed.
 
-  Hint Resolve lex_ilist_app_head : core.
+  Section lex2_trans.
 
-  Fact lex_ilist_prefix' p x l : lex_ilist p (p++x::l).
-  Proof. rewrite (app_nil_end p) at 1; auto. Qed.
+    Variables (l m p : list (X*I))
+              (RXtrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ p → RX x y → RX y z → RX x z)
+              (RItrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ p → RI i j → RI j u → RI i u).
 
-  Hint Resolve lex_ilist_prefix' : core.
-
-  Fact lex_ilist_prefix p l : l ≠ [] → lex_ilist p (p++l).
-  Proof. destruct l; [ easy | auto ]. Qed. 
-
-  Fact lex_ilist_snoc h l : lex_ilist l (l++[h]).
-  Proof. now apply lex_ilist_prefix. Qed.
-
-  (* inversion lemmas *)
-
-  Inductive lex_ilist_inv_shape l m y j : X → I → Prop :=
-    | in_lex_ilist_inv_shape2 x i : RX x y → lex_ilist_inv_shape l m y j x i
-    | in_lex_ilist_inv_shape3 i   : RI i j → lex_ilist_inv_shape l m y j y i
-    | in_lex_ilist_inv_shape4     : lex_ilist l m → lex_ilist_inv_shape l m y j y j.
-
-  Hint Constructors lex_ilist_inv_shape : core.
-
-  Fact lex_ilist_inv l m :
-         lex_ilist l m 
-       ↔ match l, m with 
-         | _, []      => False
-         | [], _      => True
-         | (x,i)::l, (y,j)::m => lex_ilist_inv_shape l m y j x i
-         end.
-  Proof. 
-    split.
-    + intros [ | | | [] ]; eauto.
-    + revert l m; intros [|[]] [|[]] []; eauto.
-  Qed.
-
-  Section lex_ilist_irrefl.
-
-    Let ll_irrefl_rec l m : lex_ilist l m → l = m → ∃ x i, (x,i) ∈ l ∧ (RX x x ∨ RI i i).
+    Lemma lex2_trans xi yj zk : xi ∈ l → yj ∈ m → zk ∈ p → lex2 xi yj → lex2 yj zk → lex2 xi zk.
     Proof.
-      induction 1 as [ | | | [] ? ? ? IH ]; try easy.
-      * inversion 1; subst; eauto.
-      * inversion 1; subst; eauto.
-      * injection 1; intros (? & ? & [])%IH; eauto.
+      revert xi yj zk.
+      intros [] [] [] ? ? ? [ | (<- & ?) ]%lex2_inv [ | (<- & ?) ]%lex2_inv; eauto.
     Qed.
 
-    Lemma lex_ilist_irrefl l : lex_ilist l l → ∃ x i, (x,i) ∈ l ∧ (RX x x ∨ RI i i).
-    Proof. intros ?%ll_irrefl_rec; auto. Qed.
-
-  End lex_ilist_irrefl.
-
-  Section lex_ilist_trans.
-
-    Variables (l m k : list (X*I))
-              (RXtrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ k → RX x y → RX y z → RX x z)
-              (RItrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ k → RI i j → RI j u → RI i u).
-
-    Lemma lex_ilist_trans : lex_ilist l m → lex_ilist m k → lex_ilist l k.
-    Proof.
-      intros H1 H2; revert H1 k H2 RXtrans RItrans.
-      induction 1 as [ [] m | | | [] ? ? ? IH1 ];
-        intros [|[]] Hk%lex_ilist_inv; try destruct Hk; eauto.
-      constructor 4; apply IH1; eauto.
-    Qed.
-
-  End lex_ilist_trans.
+  End lex2_trans.
 
   Hint Constructors sdec : core.
 
-  Section lex_list_total.
+  Section lex2_sdec.
 
     Variables (l m : list (X*I))
               (RX_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RX x y)
               (RI_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RI i j).
 
-    Theorem lex_ilist_sdec : sdec lex_ilist l m.
+    Lemma lex2_sdec xi yj : xi ∈ l → yj ∈ m → sdec lex2 xi yj.
     Proof.
-      revert m RX_sdec RI_sdec.
-      rename l into l'.
-      induction l' as [ | [x i] l IHl ]; intros [ | [y j] m ] RX_sdec RI_sdec; eauto.
-      destruct (RX_sdec x i y j) as [ x y H | x | x y H ]; eauto.
-      destruct (RI_sdec x i x j) as [ i j H | i | i j H ]; eauto.
-      destruct (IHl m); eauto.
+      revert xi yj; intros (x,i) (y,j) ? ?.
+      destruct (RX_sdec x i y j) as [| x |]; eauto.
+      destruct (RI_sdec x i x j); eauto.
     Qed.
 
-  End lex_list_total.
+  End lex2_sdec.
 
-End lex_ilist.
+  Section Acc.
 
-Arguments lex_ilist {_ _}.
+    Hypothesis RI_wf : well_founded RI.
 
-#[local] Hint Constructors lex_ilist : core.
+    Fact Acc_lex2 x : Acc RX x → ∀i, Acc lex2 (x,i).
+    Proof.
+      induction 1 as [ x _ IHx ].
+      intros i; induction i using (well_founded_induction RI_wf).
+      constructor.
+      intros [] [ | (<- & ?) ]%lex2_inv; eauto.
+    Qed.
+
+  End Acc.
+
+End lex2.
+
+Arguments lex2 {_ _}.
 
 Unset Elimination Schemes.
 
 Inductive E0_lt : E0 → E0 → Prop :=
-  | E0_lt_intro l m : lex_ilist E0_lt lt l m → E0_lt ω[l] ω[m].
+  | E0_lt_intro l m : lex_list (lex2 E0_lt lt) l m → E0_lt ω[l] ω[m].
 
 Set Elimination Schemes.
+
+#[local] Hint Constructors E0_lt : core.
 
 Notation "e '<E₀' f" := (E0_lt e f) (at level 70, format "e  <E₀  f").
 
@@ -222,7 +183,7 @@ Notation "e '<E₀' f" := (E0_lt e f) (at level 70, format "e  <E₀  f").
 
 (* This inversion principle is enough to reason about <ε₀, 
    proceeding by induction on arguments *)
-Fact E0_lt_inv l m : ω[l] <E₀ ω[m] ↔ lex_ilist E0_lt lt l m.
+Fact E0_lt_inv l m : ω[l] <E₀ ω[m] ↔ lex_list (lex2 E0_lt lt) l m.
 Proof. split; auto; now inversion 1. Qed.
 
 (** We show that <E₀ is a strict order (irreflexive and transitive)
@@ -238,10 +199,10 @@ Proof. lia. Qed.
 Lemma E0_lt_irrefl e : ¬ e <E₀ e.
 Proof.
   induction e as [ l IH ].
-  intros (x & i & ? & [ ?%(IH _ i) | ?%lt_irrefl])%E0_lt_inv%lex_ilist_irrefl; auto.
+  intros ((?,i) & ? & [ ?%(IH _ i) | ?%lt_irrefl ]%lex2_irrefl)%E0_lt_inv%lex_list_irrefl; auto.
 Qed.
 
-#[local] Hint Resolve lt_trans : core.
+#[local] Hint Resolve lt_trans lex2_trans : core.
 
 (* transitive *)
 Lemma E0_lt_trans : transitive E0_lt.
@@ -249,7 +210,7 @@ Proof.
   intros e.
   induction e as [ l IH ]. 
   intros [] [] H1%E0_lt_inv H2%E0_lt_inv; constructor.
-  revert H1 H2; apply lex_ilist_trans; eauto.
+  revert H1 H2; apply lex_list_trans; eauto.
 Qed.
 
 #[local] Hint Constructors sdec : core.
@@ -257,13 +218,13 @@ Qed.
 Lemma lt_sdec i j : sdec lt i j.
 Proof. destruct (lt_eq_lt_dec i j) as [ [ | []] | ]; eauto. Qed.
 
-#[local] Hint Resolve lt_sdec : core.
+#[local] Hint Resolve lt_sdec lex2_sdec : core.
 
 (* computably total *)
 Lemma E0_lt_sdec e f : sdec E0_lt e f.
 Proof.
   revert f; induction e as [l]; intros [m].
-  destruct (@lex_ilist_sdec _ _ E0_lt lt l m); eauto.
+  destruct (@lex_list_sdec _ (lex2 E0_lt lt) l m); eauto.
 Qed.
 
 #[local] Hint Resolve E0_lt_trans E0_lt_irrefl : core.
@@ -333,6 +294,69 @@ Proof.
   + right; rewrite E0_cnf_fix; tauto.
 Qed.
 
+Inductive E0_lpo : E0 → E0 → Prop :=
+  | E0_lpo_intro l m : lo (lex2 E0_lpo lt) l m → E0_lpo ω[l] ω[m].
+
+#[local] Hint Constructors E0_lpo : core.
+
+Fact E0_lpo_inv l m : E0_lpo ω[l] ω[m] → lo (lex2 E0_lpo lt) l m.
+Proof. now inversion 1. Qed.
+
+#[local] Hint Resolve lt_wf : core.
+
+Section wf_rel_morph.
+
+  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
+            (f : X → Y → Prop)
+            (f_surj : ∀y, ∃x, f x y)
+            (f_morph : ∀ x₁ x₂ y₁ y₂, f x₁ y₁ → f x₂ y₂ → T y₁ y₂ → R x₁ x₂).
+
+  Theorem Acc_rel_morph x y : f x y → Acc R x → Acc T y.
+  Proof.
+    intros H1 H2; revert H2 y H1.
+    induction 1 as [ x _ IH ]; intros y ?.
+    constructor; intros z ?.
+    destruct (f_surj z); eauto.
+  Qed.
+
+  Hint Resolve Acc_rel_morph : core.
+
+  Corollary wf_rel_morph : well_founded R → well_founded T.
+  Proof. intros ? y; destruct (f_surj y); eauto. Qed.
+
+End wf_rel_morph.
+
+Lemma wf_E0_lpo : well_founded E0_lpo.
+Proof.
+  intros e.
+  induction e as [ l IH ].
+  assert (Acc (lo (lex2 E0_lpo lt)) l) as Hl.
+  1:{ apply Acc_lo_iff.
+      intros [] ?.
+      apply Acc_lex2; eauto. }
+  revert Hl.
+  apply Acc_rel_morph with (f := fun l e => ω[l] = e); auto.
+  + intros []; eauto.
+  + now intros ? ? ? ? <- <- ?%E0_lpo_inv.
+Qed.
+
+Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ~ R x x.
+Proof. induction 1 as [ x _ IH ]; intros H; exact (IH _ H H). Qed.
+
+Fact E0_lpo_irrefl e : ~ E0_lpo e e.
+Proof. apply Acc_irrefl with (1 := wf_E0_lpo _). Qed.
+
+Fact E0_lpo_trans : transitive E0_lpo.
+Proof.
+  intros [l] [m] [k] ?%E0_lpo_inv ?%E0_lpo_inv.
+  constructor; econstructor 2; eauto.
+Qed.
+
+#[local] Hint Resolve E0_lpo_trans : core.
+
+Fact E0_lpo_trans' e f : clos_trans E0_lpo e f → E0_lpo e f.
+Proof. induction 1; eauto. Qed.
+
 Section squash.
 
   (* Squashing map a (strongly) decidable predicate into
@@ -368,7 +392,8 @@ Qed.
 (* We convert the recursor *)
 Fact cnf_rect (P : E0 → Type) :
     (∀l, ordered E0_lt⁻¹ (map fst l) 
-       → (∀ e i, (e,i) ∈ l → 0 < i ∧ cnf e)
+       → (∀ e i, (e,i) ∈ l → 0 < i)
+       → (∀ e i, (e,i) ∈ l → cnf e)
        → (∀ e i, (e,i) ∈ l → P e)
        → P ω[l])
   → ∀e, cnf e → P e.
@@ -376,18 +401,81 @@ Proof.
   intros HP h H%cnf_iff; revert h H.
   induction 1 as [ l [] H2 IH ] using E0_fall_rect.
   apply HP; auto.
-  intros ? i; split; eauto.
+  intros ? i ?.
   apply cnf_iff, (H2 _ i); auto.
 Qed.
 
-(* We now show that E0_lt is well_founded on cnf because 
-   on this subtype, it is equivalent to the nested list ordering lpo
-   which is itself well_founded. To Check because this does
-   not take multiplicities into account. *)
+Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo lt).
+Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
 
-Definition epsilon0 := { e | cnf e }.
+#[local] Hint Resolve lex2_E0_lpo_lt_trans : core.
 
-Notation ε₀ := epsilon0.
+Fact lex2_E0_lpo_lt_trans' xi yj : clos_trans (lex2 E0_lpo lt) xi yj → lex2 E0_lpo lt xi yj.
+Proof. induction 1; eauto. Qed.
+
+#[local] Hint Constructors lex2 : core.
+
+#[local] Hint Resolve lex_list_mono : core.
+
+(** The fundamental theorem: E0_lt is well-founded on CNF *)
+Lemma cnf_lt_lpo e f : cnf e → cnf f → e <E₀ f → E0_lpo e f.
+Proof.
+  intros H1 H2; revert e H1 f H2.
+  induction 1 as [ l He1 He2 He3 IH ] using cnf_rect.
+  induction 1 as [ m Hf1 Hf2 Hf3 _   ] using cnf_rect.
+  intros H%E0_lt_inv.
+  constructor.
+  apply lo_mono with (1 := lex2_E0_lpo_lt_trans').
+  apply ordered_lex_list_lo; eauto.
+  + revert He1.
+    apply ordered_morphism with (f := fun x y => x = fst y).
+    * intros ? ? [] [] ([] & ? & ?)%in_map_iff ([] & ? & ?)%in_map_iff -> ->; right; left; simpl in *; subst; eauto.
+    * clear He2 He3 IH H; induction l; simpl; constructor; auto.
+  + revert H; apply lex_list_mono.
+    intros [] [] ? ? [| (<- & ?)]%lex2_inv; eauto.
+Qed.
+
+(** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
+
+Definition eps0 := { e | cnf e }.
+
+Notation ε₀ := eps0.
+
+Notation π₁ := proj1_sig.
+Notation π₂ := proj2_sig.
+
+(** ε₀ is itself equipped with the restriction of the nested lex. order
+    denoted <ε₀ *)
+
+Definition eps0_lt (e f : ε₀) := E0_lt (π₁ e) (π₁ f).
+
+Notation "e '<ε₀' f" := (eps0_lt e f) (at level 70, format "e  <ε₀  f").
+
+(** The nested lexicographic order <ε₀ is a strict total/decidable order *)
+
+Theorem eps0_lt_irrefl e : ¬ e <ε₀ e.
+Proof. destruct e; apply E0_lt_irrefl. Qed.
+
+Theorem eps0_lt_trans : transitive eps0_lt.
+Proof. intros [] [] []; apply E0_lt_trans. Qed.
+
+Theorem eps0_lt_sdec e f : sdec eps0_lt e f.
+Proof.
+  revert e f; intros (e & He) (f & Hf).
+  destruct (E0_lt_sdec e f) as []; eauto.
+  rewrite (cnf_pirr _ He Hf); auto.
+Qed.
+
+#[local] Hint Resolve cnf_lt_lpo : core.
+
+(* <ε₀ is well-founded *)
+Theorem wf_eps0_lt : well_founded eps0_lt.
+Proof.
+  generalize wf_E0_lpo.
+  apply wf_rel_morph with (f := fun x y => x = π₁ y).
+  + intros []; eauto.
+  + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
+Qed.
 
 Section epsilon0_rect.
 
