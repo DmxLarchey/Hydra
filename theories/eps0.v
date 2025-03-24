@@ -444,6 +444,13 @@ Notation ε₀ := eps0.
 Notation π₁ := proj1_sig.
 Notation π₂ := proj2_sig.
 
+Fact eps0_eq_iff (e f : ε₀) : e = f ↔ π₁ e = π₁ f.
+Proof.
+  split; intro H; subst; auto.
+  revert e f H; intros [e He] [f Hf] ?; simpl in *; subst.
+  now rewrite (cnf_pirr _ He Hf).
+Qed.
+
 (** ε₀ is itself equipped with the restriction of the nested lex. order
     denoted <ε₀ *)
 
@@ -476,6 +483,122 @@ Proof.
   + intros []; eauto.
   + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
 Qed.
+
+Fact cnf_zero : cnf ω[nil].
+Proof.
+  apply cnf_fix; simpl; split.
+  + constructor.
+  + tauto.
+Qed.
+
+#[local] Hint Resolve cnf_zero : core.
+
+Definition eps0_zero : ε₀.
+Proof. now exists ω[nil]. Defined.
+
+Definition eps0_le e f := e <ε₀ f ∨ e = f.
+
+Notation "e '≤ε₀' f" := (eps0_le e f) (at level 70, format "e  ≤ε₀  f").
+
+Fact eps0_le_iff e f : e ≤ε₀ f ↔ π₁ e <E₀ π₁ f ∨ π₁ e = π₁ f.
+Proof.
+  unfold eps0_le; rewrite eps0_eq_iff.  
+  revert e f; intros [ e He ] [ f Hf ]; simpl; tauto.
+Qed.
+
+Fact eps0_zero_least e : eps0_zero ≤ε₀ e.
+Proof.
+  apply eps0_le_iff.
+  destruct e as [ [l] He ]; simpl.
+  destruct l as [ | x l ]; auto; left.
+  constructor; constructor.
+Qed.
+
+(* e is a strict upper bounded of P *)
+Definition eps0_is_sub (P : ε₀ → Prop) e := ∀x, P x → x <ε₀ e.
+
+(* e is the least strict upper bound of P *) 
+Definition eps0_is_lub (P : ε₀ → Prop) e := eps0_is_sub P e ∧ ∀x, eps0_is_sub P x → e ≤ε₀ x.
+
+(* A limit ordinal is a strict upperbound (of lesser ordinals) *)
+Definition eps0_is_limit e := exists P, eps0_is_lub P e.
+
+Fact eps0_zero_is_limit : eps0_is_limit eps0_zero.
+Proof.
+  exists (fun _ => False); split.
+  + intros ? [].
+  + intros; apply eps0_zero_least.
+Qed.
+
+Fact eps0_zero_or_pos e : { e = eps0_zero } + { eps0_zero <ε₀ e }.
+Proof.
+  destruct e as [ [ [ | x l ] ] Hl ].
+  + left; apply eps0_eq_iff; auto.
+  + right; cbv; repeat constructor.
+Qed.
+
+Fact rev_rect X (P : list X → Type) :
+      P [] → (∀ l x, P l → P (l++[x])) → ∀l, P l.
+Proof.
+  intros H1 H2 l; revert l P H1 H2.
+  induction l as [ | x l IH ]; intros P H1 H2; auto.
+  apply IH.
+  + apply (H2 []); auto.
+  + intros ? ? ?; now apply (H2 (_::_)).
+Qed.
+
+Fact in_snoc_iff X (l : list X) x y : y ∈ l++[x] ↔ x = y ∨ y ∈ l.
+Proof. rewrite in_app_iff; simpl; tauto. Qed.
+
+Fact snoc_assoc X l (x y : X) : l++[x;y] = (l++[x])++[y].
+Proof. now rewrite <- app_assoc. Qed.
+
+Inductive E0_succ_graph : E0 → E0 → Prop :=
+  | E0_succ_graph0   : E0_succ_graph ω[[]] ω[[(ω[[]],1)]]
+  | E0_succ_graph1 l i : E0_succ_graph ω[l++[(ω[[]],i)]] ω[l++[(ω[[]],S i)]] 
+  | E0_succ_graph2 l x i : x <> ω[[]] → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]]. 
+
+Definition E0_succ_pwc (e : E0) : sig (E0_succ_graph e).
+Proof.
+  destruct e as [l].
+  destruct l as [ | l (x,i) _ ] using rev_rect.
+  + exists ω[(ω[nil],1)::nil]; constructor.
+  + destruct x as [ [ | y m ] ].
+    * exists ω[l++[(ω[[]],S i)]]; constructor.
+    * exists ω[l⊣⊢[(ω[y::m],i);(ω[[]],1)]]; now constructor.
+Qed.
+
+Definition E0_succ e := π₁ (E0_succ_pwc e).
+Fact E0_succ_spec e : E0_succ_graph e (E0_succ e).
+Proof. apply (proj2_sig _). Qed.
+
+Fact E0_succ_correct : ∀e, cnf e → cnf (E0_succ e).
+Proof.
+  intros e.
+  generalize (E0_succ e) (E0_succ_spec e).
+  induction 1 as [ | l i | l x i ]; rewrite !cnf_fix;
+    intros [H1 H2]; split; simpl in *; eauto.
+  + repeat constructor.
+  + intros ? ? [ [=] | [] ]; subst; auto.
+  + rewrite map_app in * |- *; auto.
+  + intros ? ? [ [=] | ]%in_snoc_iff; subst; auto.
+    split; auto || lia.
+  + rewrite map_app in * |- *; simpl; auto.
+    rewrite snoc_assoc.
+    (** Possibly ordered rev ? *)
+    admit.
+  + intros e j; rewrite snoc_assoc. 
+    intros [ [=] | ]%in_snoc_iff; subst; auto.
+Admitted.
+
+Definition eps0_succ (e : ε₀) : ε₀.
+Proof.
+  destruct e as [ e He ].
+  exists (E0_succ e).
+  now apply E0_succ_correct.
+Defined.
+
+(** Show that there is no ordinal between e and (eps0_succ e) *)
 
 Section epsilon0_rect.
 
