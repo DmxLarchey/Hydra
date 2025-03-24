@@ -21,6 +21,8 @@ Set Implicit Arguments.
 
 #[global] Notation ge R := (λ x y, x = y ∨ R y x).
 
+#[global] Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
+
 Inductive sdec {X} (R : X → X → Prop) : X → X → Type :=
   | sdec_lt x y : R x y → sdec R x y
   | sdec_eq x : sdec R x x
@@ -30,78 +32,100 @@ Definition dec (P : Prop) := {P} + {~P}.
 
 Section ordered.
 
-  Variables (X : Type) (R : X → X → Prop).
+  Variables (X : Type).
 
-  Inductive ordered_from : X → list X → Prop :=
-    | ordered_from_nil x : ordered_from x []
-    | ordered_from_cons x y l : R x y → ordered_from y l → ordered_from x (y::l).
+  Implicit Type (R : X → X → Prop).
 
-  Inductive ordered : list X → Prop :=
-    | ordered_nil : ordered []
-    | ordered_cons x l : ordered_from x l → ordered (x::l).
+  Inductive ordered_from R : X → list X → Prop :=
+    | ordered_from_nil x : ordered_from R x []
+    | ordered_from_cons x y l : R x y → ordered_from R y l → ordered_from R x (y::l).
+
+  Inductive ordered R : list X → Prop :=
+    | ordered_nil : ordered R []
+    | ordered_cons x l : ordered_from R x l → ordered R (x::l).
 
   Hint Constructors ordered_from ordered : core.
 
-  Fact ordered_from_inv x y l : ordered_from x (y::l) → R x y ∧ ordered_from y l.
+  Fact ordered_from_inv R x y l : ordered_from R x (y::l) → R x y ∧ ordered_from R y l.
   Proof. inversion 1; auto. Qed.
 
-  Fact ordered_from_inv_iff x y l : ordered_from x (y::l) ↔ R x y ∧ ordered_from y l.
+  Fact ordered_from_inv_iff R x y l : ordered_from R x (y::l) ↔ R x y ∧ ordered_from R y l.
   Proof. split; [ inversion 1 | intros []; constructor ]; auto. Qed.
 
-  Fact ordered_inv_iff x l : ordered (x::l) ↔ ordered_from x l.
+  Fact ordered_inv_iff R x l : ordered R (x::l) ↔ ordered_from R x l.
   Proof. split; [ now inversion 1 | now constructor ]. Qed.
 
-  Fact ordered_inv x l : ordered (x::l) → ordered_from x l.
+  Fact ordered_inv R x l : ordered R (x::l) → ordered_from R x l.
   Proof. now inversion 1. Qed.
 
-  Fact ordered_from_ordered x l : ordered_from x l → ordered l.
+  Fact ordered_from_ordered R x l : ordered_from R x l → ordered R l.
   Proof. induction 1; eauto. Qed.
 
   Hint Resolve ordered_inv ordered_from_ordered : core.
 
-  Fact ordered_cons_inv x l : ordered (x::l) → ordered l.
+  Fact ordered_cons_inv R x l : ordered R (x::l) → ordered R l.
   Proof. eauto. Qed.
 
-  Fact ordered_from_app_head x l m : ordered_from x (l++m) → ordered_from x l.
+  Fact ordered_from_app_head R x l m : ordered_from R x (l++m) → ordered_from R x l.
   Proof. induction l in x |- *; simpl; eauto; intros []%ordered_from_inv; eauto. Qed.
 
-  Fact ordered_from_app_tail x l m : ordered_from x (l++m) → ordered m.
+  Fact ordered_from_app_tail R x l m : ordered_from R x (l++m) → ordered R m.
   Proof. induction l in x |- *; simpl; eauto. Qed.
 
   Hint Resolve ordered_from_app_head ordered_from_app_tail : core.
 
-  Fact ordered_app_head l m : ordered (l++m) → ordered l.
+  Fact ordered_app_head R l m : ordered R (l++m) → ordered R l.
   Proof. destruct l; auto; simpl; intros ?%ordered_inv; eauto. Qed.
 
-  Fact ordered_app_tail l m : ordered (l++m) → ordered m.
+  Fact ordered_app_tail R l m : ordered R (l++m) → ordered R m.
   Proof. destruct l; simpl; auto; intros ?%ordered_inv; eauto. Qed.
 
-  Fact ordered_from_comp x l y m : ordered_from x (l++[y]) → ordered_from y m → ordered_from x (l++[y]++m).
+  Fact ordered_from_comp R x l y m : ordered_from R x (l++[y]) → ordered_from R y m → ordered_from R x (l++[y]++m).
   Proof. induction l in x |- *; simpl; intros []%ordered_from_inv; eauto. Qed.
 
-  Fact ordered_comp l x m : ordered (l++[x]) → ordered (x::m) → ordered (l++[x]++m).
+  Fact ordered_comp R l x m : ordered R (l++[x]) → ordered R (x::m) → ordered R (l++[x]++m).
   Proof.
     destruct l; simpl; auto; intros ?%ordered_inv ?%ordered_inv.
     now constructor; apply ordered_from_comp.
   Qed.
 
-  Fact ordered_from_tail x l y z : ordered_from x (l++[y]) → (∀u, R u y → R u z) → ordered_from x (l++[z]).
+  Fact ordered_from_tail R x l y z : ordered_from R x (l++[y]) → (∀u, R u y → R u z) → ordered_from R x (l++[z]).
   Proof. induction l in x |- *; simpl; intros []%ordered_from_inv; constructor; eauto. Qed.
 
   Hint Resolve ordered_from_tail : core.
 
-  Fact ordered_tail l x y : ordered (l++[x]) → (∀u, R u x → R u y) → ordered (l++[y]).
+  Fact ordered_tail R l x y : ordered R (l++[x]) → (∀u, R u x → R u y) → ordered R (l++[y]).
   Proof. destruct l; simpl; eauto. Qed.
+
+  Fact ordered_from_rev R x l : ordered_from R x l → ordered R⁻¹ (rev l++[x]).
+  Proof.
+    induction 1 as [ | x y l H _ IH ]; simpl; auto.
+    rewrite <- app_assoc.
+    apply ordered_comp with (m := [_]); auto.
+  Qed.
+
+  Hint Resolve ordered_from_rev : core.
+
+  Fact ordered_rev R l : ordered R l → ordered R⁻¹ (rev l).
+  Proof. induction 1; simpl; auto. Qed.
+
+  Fact ordered_rev_iff R l : ordered R l ↔ ordered R⁻¹ (rev l).
+  Proof.
+    split.
+    + apply ordered_rev.
+    + intros ?%ordered_rev.
+      now rewrite <- rev_involutive.
+  Qed.
 
   Hint Constructors clos_trans : core.
 
-  Fact ordered_from_clos_trans x l : ordered_from x l → ∀ y, y ∈ l → clos_trans R x y.
+  Fact ordered_from_clos_trans R x l : ordered_from R x l → ∀ y, y ∈ l → clos_trans R x y.
   Proof.
     induction 1 as [ | x y l H1 H2 IH2 ]; [ easy | ].
     intros ? [ <- | ? ]; eauto.
   Qed.
 
-  Fact ordered_app_clos_trans l m : ordered (l++m) → ∀ x y, x ∈ l → y ∈ m → clos_trans R x y.
+  Fact ordered_app_clos_trans R l m : ordered R (l++m) → ∀ x y, x ∈ l → y ∈ m → clos_trans R x y.
   Proof.
     destruct l as [ | x l ]; simpl.
     1: easy.
@@ -111,9 +135,9 @@ Section ordered.
     + intros []%ordered_from_inv ? ? [ <- | ] ?; eauto.
   Qed.
 
-  Fact ordered_from_dec x l : 
+  Fact ordered_from_dec R x l : 
         (∀ u v, u ∈ x::l → v ∈ x::l → { R u v } + { ~ R u v })
-      → { ordered_from x l } + { ~ ordered_from x l }.
+      → { ordered_from R x l } + { ~ ordered_from R x l }.
   Proof.
     revert x.
     induction l as [ | y l IHl ]; intros x H.
@@ -124,9 +148,9 @@ Section ordered.
       * right; contradict G; now inversion G.
   Qed.
 
-  Fact ordered_dec l : 
+  Fact ordered_dec R l : 
         (∀ u v, u ∈ l → v ∈ l → { R u v } + { ~ R u v })
-      → { ordered l } + { ~ ordered l }.
+      → { ordered R l } + { ~ ordered R l }.
   Proof.
     destruct l as [ | x ].
     + left; eauto.

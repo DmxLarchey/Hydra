@@ -24,6 +24,14 @@ Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R
 #[local] Hint Resolve Acc_inv Acc_intro 
                       in_cons in_eq in_elt in_or_app : core.
 
+Fact clos_trans_rev X R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
+Proof. induction 1; eauto. Qed.
+
+#[local] Hint Resolve clos_trans_rev : core.
+
+Fact clos_trans_rev_iff X R x y : @clos_trans X R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
+Proof. split; auto. Qed.
+
 Unset Elimination Schemes.
 
 Inductive E0 : Set :=
@@ -32,6 +40,9 @@ Inductive E0 : Set :=
 Set Elimination Schemes.
 
 Notation "'ω[' l ]" := (E0_cons l) (at level 1, no associativity, format "ω[ l ]").
+
+Fact E0_eq_inv l m : ω[l] = ω[m] → l = m.
+Proof. now inversion 1. Qed.
 
 Section E0_rect.
 
@@ -343,7 +354,7 @@ Qed.
 Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ~ R x x.
 Proof. induction 1 as [ x _ IH ]; intros H; exact (IH _ H H). Qed.
 
-Fact E0_lpo_irrefl e : ~ E0_lpo e e.
+Fact E0_lpo_irrefl e : ¬ E0_lpo e e.
 Proof. apply Acc_irrefl with (1 := wf_E0_lpo _). Qed.
 
 Fact E0_lpo_trans : transitive E0_lpo.
@@ -356,6 +367,25 @@ Qed.
 
 Fact E0_lpo_trans' e f : clos_trans E0_lpo e f → E0_lpo e f.
 Proof. induction 1; eauto. Qed.
+
+Definition E0_zero := ω[[]].
+
+Fact E0_zero_lt e : E0_zero = e ∨ E0_zero <E₀ e.
+Proof.
+  destruct e as [ [] ]; [ left | right ]; eauto.
+  repeat constructor.
+Qed.
+
+Definition E0_le e f := e <E₀ f ∨ e = f.
+
+Notation "e '≤E₀' f" := (E0_le e f) (at level 70, format "e  ≤E₀  f").
+
+Fact E0_zero_not_gt e : ¬ e <E₀ E0_zero.
+Proof.
+  destruct e as [ l ].
+  intros ?%E0_lt_inv%lex_list_inv.
+  now destruct l.
+Qed.
 
 Section squash.
 
@@ -435,6 +465,54 @@ Proof.
     intros [] [] ? ? [| (<- & ?)]%lex2_inv; eauto.
 Qed.
 
+Fact E0_lt_app_head l m k : ω[m] <E₀ ω[k] → ω[l++m] <E₀ ω[l++k].
+Proof.
+  intros ?%E0_lt_inv; constructor.
+  now apply lex_list_app_head.
+Qed.
+
+Fact E0_le_app_head l m k : ω[m] ≤E₀ ω[k] → ω[l++m] ≤E₀ ω[l++k].
+Proof.
+  intros [ H | H ]; [ left | right ].
+  + now apply E0_lt_app_head.
+  + inversion H; subst; auto.
+Qed.
+
+Fact cnf_zero : cnf ω[nil].
+Proof.
+  apply cnf_fix; simpl; split.
+  + constructor.
+  + tauto.
+Qed.
+
+#[local] Hint Resolve cnf_zero : core.
+
+Definition E0_one := ω[[(E0_zero, 1)]].
+
+Fact cnf_one : cnf E0_one.
+Proof.
+  apply cnf_fix; simpl; split.
+  + repeat constructor.
+  + intros e i [ [=] | [] ]; subst; split; auto; lia.
+Qed.
+
+#[local] Hint Resolve cnf_one : core.
+
+Fact E0_one_ge r : r ≠ [] → cnf ω[r] → E0_one ≤E₀ ω[r].
+Proof.
+  destruct r as [ | (x,i) r ]; [ easy | intros _ Hr ].
+  destruct (E0_zero_lt x) as [ <- | Hx ].
+  + destruct i as [ | [ | i ] ].
+    * apply cnf_fix, proj2 in Hr.
+      destruct (Hr E0_zero 0); auto; lia.
+    * apply E0_le_app_head with (l := [_]).
+      destruct r.
+      - now right.
+      - left; constructor; constructor 1.
+    * left; constructor; constructor; right; lia.
+  + left; constructor; constructor; now left.
+Qed.
+
 (** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
 
 Definition eps0 := { e | cnf e }.
@@ -484,25 +562,19 @@ Proof.
   + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
 Qed.
 
-Fact cnf_zero : cnf ω[nil].
-Proof.
-  apply cnf_fix; simpl; split.
-  + constructor.
-  + tauto.
-Qed.
-
-#[local] Hint Resolve cnf_zero : core.
-
 Definition eps0_zero : ε₀.
-Proof. now exists ω[nil]. Defined.
+Proof. now exists E0_zero. Defined.
+
+Definition eps0_one : ε₀.
+Proof. now exists E0_one. Defined.
 
 Definition eps0_le e f := e <ε₀ f ∨ e = f.
 
 Notation "e '≤ε₀' f" := (eps0_le e f) (at level 70, format "e  ≤ε₀  f").
 
-Fact eps0_le_iff e f : e ≤ε₀ f ↔ π₁ e <E₀ π₁ f ∨ π₁ e = π₁ f.
+Fact eps0_le_iff e f : e ≤ε₀ f ↔ π₁ e ≤E₀ π₁ f.
 Proof.
-  unfold eps0_le; rewrite eps0_eq_iff.  
+  unfold eps0_le, E0_le; rewrite eps0_eq_iff.  
   revert e f; intros [ e He ] [ f Hf ]; simpl; tauto.
 Qed.
 
@@ -510,7 +582,7 @@ Fact eps0_zero_least e : eps0_zero ≤ε₀ e.
 Proof.
   apply eps0_le_iff.
   destruct e as [ [l] He ]; simpl.
-  destruct l as [ | x l ]; auto; left.
+  destruct l as [ | x l ]; [ right | left ]; auto.
   constructor; constructor.
 Qed.
 
@@ -556,7 +628,28 @@ Proof. now rewrite <- app_assoc. Qed.
 Inductive E0_succ_graph : E0 → E0 → Prop :=
   | E0_succ_graph0   : E0_succ_graph ω[[]] ω[[(ω[[]],1)]]
   | E0_succ_graph1 l i : E0_succ_graph ω[l++[(ω[[]],i)]] ω[l++[(ω[[]],S i)]] 
-  | E0_succ_graph2 l x i : x <> ω[[]] → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]]. 
+  | E0_succ_graph2 l x i : x ≠ E0_zero → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
+
+(* Inversion lemma for the graph of E0_succ *)
+Lemma E0_succ_graph_inv e f :
+    E0_succ_graph e f
+  → (e = ω[[]] → f = ω[[(ω[[]],1)]])
+  ∧ (∀ l i, e = ω[l++[(ω[[]],i)]] → f = ω[l++[(ω[[]],S i)]])
+  ∧ (∀ l x i, x ≠ E0_zero → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
+Proof.
+  destruct 1 as [ | l i | l x i H ]; (split; [ | split ]); eauto;
+    try now intros [].
+  + now destruct l.
+  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst i'; auto.
+  + intros l' x i' H (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
+  + now destruct l.
+  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
+  + intros m y j G (<- & [=])%E0_eq_inv%app_inj_tail; subst; auto.
+Qed.
+
+Corollary E0_succ_graph_fun e f g :
+   E0_succ_graph e f → E0_succ_graph e g → f = g.
+Proof. intros [] G%E0_succ_graph_inv; symmetry; apply G; auto. Qed.
 
 Definition E0_succ_pwc (e : E0) : sig (E0_succ_graph e).
 Proof.
@@ -569,6 +662,7 @@ Proof.
 Qed.
 
 Definition E0_succ e := π₁ (E0_succ_pwc e).
+
 Fact E0_succ_spec e : E0_succ_graph e (E0_succ e).
 Proof. apply (proj2_sig _). Qed.
 
@@ -584,12 +678,13 @@ Proof.
   + intros ? ? [ [=] | ]%in_snoc_iff; subst; auto.
     split; auto || lia.
   + rewrite map_app in * |- *; simpl; auto.
-    rewrite snoc_assoc.
-    (** Possibly ordered rev ? *)
-    admit.
+    apply ordered_comp with (m := [_]); auto.
+    repeat constructor.
+    destruct (E0_zero_lt x) as [ <- | ]; auto.
+    now destruct H.
   + intros e j; rewrite snoc_assoc. 
     intros [ [=] | ]%in_snoc_iff; subst; auto.
-Admitted.
+Qed.
 
 Definition eps0_succ (e : ε₀) : ε₀.
 Proof.
@@ -598,10 +693,100 @@ Proof.
   now apply E0_succ_correct.
 Defined.
 
-(** Show that there is no ordinal between e and (eps0_succ e) *)
+(** The successor of E0_zero is E0_one *) 
+Lemma eps0_succ_zero_is_one : eps0_succ eps0_zero = eps0_one.
+Proof.
+  apply eps0_eq_iff; simpl.
+  apply E0_succ_graph_fun with (1 := E0_succ_spec _).
+  constructor.
+Qed.
 
-Section epsilon0_rect.
+(* Such a complicated proof to show that there is no
+   ordinal between e and eps0_succ e is unreasonnable *)
+Lemma eps0_succ_next e f : e <ε₀ f → eps0_succ e ≤ε₀ f.
+Proof.
+  rewrite eps0_le_iff; unfold eps0_lt.
+  revert e f; intros [ e He ] [ f Hf ]; simpl.
+  generalize (E0_succ e) (E0_succ_spec e).
+  induction 1 as [ | li | l x i Hx ].
+  + destruct f as [ [ | (x,j) l ] ].
+    * intros []%E0_lt_irrefl.
+    * intros _.
+      apply cnf_fix in Hf as (Hl & Hf).
+      simpl in Hl; apply ordered_inv in Hl.
+      generalize (ordered_from_clos_trans Hl); intros Hl'.
+      destruct x as [ [ | u m ] ].
+      - destruct j as [ | [| j] ].
+        ++ destruct (Hf ω[[]] 0); eauto; lia.
+        ++ constructor 2; repeat f_equal.
+           destruct l as [ | (g,j) l ]; auto.
+           destruct (@E0_zero_not_gt g).
+           apply E0_lt_trans', clos_trans_rev_iff, Hl'; simpl; auto.
+        ++ left; constructor 1; constructor 2; right; lia.
+      - left; constructor; constructor 2; left.
+        constructor; constructor.
+  + destruct f as [ m ].
+    intros H%E0_lt_inv%lex_list_snoc_inv_left.
+    destruct H as [ | (y,j) l r H | ].
+    * left; constructor.
+      rewrite <- !app_assoc.
+      apply lex_list_app_head.
+      now constructor 2.
+    * apply lex2_inv in H as [ H | (<- & H) ].
+      - constructor 1.
+        constructor.
+        apply lex_list_app_head.
+        constructor 2; now left.
+      - destruct (eq_nat_dec (S i) j) as [ <- | ].
+        ++ destruct r.
+           ** now right.
+           ** left.
+              constructor 1.
+              apply lex_list_app_head.
+              constructor 3; constructor 1.
+        ++ left.
+           constructor.
+           apply lex_list_app_head.
+           constructor 2; right; lia.
+    * exfalso.
+      apply cnf_fix, proj1 in Hf.
+      rewrite map_app in Hf; simpl in Hf.
+      apply ordered_app_tail, ordered_inv in Hf.
+      destruct r as [ | y r ]; [ easy | ].
+      simpl in Hf; now apply ordered_from_inv, proj1, E0_zero_not_gt in Hf.
+  + destruct f as [ m ].
+    intros H%E0_lt_inv%lex_list_snoc_inv_left.
+    destruct H as [ | (y,j) l r H | ].
+    * left; constructor.
+      rewrite <- app_assoc; apply lex_list_app_head.
+      now constructor 2.
+    * left; constructor.
+      apply lex_list_app_head.
+      now constructor 2.
+    * apply E0_le_app_head.
+      apply E0_le_app_head with (l := [_]).
+      apply E0_one_ge; auto.
+      rewrite cnf_fix in Hf |- *.
+      destruct Hf as (H1 & H2); split; eauto.
+      - rewrite map_app in H1; simpl in H1.
+        now apply ordered_app_tail, ordered_cons_inv in H1.
+      - intros ? ? ?; apply H2; eauto.
+Qed.
 
+(** There is no ordinal between e and (eps0_succ e) *)
+Corollary eps0_no_ordinal_between_n_and_succ e f :
+    ¬ (e <ε₀ f ∧ f <ε₀ eps0_succ e).
+Proof.
+  intros (H1 & H2).
+  destruct eps0_succ_next with (1 := H1) as [ | <- ].
+  + apply (@eps0_lt_irrefl f), eps0_lt_trans with (1 := H2); auto.
+  + revert H2; apply eps0_lt_irrefl.
+Qed.
+
+(* Hence a successor is not a limit ordinal 
+
+   Successor is of shape ω[_++[(ω[[]],1+i)]]
+   Limit is either ω[[]] or ω[_++[(x,i)]] with 0 < i and x <> ω[[]] *)
 
 
 

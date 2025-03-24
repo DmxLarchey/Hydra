@@ -139,6 +139,42 @@ Section lex_list.
     + now constructor 2 with (p := _::_).
   Qed.
 
+  Inductive lex_list_snoc_inv_shape_l x : list X → list X → Prop :=
+    | in_lex_list_snoc_inv_shape0_l0 l a b r r' : R a b → lex_list_snoc_inv_shape_l x (l++[a]++r) (l++[b]++r')
+    | in_lex_list_snoc_inv_shape0_l1 y l r : R x y → lex_list_snoc_inv_shape_l x l (l++[y]++r)
+    | in_lex_list_snoc_inv_shape0_l2 l r : r ≠ [] → lex_list_snoc_inv_shape_l x l (l++[x]++r).
+
+  Fact lex_list_snoc_inv_left_rec lx m : 
+        lex_list lx m → ∀ l x, lx = l++[x] → lex_list_snoc_inv_shape_l x l m.
+  Proof.
+    intros [k lx' H|p x y l m' H]%lex_list_invert.
+    + intros l x ->; rewrite <- app_assoc; now constructor 3.
+    + intros l' u.
+      destruct l as [ | v l _ ] using rev_ind.
+      * simpl; intros (<- & <-)%app_inj_tail.
+        now constructor 2. 
+      * rewrite !app_assoc.
+        intros (<- & <-)%app_inj_tail.
+        rewrite <- !app_assoc.
+        now constructor 1.
+  Qed.
+
+  Fact lex_list_snoc_inv_left l x m : 
+       lex_list (l++[x]) m → lex_list_snoc_inv_shape_l x l m.
+  Proof. intros H; now apply lex_list_snoc_inv_left_rec with (2 := eq_refl). Qed.
+
+  Remark lex_list_snoc_inv_left' l x m : 
+        lex_list (l++[x]) m 
+     -> (exists p a b q r, l = p++[a]++q /\ m = p++[b]++r /\ R a b)
+     \/ (exists y r, m = l++[y]++r /\ R x y)
+     \/ (exists r, m = l++[x]++r /\ r <> []).
+  Proof.
+    intros [ l' a b r r' | y l' r | l' r ]%lex_list_snoc_inv_left.
+    + left; now exists l', a, b, r, r'.
+    + right; left; eauto.
+    + do 2 right; eauto.
+  Qed.
+
   Inductive lex_list_snoc_inv_shape y : list X → list X → Prop :=
     | in_lex_list_snoc_inv_shape0 l m : lex_list_snoc_inv_shape y l (l++m)
     | in_lex_list_snoc_inv_shape1 x l m : R x y → lex_list_snoc_inv_shape y (l++[x]++m) l
