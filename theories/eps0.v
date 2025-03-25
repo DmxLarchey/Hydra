@@ -78,8 +78,24 @@ Definition E0_rec (P : _ → Set) := E0_rect P.
 
 Fixpoint E0_ht e :=
   match e with
-  | ω[l] => lmax (map (λ '(f,_), 1+E0_ht f) l)
+  | ω[l] => lmax (map (λ x, 1+E0_ht (fst x)) l)
   end.
+
+Fact E0_ht_fix l : E0_ht ω[l] = lmax (map (λ x, 1+E0_ht (fst x)) l).
+Proof. trivial. Qed.
+
+Fact lmax_cons x l : lmax (x::l) = max x (lmax l).
+Proof. induction l; simpl; lia. Qed.
+
+Fact lmax_bounded n l : (∀ x : nat, x ∈ l → x ≤ n) → lmax l ≤ n.
+Proof. rewrite <- Forall_forall; induction 1; simpl; lia. Qed.
+
+Fact E0_ht_in e i l : (e,i) ∈ l → E0_ht e < E0_ht ω[l].
+Proof.
+  intros H; rewrite E0_ht_fix.
+  apply lmax_in, in_map_iff.
+  now exists (e,i).
+Qed.
 
 Definition E0_fall (P : list (E0*nat) → Prop) : E0 → Prop :=
   fix loop e :=
@@ -179,6 +195,8 @@ End lex2.
 
 Arguments lex2 {_ _}.
 
+#[local] Hint Constructors lex2 : core.
+
 Unset Elimination Schemes.
 
 Inductive E0_lt : E0 → E0 → Prop :=
@@ -189,8 +207,6 @@ Set Elimination Schemes.
 #[local] Hint Constructors E0_lt : core.
 
 Notation "e '<E₀' f" := (E0_lt e f) (at level 70, format "e  <E₀  f").
-
-#[local] Hint Constructors E0_lt : core.
 
 (* This inversion principle is enough to reason about <ε₀, 
    proceeding by induction on arguments *)
@@ -252,7 +268,7 @@ Qed.
 Corollary E0_lt_trans' e f : clos_trans E0_lt e f → e <E₀ f.
 Proof. induction 1; eauto. Qed.
 
-(** An ordinal of ε₀ is in CNF if, recursivelly, it is
+(** An "ordinal" of E₀ is in CNF if, recursivelly, it is
    of the shape ω[(e₁,i₁);...;(eₙ,iₙ)] with
    0 < i₁,...,iₙ and e₁ >ε₀ ... >ε₀ eₙ *)
 
@@ -435,6 +451,72 @@ Proof.
   apply cnf_iff, (H2 _ i); auto.
 Qed.
 
+Fact ordered_from_lmax x l : ordered_from (λ n m, m ≤ n) x l → lmax l ≤ x.
+Proof. induction 1; simpl; lia. Qed.
+
+Fact ordered_lmax l :
+    ordered (λ n m, m ≤ n) l
+  → match l with
+    | []   => True
+    | x::l => lmax (x::l) = x
+    end.
+Proof. induction 1 as [ | ? ? ?%ordered_from_lmax ]; simpl; lia. Qed.
+
+Fact ordered_lmax_cons x l : ordered (λ n m, m ≤ n) (x::l) → lmax (x::l) = x.
+Proof. exact (@ordered_lmax (_::_)). Qed.
+
+(** Factor that proof !! *)
+Local Lemma E0_lt_ht_rec n e f : E0_ht e < n → E0_ht f < n → cnf e → cnf f → e <E₀ f → E0_ht e ≤ E0_ht f.
+Proof.
+  revert e f; induction n as [ | n IHn ].
+  + intros; lia.
+  + intros [ l ] [ m ]; rewrite !E0_ht_fix.
+    intros Hl Hm (H1 & H2)%cnf_fix (H3 & H4)%cnf_fix Hlm%E0_lt_inv.
+    assert (∀ e i, (e,i) ∈ l → cnf e) as H2'.
+    1: intros; eapply H2; eauto.
+    assert (∀ e i, (e,i) ∈ m → cnf e) as H4'.
+    1: intros; eapply H4; eauto.
+    assert (∀ e i, (e,i) ∈ l → E0_ht e < n) as G1.
+    1:{ intros e i ?; apply PeanoNat.lt_S_n, Nat.le_lt_trans with (2 := Hl).
+        apply lmax_in, in_map_iff; exists (e,i); eauto. }
+    assert (∀ e i, (e,i) ∈ m → E0_ht e < n) as G2.
+    1:{ intros e i ?; apply PeanoNat.lt_S_n, Nat.le_lt_trans with (2 := Hm).
+        apply lmax_in, in_map_iff; exists (e,i); eauto. }
+    assert (ordered le⁻¹ (map (λ x, 1 + E0_ht (fst x)) l)) as H1'.
+    1:{ revert H1.
+        rewrite <- (map_map fst (λ x, S (E0_ht x))).
+        apply ordered_mono_map with (f := λ x, S (E0_ht x)).
+        intros ? ? ((x,i) & <- & E1)%in_map_iff ((y,j) & <- & E2)%in_map_iff; simpl.
+        intros H; apply le_n_S, IHn; eauto. }
+    assert (ordered le⁻¹ (map (λ x, 1 + E0_ht (fst x)) m)) as H3'.
+    1:{ revert H3.
+        rewrite <- (map_map fst (λ x, S (E0_ht x))).
+        apply ordered_mono_map with (f := λ x, S (E0_ht x)).
+        intros ? ? ((x,i) & <- & E1)%in_map_iff ((y,j) & <- & E2)%in_map_iff; simpl.
+        intros H; apply le_n_S, IHn; eauto. }
+    assert (∀ e i f j, (e,i) ∈ l → (f,j) ∈ m → e <E₀ f → E0_ht e ≤ E0_ht f) as IH.
+    1:{ intros; apply IHn; eauto. }
+    clear IHn Hl Hm H1 H2 H3 H4 H2' H4' G1 G2.
+    induction Hlm as [ | (e,i) (f,j) | ].
+    * simpl; lia.
+    * simpl map; rewrite !ordered_lmax_cons; auto.
+      apply lex2_inv in H as [ H | (? & _) ]; subst; auto.
+      apply le_n_S; eauto.
+    * simpl map; rewrite !ordered_lmax_cons; auto.
+Qed.
+
+(** The height is an over approx. of <E₀ *)
+Theorem E0_lt_ht e f : cnf e → cnf f → e <E₀ f → E0_ht e ≤ E0_ht f.
+Proof. apply E0_lt_ht_rec with (n := 1+E0_ht e+E0_ht f); lia. Qed.
+
+(** Complete this thing that show that the height is easy quick to compute on cnf *)
+Fact cnf_ht e i l : cnf ω[(e,i)::l] → E0_ht ω[(e,i)::l] = 1+E0_ht e.
+Proof.
+  intros (H1 & H2)%cnf_fix.
+  rewrite E0_ht_fix; simpl map.
+  rewrite lmax_cons.
+Admitted.
+
 Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo lt).
 Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
 
@@ -442,8 +524,6 @@ Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
 
 Fact lex2_E0_lpo_lt_trans' xi yj : clos_trans (lex2 E0_lpo lt) xi yj → lex2 E0_lpo lt xi yj.
 Proof. induction 1; eauto. Qed.
-
-#[local] Hint Constructors lex2 : core.
 
 #[local] Hint Resolve lex_list_mono : core.
 
@@ -533,6 +613,8 @@ Qed.
     denoted <ε₀ *)
 
 Definition eps0_lt (e f : ε₀) := E0_lt (π₁ e) (π₁ f).
+
+Arguments eps0_lt /.
 
 Notation "e '<ε₀' f" := (eps0_lt e f) (at level 70, format "e  <ε₀  f").
 
@@ -694,15 +776,31 @@ Proof.
 Defined.
 
 (** The successor of E0_zero is E0_one *) 
-Lemma eps0_succ_zero_is_one : eps0_succ eps0_zero = eps0_one.
+Fact eps0_succ_zero_is_one : eps0_succ eps0_zero = eps0_one.
 Proof.
   apply eps0_eq_iff; simpl.
   apply E0_succ_graph_fun with (1 := E0_succ_spec _).
   constructor.
 Qed.
 
-(* Such a complicated proof to show that there is no
-   ordinal between e and eps0_succ e is unreasonnable *)
+(** The successor is <ε₀-greater *)
+Fact eps0_succ_lt e : e <ε₀ eps0_succ e.
+Proof.
+  destruct e as (e & He); simpl.
+  generalize (E0_succ e) (E0_succ_spec e).
+  induction 1; constructor.
+  + constructor.
+  + apply lex_list_app_head.
+    constructor 2; right; lia.
+  + apply lex_list_app_head.
+    constructor 3; constructor.
+Qed. 
+
+(* We show that there is nothing inbetween
+   e and eps0_succ e.
+
+   Such a complicated proof is unreasonnable 
+   FIND a way to factor this in smaller lemmas *)
 Lemma eps0_succ_next e f : e <ε₀ f → eps0_succ e ≤ε₀ f.
 Proof.
   rewrite eps0_le_iff; unfold eps0_lt.
