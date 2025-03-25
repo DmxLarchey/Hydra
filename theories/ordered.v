@@ -83,6 +83,26 @@ Section ordered.
   Fact ordered_from_comp R x l y m : ordered_from R x (l++[y]) → ordered_from R y m → ordered_from R x (l++[y]++m).
   Proof. induction l in x |- *; simpl; intros []%ordered_from_inv; eauto. Qed.
 
+  Fact ordered_from_trans R x y l : transitive _ R → ordered_from R x l → R y x → ordered_from R y l.
+  Proof. induction 2 in y |- *; eauto. Qed.
+
+  Fact ordered_from_app_middle R l x m : 
+       transitive _ R
+     → ordered R l 
+     → (forall y, In y l -> R y x \/ y = x)
+     → ordered_from R x m
+     → ordered R (l++m).
+  Proof.
+    intros HR.
+    induction 1 as [ | a l Hl ]; simpl; eauto.
+    revert Hl x; induction 1 as [ a | a b l H1 H2 IH2 ]; intros x Hx H; simpl.
+    + constructor.
+      destruct (Hx a) as [ Ha | ]; subst; auto.
+      revert Ha; apply ordered_from_trans; auto.
+    + constructor.
+      apply IH2 in H; eauto.
+  Qed.
+
   Fact ordered_comp R l x m : ordered R (l++[x]) → ordered R (x::m) → ordered R (l++[x]++m).
   Proof.
     destruct l; simpl; auto; intros ?%ordered_inv ?%ordered_inv.

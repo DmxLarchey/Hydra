@@ -32,6 +32,9 @@ Proof. induction 1; eauto. Qed.
 Fact clos_trans_rev_iff X R x y : @clos_trans X R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
 Proof. split; auto. Qed.
 
+Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
+Proof. unfold transitive; eauto. Qed.
+
 Unset Elimination Schemes.
 
 Inductive E0 : Set :=
@@ -196,6 +199,87 @@ End lex2.
 Arguments lex2 {_ _}.
 
 #[local] Hint Constructors lex2 : core.
+
+Section wlist_combine.
+
+  Variables (X : Type) (R : X → X → Prop) (R_sdec : ∀ x y, sdec R x y).
+
+  Implicit Type (l m : list (X*nat)).
+
+  Fixpoint wlist_cut l y j :=
+    match l with
+    | []       => [(y,j)]
+    | (x,i)::l =>
+      match R_sdec x y with
+      | sdec_lt _ _ _ _ => [(y,j)]
+      | sdec_eq _ _     => [(x,i+j)]
+      | sdec_gt _ _ _ _ => (x,i)::wlist_cut l y j
+      end
+    end.
+
+  Local Fact wlist_cut_ordered_from a l y j : R y a → ordered_from R⁻¹ a (map fst l) → ordered_from R⁻¹ a (map fst (wlist_cut l y j)).
+  Proof.
+    induction l as [ | (x,i) l IHl ] in a |- *; simpl; intros Ha.
+    + constructor; auto; constructor.
+    + intros (H1 & H2)%ordered_from_inv.
+      destruct (R_sdec x y) as [ x y Hxy | x | x y Hxy ].
+      * repeat constructor; auto.
+      * repeat constructor; auto.
+      * simpl; constructor; auto.
+  Qed.
+
+  Local Fact wlist_cut_ub l y j : ∀ a u, (a,u) ∈ wlist_cut l y j → R y a ∨ y = a.
+  Proof.
+    induction l as [ | (x,i) l IHl ]; simpl; intros a u.
+    + intros [ [=] | [] ]; auto.
+    + destruct (R_sdec x y).
+      * intros [ [=] | [] ]; auto.
+      * intros [ [=] | [] ]; auto.
+      * intros [ [=] | ? ]; subst; eauto.
+  Qed.
+
+  Hint Resolve wlist_cut_ordered_from : core.
+
+  Local Fact wlist_cut_ordered l y j : ordered R⁻¹ (map fst l) → ordered R⁻¹ (map fst (wlist_cut l y j)).
+  Proof.
+    destruct l as [ | (x,i) l ]; simpl.
+    + repeat constructor.
+    + intros ?%ordered_inv.
+      destruct (R_sdec x y).
+      * repeat constructor.
+      * repeat constructor.
+      * simpl; constructor; eauto.
+  Qed.
+
+  Definition wlist_combine l m :=
+    match m with
+    | []       => l
+    | (y,j)::m => wlist_cut l y j ++ m
+    end.
+
+  Fact wlist_combine_in l m x i : (x,i) ∈ wlist_combine l m → ∃j, j ≤ i ∧ ((x,j) ∈ l ∨ (x,j) ∈ m).
+  Proof.
+  Admitted.
+
+  Hypothesis (HR : transitive R).
+
+  Fact wlist_combine_ordered l m : ordered R⁻¹ (map fst l) → ordered R⁻¹ (map fst m) → ordered R⁻¹ (map fst (wlist_combine l m)).
+  Proof.
+    destruct m as [ | (y,j) m ]; simpl; auto.
+    intros Hl Hm%ordered_inv.
+    rewrite map_app.
+    apply wlist_cut_ordered with (y := y) (j := j) in Hl.
+    generalize (wlist_cut_ub l y j); intros H.
+    apply ordered_from_app_middle with y; eauto.
+    + now apply transitive_rev.
+    + intros ? ((x,i) & <- & ?)%in_map_iff; simpl; eauto.
+      destruct (H x i) as [ | <- ]; eauto.
+  Qed. 
+
+End wlist_combine.
+
+Arguments wlist_cut {_ _}.
+Arguments wlist_combine {_ _}.
 
 Unset Elimination Schemes.
 
@@ -514,8 +598,15 @@ Fact cnf_ht e i l : cnf ω[(e,i)::l] → E0_ht ω[(e,i)::l] = 1+E0_ht e.
 Proof.
   intros (H1 & H2)%cnf_fix.
   rewrite E0_ht_fix; simpl map.
-  rewrite lmax_cons.
-Admitted.
+  rewrite ordered_lmax_cons; auto.
+  revert H1.
+  rewrite <- (map_map fst (λ x, S (E0_ht x))).
+  apply ordered_mono_map with (f := λ x, S (E0_ht x)).
+  intros a b ((x,u) & <- & Hx)%in_map_iff ((y,v) & <- & Hy)%in_map_iff ?.
+  apply le_n_S, E0_lt_ht; eauto; simpl.
+  + apply H2 with v; auto.
+  + apply H2 with u; auto.
+Qed.
 
 Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo lt).
 Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
@@ -592,6 +683,24 @@ Proof.
     * left; constructor; constructor; right; lia.
   + left; constructor; constructor; now left.
 Qed.
+
+Definition E0_add e f :=
+  match e, f with
+  | ω[l], ω[m] => ω[wlist_combine E0_lt_sdec l m]
+  end.
+
+Fact E0_add_correct : ∀ e f, cnf e → cnf f → cnf (E0_add e f).
+Proof.
+  intros [l] [m] (H1 & H2)%cnf_fix (H3 & H4)%cnf_fix; apply cnf_fix.
+  split.
+  + apply wlist_combine_ordered; auto.
+  + (* use wlist_combine_in *)
+Admitted.
+
+(** Then show that 
+      E0_add e E0_zero = e
+  and E0_add e E0_one = E0_succ e 
+    Show also the preservation of lubs *)
 
 (** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
 
