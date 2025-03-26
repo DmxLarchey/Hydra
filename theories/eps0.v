@@ -480,6 +480,21 @@ Section wlist_combine.
     now rewrite wlist_cut_lt.
   Qed.
 
+  Fact wlist_combine_choice x i l y j m :
+    ∃ z k r, wlist_combine ((x,i)::l) ((y,j)::m) = (z,k)::r
+           ∧ ( R x y ∧ z = y ∧ k = j ∧ r = m
+             ∨ x = y ∧ z = x ∧ k = i+j ∧ r = m
+             ∨ R y x ∧ z = x ∧ k = i ∧ r = wlist_combine l ((y,j)::m) ).
+  Proof.
+    destruct (R_sdec x y) as [ x y H | x | x y H ].
+    + rewrite wlist_combine_lt; auto.
+      exists y, j, m; split; auto.
+    + rewrite wlist_combine_eq.
+      exists x, (i+j), m; split; auto; right; auto.
+    + rewrite wlist_combine_gt; auto.
+      exists x, i, (wlist_combine l ((y,j)::m)); split; auto; do 2 right; auto.
+  Qed. 
+
   Fact wlist_combine_in l m x i : (x,i) ∈ wlist_combine l m → ∃j, j ≤ i ∧ ((x,j) ∈ l ∨ (x,j) ∈ m).
   Proof.
     destruct m as [ | (y,j) m ].
@@ -1019,12 +1034,33 @@ Proof.
   + inversion H2; subst; exists m; auto.
 Qed. 
 
+Fact list_split_cons2 {X} (l₁ l₂ r₁ r₂ : list X) x y :
+    l₁++[x]++r₁ = l₂++[y]++r₂
+  → l₁ = l₂ ∧ x = y ∧ r₁ = r₂
+  ∨ ∃m, l₁++[x]++m = l₂ ∧ r₁ = m++[y]++r₂
+     ∨  l₁ = l₂++[y]++m ∧ m++[x]++r₁ = r₂.
+Proof.
+  intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst.
+  + destruct m as [ | z m ]; simpl in H2.
+    * inversion H2; subst y r₂.
+      rewrite app_nil_r; auto.
+    * inversion H2; subst z r₁.
+      right; exists m; auto.
+  + destruct m as [ | z m ]; simpl in H2.
+    * inversion H2; subst y r₂.
+      rewrite app_nil_r; auto.
+    * inversion H2; subst z r₂.
+      right; exists m; auto.
+Qed. 
+
+
 (* Proof that if cnf u then
    either u is E0_zero                             (limit ordinal)
       or  u is ω[l++[(E0_zero,i)]])                (successor)
       or  u is ω[l++[(e,i)]]) with  E0_zero <E₀ e  (limit ordinal) *)
 
-Fact E0_add_mono u v e : cnf u → cnf v → cnf e → u ≤E₀ v → E0_add u e ≤E₀ E0_add v e.
+(** This proof needs much better automation ... *)
+Theorem E0_add_mono u v e : cnf u → cnf v → cnf e → u ≤E₀ v → E0_add u e ≤E₀ E0_add v e.
 Proof.
   intros Hu Hv He [ H | -> ]; [ | right ]; auto.
   revert u v e Hu Hv He H.
@@ -1109,10 +1145,119 @@ Proof.
         rewrite <- app_assoc. 
         apply lex_list_app_head.
         constructor 2; left; auto.
-    * admit.
-    * admit.
-  + admit.
-Admitted.
+    * apply list_split_cons2 in E
+        as [ (<- & [=] & <-) | (m & [ (E1 & E2) | (E1 & E2) ]) ].
+      - subst z i'.
+        simpl app; rewrite !wlist_combine_gt_list; auto.
+        rewrite wlist_combine_lt; auto.
+        rewrite wlist_combine_eq; auto.
+        left; constructor.
+        apply lex_list_app_head.
+        constructor 2.
+        right.
+        apply cnf_fix, proj2 in Hq.
+        destruct (Hq y j); auto; lia.
+      - subst l m'.
+        rewrite !Forall_app in G1.
+        destruct G1 as (G1 & G2 & G3).
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        rewrite wlist_combine_gt_list with (3 := G2); auto.
+        rewrite wlist_combine_gt_list with (3 := G3); auto.
+        simpl app at 6; rewrite wlist_combine_eq; auto.
+        simpl app at 2.
+        left; constructor; apply lex_list_app_head.
+        apply Forall_cons_iff, proj1 in G2.
+        destruct (E0_lt_sdec x z) as [ x z Hxz | x | x z Hxz ].
+        ++ rewrite wlist_combine_lt; auto.
+           constructor 2; left; auto.
+        ++ rewrite wlist_combine_eq; auto.
+           constructor; left; auto.
+        ++ rewrite wlist_combine_gt; auto.
+           constructor; left; auto.
+      - subst p r.
+        rewrite <- !app_assoc.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        right; do 2 f_equal.
+        simpl app; rewrite !wlist_combine_eq; auto.
+    * apply list_split_cons2 in E
+        as [ (<- & [=] & <-) | (m & [ (E1 & E2) | (E1 & E2) ]) ].
+      - subst x' i'.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        simpl app at 2 4.
+        rewrite !wlist_combine_lt; eauto.
+        now right.
+      - subst l m'.
+        rewrite !Forall_app in G1.
+        destruct G1 as (G1 & G4 & G3).
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        rewrite wlist_combine_gt_list with (3 := G4); auto.
+        simpl app at 2.
+        destruct wlist_combine_choice with (R_sdec := E0_lt_sdec)
+          (x := x) (i := i) (y := z) (j := h) (l := l') (m := k)
+          as (a & b & c & -> & E); eauto.
+        apply Forall_cons_iff, proj1 in G4; simpl in G4.
+        left; constructor; apply lex_list_app_head; constructor 2; left.
+        destruct E as [ (? & <- & _) | [ (<- & <- & _) | (? & <- & _) ] ]; eauto.
+      - subst p r.
+        rewrite <- !app_assoc.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        simpl app at 2 6; rewrite !wlist_combine_lt; auto.
+        right; auto.
+  + unfold E0_add.
+    destruct (wlist_cut_choice E0_lt_sdec (p++[(x,j)]++m') z)
+      as [ G1 
+       | [ (i' & l & r & E & G1) 
+       |   (x' & i' & l & r & E & G1 & G2) ] ].
+    * rewrite !Forall_app in G1.
+      destruct G1 as (G1 & G2 & G3).
+      rewrite !wlist_combine_gt_list with (3 := G1); auto.
+      simpl app at 2 4.
+      apply Forall_cons_iff, proj1 in G2.
+      rewrite !wlist_combine_gt; auto.
+      left; constructor; apply lex_list_app_head; constructor 2; right; auto.
+    * apply list_split_cons2 in E
+        as [ (<- & [=] & <-) | (m & [ (E1 & E2) | (E1 & E2) ]) ].
+      - subst z i'.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        simpl app at 2 4; rewrite !wlist_combine_eq; auto.
+        left; constructor; apply lex_list_app_head; constructor 2; right; lia.
+      - subst l m'.
+        rewrite !Forall_app in G1.
+        destruct G1 as (G1 & G2 & G3).
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        rewrite !wlist_combine_gt_list with (3 := G2); auto.
+        simpl app at 2.
+        apply Forall_cons_iff, proj1 in G2.
+        rewrite wlist_combine_gt; auto.
+        left; constructor; apply lex_list_app_head; constructor 2; right; lia.
+      - subst p.
+        rewrite <- !app_assoc.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        simpl app at 2 6.
+        rewrite !wlist_combine_eq; auto.
+        right; auto.
+    * apply list_split_cons2 in E
+        as [ (<- & [=] & <-) | (m & [ (E1 & E2) | (E1 & E2) ]) ].
+      - subst x' i'.
+        simpl app.
+        rewrite !wlist_combine_gt_list; auto.
+        rewrite !wlist_combine_lt; auto.
+        right; auto.
+      - subst l m'.
+        rewrite !Forall_app in G1.
+        destruct G1 as (G1 & G4 & G3).
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        rewrite !wlist_combine_gt_list with (3 := G4); auto.
+        simpl app at 2.
+        apply Forall_cons_iff, proj1 in G4.
+        rewrite wlist_combine_gt; auto.
+        left; constructor; apply lex_list_app_head; constructor 2; right; lia.
+      - subst p r.
+        rewrite <- !app_assoc.
+        rewrite !wlist_combine_gt_list with (3 := G1); auto.
+        simpl app at 2 6; rewrite !wlist_combine_lt; auto.
+        right; auto.
+Qed.
 
 Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
 
