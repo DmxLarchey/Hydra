@@ -929,6 +929,29 @@ Proof.
   + now apply E0_zero_not_gt in H2.
 Qed.
 
+Fact list_split {X} (l₁ l₂ r₁ r₂ : list X) :
+    l₁++r₁ = l₂++r₂
+  → ∃m, l₁++m = l₂ ∧ r₁ = m++r₂
+     ∨  l₁ = l₂++m ∧ m++r₁ = r₂.
+Proof.
+  revert l₂; induction l₁ as [ | x l1 IH ]; intros [ | y l2 ]; simpl.
+  + exists []; auto.
+  + intros ->; eauto.
+  + intros <-; eauto.
+  + injection 1; intros (m & [ [] | [] ])%IH <-; subst; eauto.
+Qed.
+
+Fact list_split_cons {X} (l₁ l₂ r₁ r₂ : list X) x :
+    l₁++r₁ = l₂++[x]++r₂
+  → ∃m, l₁++m = l₂ ∧ r₁ = m++[x]++r₂
+     ∨  l₁ = l₂++[x]++m ∧ m++r₁ = r₂.
+Proof.
+  intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst; eauto.
+  destruct m as [ | y m ]; simpl in H2.
+  + subst; exists []; rewrite !app_nil_r; auto.
+  + inversion H2; subst; exists m; auto.
+Qed. 
+
 (* Proof that if cnf u then
    either u is E0_zero                             (limit ordinal)
       or  u is ω[l++[(E0_zero,i)]])                (successor)
@@ -946,7 +969,7 @@ Proof.
     destruct (wlist_cut_choice E0_lt_sdec (p++q) z)
       as [ G1 
        | [ (i & l & r & E & G1) 
-       |   (x & i & l & r & E & G1) ] ].
+       |   (x & i & l & r & E & G1 & G2) ] ].
     * rewrite wlist_combine_spec1 with (l := _++_); auto.
       apply Forall_app in G1 as [ G1 G2 ].
       rewrite  wlist_combine_spec1; auto.
@@ -955,7 +978,50 @@ Proof.
       destruct q as [ | (v,j) q ]; [ easy | ].
       constructor 2; left.
       apply Forall_cons_iff in G2; tauto.
-    * admit.
+    * rewrite E.
+      rewrite wlist_combine_spec2; auto.
+      destruct (@list_split_cons (E0*nat))
+        with (1 := E)
+        as (m & [ (<- & ->) | (-> & <-) ]).
+      - apply Forall_app in G1 as (G1 & G2).
+        rewrite wlist_combine_spec1; auto.
+        left; constructor.
+        rewrite <- app_assoc.
+        apply lex_list_app_head.
+        apply cnf_fix in Hq as [Hq1 Hq2].
+        rewrite !map_app in Hq1.
+        apply ordered_app_tail in Hq1.
+        rewrite app_assoc in Hq1.
+        apply ordered_app_head in Hq1.
+        simpl in Hq1.
+        destruct m as [ | (u,j) m ].
+        ++ constructor 2; right.
+           destruct (Hq2 z i); try lia.
+           apply in_app_iff; simpl; auto.
+        ++ constructor 2; left.
+           simpl in Hq1; apply ordered_inv in Hq1.
+           apply E0_lt_trans', clos_trans_rev.
+           apply ordered_from_clos_trans with (1 := Hq1).
+           apply in_app_iff; auto.
+      - rewrite wlist_combine_spec2; auto; right; auto.
+    * rewrite E.
+      rewrite wlist_combine_spec3; auto.
+      destruct (@list_split_cons (E0*nat))
+        with (1 := E)
+        as (m & [ (<- & ->) | (-> & <-) ]).
+      - apply Forall_app in G1 as (G1 & G3).
+        rewrite wlist_combine_spec1; auto.
+        destruct m as [ | (u,j) m ].
+        1: right; rewrite app_nil_r; auto.
+        left; constructor.
+        rewrite <- app_assoc.
+        apply lex_list_app_head.
+        constructor 2; left.
+        apply Forall_cons_iff, proj1 in G3; auto.
+      - 
+
+rewrite wlist_combine_spec2; auto; right; auto.
+admit.
     * admit.
   + apply lex2_inv in H as [ H | (<- & ?) ].
 Admitted.
