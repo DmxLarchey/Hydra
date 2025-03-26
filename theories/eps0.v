@@ -20,9 +20,18 @@ Arguments transitive {_}.
 
 Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
 
+Notation π₁ := proj1_sig.
+Notation π₂ := proj2_sig.
+
 #[local] Hint Constructors clos_trans : core.
 #[local] Hint Resolve Acc_inv Acc_intro 
                       in_cons in_eq in_elt in_or_app : core.
+
+Fact lt_irrefl n : ¬ n < n.
+Proof. lia. Qed.
+
+Fact lt_trans a b c : a < b → b < c → a < c.
+Proof. lia. Qed.
 
 Fact clos_trans_rev X R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
 Proof. induction 1; eauto. Qed.
@@ -34,6 +43,44 @@ Proof. split; auto. Qed.
 
 Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
 Proof. unfold transitive; eauto. Qed.
+
+Fact rev_rect X (P : list X → Type) :
+      P [] → (∀ l x, P l → P (l++[x])) → ∀l, P l.
+Proof.
+  intros H1 H2 l; revert l P H1 H2.
+  induction l as [ | x l IH ]; intros P H1 H2; auto.
+  apply IH.
+  + apply (H2 []); auto.
+  + intros ? ? ?; now apply (H2 (_::_)).
+Qed.
+
+Fact in_snoc_iff X (l : list X) x y : y ∈ l++[x] ↔ x = y ∨ y ∈ l.
+Proof. rewrite in_app_iff; simpl; tauto. Qed.
+
+Fact snoc_assoc X l (x y : X) : l++[x;y] = (l++[x])++[y].
+Proof. now rewrite <- app_assoc. Qed.
+
+Section wf_rel_morph.
+
+  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
+            (f : X → Y → Prop)
+            (f_surj : ∀y, ∃x, f x y)
+            (f_morph : ∀ x₁ x₂ y₁ y₂, f x₁ y₁ → f x₂ y₂ → T y₁ y₂ → R x₁ x₂).
+
+  Theorem Acc_rel_morph x y : f x y → Acc R x → Acc T y.
+  Proof.
+    intros H1 H2; revert H2 y H1.
+    induction 1 as [ x _ IH ]; intros y ?.
+    constructor; intros z ?.
+    destruct (f_surj z); eauto.
+  Qed.
+
+  Hint Resolve Acc_rel_morph : core.
+
+  Corollary wf_rel_morph : well_founded R → well_founded T.
+  Proof. intros ? y; destruct (f_surj y); eauto. Qed.
+
+End wf_rel_morph.
 
 Unset Elimination Schemes.
 
@@ -206,16 +253,107 @@ Section wlist_combine.
 
   Implicit Type (l m : list (X*nat)).
 
-  Fixpoint wlist_cut l y j :=
-    match l with
+  Fixpoint wlist_cut m y j :=
+    match m with
     | []       => [(y,j)]
-    | (x,i)::l =>
+    | (x,i)::m =>
       match R_sdec x y with
       | sdec_lt _ _ _ _ => [(y,j)]
       | sdec_eq _ _     => [(x,i+j)]
-      | sdec_gt _ _ _ _ => (x,i)::wlist_cut l y j
+      | sdec_gt _ _ _ _ => (x,i)::wlist_cut m y j
       end
     end.
+
+  Fact wlist_cut_spec m y j :
+      Forall (λ x, R y (fst x)) m ∧ wlist_cut m y j = m++[(y,j)]
+    ∨ (∃ i l r, m   = l++[(y,i)]++r ∧ Forall (λ x, R y (fst x)) l ∧ wlist_cut m y j = l++[(y,i+j)])
+    ∨ (∃ x i l r, m = l++[(x,i)]++r ∧ Forall (λ x, R y (fst x)) l ∧ R x y ∧ wlist_cut m y j = l++[(y,j)]).
+  Proof.
+    induction m as [ | (x,i) m IH ]; simpl.
+    + left; simpl; auto.
+    + destruct (R_sdec x y) as [ x y H | y | x y H ].
+      * do 2 right; exists x, i, [], m; simpl; auto.
+      * right; left; exists i, [], m; simpl; auto.
+      * destruct IH 
+          as [ (H1 & ->) 
+           | [ (k & l & r & E & ? & ->) 
+             | (z & k & l & r & E & ? & ? & ->) ] ].
+        - left; auto.
+        - subst m; right; left; exists k, ((x,i)::l), r; simpl; auto.
+        - subst m; do 2 right.
+          exists z, k, ((x,i)::l), r; auto.
+  Qed.
+
+  Fact wlist_cut_choice m y : 
+      Forall (λ x, R y (fst x)) m
+    ∨ (∃ i l r,   m = l++[(y,i)]++r ∧ Forall (λ x, R y (fst x)) l)
+    ∨ (∃ x i l r, m = l++[(x,i)]++r ∧ Forall (λ x, R y (fst x)) l ∧ R x y).
+  Proof.
+    induction m as [ | (x,i) m IH ]; simpl.
+    + left; simpl; auto.
+    + destruct (R_sdec x y) as [ x y H | y | x y H ].
+      * do 2 right; exists x, i, [], m; simpl; auto.
+      * right; left; exists i, [], m; simpl; auto.
+      * destruct IH 
+          as [ H1 
+           | [ (k & l & r & E & ?) 
+             | (z & k & l & r & E & ? & ?) ] ].
+        - left; auto.
+        - subst m; right; left; exists k, ((x,i)::l), r; simpl; auto.
+        - subst m; do 2 right.
+          exists z, k, ((x,i)::l), r; auto.
+  Qed.
+
+  Hypothesis (R_irrefl : ∀x, ~ R x x) (R_trans : transitive R).
+
+  Fact wlist_cut_spec1 m y j :
+      Forall (λ x, R y (fst x)) m
+    → wlist_cut m y j = m++[(y,j)].
+  Proof.
+    induction 1 as [ | (x,i) m H1 H2 IH2 ]; simpl; auto.
+    destruct (R_sdec x y) as [ x y H | y | x y H ].
+    + destruct (@R_irrefl x); eauto.
+    + destruct (R_irrefl H1).
+    + f_equal; auto.
+  Qed.
+
+  Local Fact R_sdec_refl x y : 
+      x = y
+    → match R_sdec x y with
+      | sdec_lt _ _ _ _ => False
+      | sdec_eq _ _     => True
+      | sdec_gt _ _ _ _ => False
+      end.
+  Proof. intros; destruct (R_sdec x y); auto; subst; eapply R_irrefl; eauto. Qed.
+
+  Fact wlist_cut_spec2 l y i r j :
+      Forall (λ x, R y (fst x)) l
+    → wlist_cut (l++[(y,i)]++r) y j = l++[(y,i+j)].
+  Proof.
+    induction 1 as [ | (x,k) m H1 H2 IH2 ]; simpl; auto.
+    + generalize (@R_sdec_refl y y eq_refl).
+      now destruct (R_sdec y y) as [ | y | ].
+    + destruct (R_sdec x y) as [ x y H | x | x y H ].
+      * destruct (@R_irrefl x); eauto.
+      * destruct (R_irrefl H1).
+      * simpl in IH2; rewrite IH2; auto.
+  Qed.
+
+  Fact wlist_cut_spec3 l x y i r j :
+      Forall (λ x, R y (fst x)) l
+    → R x y 
+    → wlist_cut (l++[(x,i)]++r) y j = l++[(y,j)].
+  Proof.
+    intros H1 Hxy; revert H1.
+    induction 1 as [ | (u,k) m H1 H2 IH2 ]; simpl; auto.
+    + destruct (R_sdec x y) as [ | y | ]; auto.
+      * destruct (R_irrefl Hxy).
+      * destruct (@R_irrefl y); eauto.
+    + destruct (R_sdec u y) as [ u y H | y | u y H ].
+      * destruct (@R_irrefl u); eauto.
+      * destruct (R_irrefl H1).
+      * simpl in IH2; rewrite IH2; auto.
+  Qed.
 
   Local Fact wlist_cut_ordered_from a l y j : R y a → ordered_from R⁻¹ a (map fst l) → ordered_from R⁻¹ a (map fst (wlist_cut l y j)).
   Proof.
@@ -257,11 +395,67 @@ Section wlist_combine.
     | (y,j)::m => wlist_cut l y j ++ m
     end.
 
+  Fact wlist_combine_spec_nil l : wlist_combine l [] = l.
+  Proof. trivial. Qed.
+
+  Fact wlist_combine_spec_cons l y j m :
+      Forall (fun x => R y (fst x)) l ∧ wlist_combine l ((y,j)::m) = l++[(y,j)]++m
+    ∨ (∃ i a b,   l = a++[(y,i)]++b ∧ Forall (fun x => R y (fst x)) a ∧ wlist_combine l ((y,j)::m) = a++[(y,i+j)]++m)
+    ∨ (∃ x i a b, l = a++[(x,i)]++b ∧ Forall (fun x => R y (fst x)) a ∧ R x y ∧ wlist_combine l ((y,j)::m) = a++[(y,j)]++m).
+  Proof.
+    simpl.
+    destruct (wlist_cut_spec l y j)
+      as [ (H1 & ->) 
+       | [ (k & a & b & E & H1 & ->) 
+         | (z & k & a & b & E & H1 & H2 & ->) ] ]; subst; rewrite <- !app_assoc; auto.
+    + right; left; exists k, a, b; auto. 
+    + do 2 right; exists z, k, a, b; auto.
+  Qed.
+
   Fact wlist_combine_in l m x i : (x,i) ∈ wlist_combine l m → ∃j, j ≤ i ∧ ((x,j) ∈ l ∨ (x,j) ∈ m).
   Proof.
-  Admitted.
+    destruct m as [ | (y,j) m ].
+    + rewrite wlist_combine_spec_nil.
+      exists i; auto.
+    + destruct (wlist_combine_spec_cons l y j m)
+        as [ (H1 & ->) 
+         | [ (k & a & b & E & H1 & ->) 
+           | (z & k & a & b & E & H1 & H2 & ->) ] ]; subst.
+      * intros []%in_app_iff; eauto.
+      * intros [H|[[=]|H]]%in_app_iff; subst; eauto.
+        - exists i; rewrite in_app_iff; auto.
+        - exists j; simpl; split; eauto; lia.
+      * intros []%in_app_iff; eauto.
+        exists i; rewrite in_app_iff; eauto.
+  Qed.
 
-  Hypothesis (HR : transitive R).
+  Fact wlist_combine_spec1 l y j m :
+      Forall (λ x, R y (fst x)) l
+    → wlist_combine l ((y,j)::m) = l++[(y,j)]++m.
+  Proof.
+    intros H.
+    unfold wlist_combine.
+    rewrite wlist_cut_spec1, <- app_assoc; auto.
+  Qed.
+
+  Fact wlist_combine_spec2 l y i r j m :
+      Forall (λ x, R y (fst x)) l
+    → wlist_combine (l++[(y,i)]++r) ((y,j)::m) = l++[(y,i+j)]++m.
+  Proof.
+    intros H.
+    unfold wlist_combine.
+    rewrite wlist_cut_spec2, <- app_assoc; auto.
+  Qed.
+
+  Fact wlist_combine_spec3 l x i r y j m :
+      Forall (λ x, R y (fst x)) l
+    → R x y
+    → wlist_combine (l++[(x,i)]++r) ((y,j)::m) = l++[(y,j)]++m.
+  Proof.
+    intros H1 H2.
+    unfold wlist_combine.
+    rewrite wlist_cut_spec3, <- app_assoc; auto.
+  Qed.
 
   Fact wlist_combine_ordered l m : ordered R⁻¹ (map fst l) → ordered R⁻¹ (map fst m) → ordered R⁻¹ (map fst (wlist_combine l m)).
   Proof.
@@ -299,12 +493,6 @@ Proof. split; auto; now inversion 1. Qed.
 
 (** We show that <E₀ is a strict order (irreflexive and transitive)
     and computably total, ie either e <E₀ f or e = f or f <E₀ e *)
-
-Fact lt_irrefl n : ¬ n < n.
-Proof. lia. Qed.
-
-Fact lt_trans a b c : a < b → b < c → a < c.
-Proof. lia. Qed.
 
 (* irreflexive *)
 Lemma E0_lt_irrefl e : ¬ e <E₀ e.
@@ -414,28 +602,6 @@ Fact E0_lpo_inv l m : E0_lpo ω[l] ω[m] → lo (lex2 E0_lpo lt) l m.
 Proof. now inversion 1. Qed.
 
 #[local] Hint Resolve lt_wf : core.
-
-Section wf_rel_morph.
-
-  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
-            (f : X → Y → Prop)
-            (f_surj : ∀y, ∃x, f x y)
-            (f_morph : ∀ x₁ x₂ y₁ y₂, f x₁ y₁ → f x₂ y₂ → T y₁ y₂ → R x₁ x₂).
-
-  Theorem Acc_rel_morph x y : f x y → Acc R x → Acc T y.
-  Proof.
-    intros H1 H2; revert H2 y H1.
-    induction 1 as [ x _ IH ]; intros y ?.
-    constructor; intros z ?.
-    destruct (f_surj z); eauto.
-  Qed.
-
-  Hint Resolve Acc_rel_morph : core.
-
-  Corollary wf_rel_morph : well_founded R → well_founded T.
-  Proof. intros ? y; destruct (f_surj y); eauto. Qed.
-
-End wf_rel_morph.
 
 Lemma wf_E0_lpo : well_founded E0_lpo.
 Proof.
@@ -684,6 +850,47 @@ Proof.
   + left; constructor; constructor; now left.
 Qed.
 
+Inductive E0_succ_graph : E0 → E0 → Prop :=
+  | E0_succ_graph0   : E0_succ_graph ω[[]] ω[[(ω[[]],1)]]
+  | E0_succ_graph1 l i : E0_succ_graph ω[l++[(ω[[]],i)]] ω[l++[(ω[[]],S i)]] 
+  | E0_succ_graph2 l x i : x ≠ E0_zero → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
+
+(* Inversion lemma for the graph of E0_succ *)
+Lemma E0_succ_graph_inv e f :
+    E0_succ_graph e f
+  → (e = ω[[]] → f = ω[[(ω[[]],1)]])
+  ∧ (∀ l i, e = ω[l++[(ω[[]],i)]] → f = ω[l++[(ω[[]],S i)]])
+  ∧ (∀ l x i, x ≠ E0_zero → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
+Proof.
+  destruct 1 as [ | l i | l x i H ]; (split; [ | split ]); eauto;
+    try now intros [].
+  + now destruct l.
+  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst i'; auto.
+  + intros l' x i' H (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
+  + now destruct l.
+  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
+  + intros m y j G (<- & [=])%E0_eq_inv%app_inj_tail; subst; auto.
+Qed.
+
+Corollary E0_succ_graph_fun e f g :
+   E0_succ_graph e f → E0_succ_graph e g → f = g.
+Proof. intros [] G%E0_succ_graph_inv; symmetry; apply G; auto. Qed.
+
+Definition E0_succ_pwc (e : E0) : sig (E0_succ_graph e).
+Proof.
+  destruct e as [l].
+  destruct l as [ | l (x,i) _ ] using rev_rect.
+  + exists ω[(ω[nil],1)::nil]; constructor.
+  + destruct x as [ [ | y m ] ].
+    * exists ω[l++[(ω[[]],S i)]]; constructor.
+    * exists ω[l⊣⊢[(ω[y::m],i);(ω[[]],1)]]; now constructor.
+Qed.
+
+Definition E0_succ e := π₁ (E0_succ_pwc e).
+
+Fact E0_succ_spec e : E0_succ_graph e (E0_succ e).
+Proof. apply (proj2_sig _). Qed.
+
 Definition E0_add e f :=
   match e, f with
   | ω[l], ω[m] => ω[wlist_combine E0_lt_sdec l m]
@@ -694,8 +901,74 @@ Proof.
   intros [l] [m] (H1 & H2)%cnf_fix (H3 & H4)%cnf_fix; apply cnf_fix.
   split.
   + apply wlist_combine_ordered; auto.
-  + (* use wlist_combine_in *)
+  + intros ? ? (? & ? & [[]%H2|[]%H4])%wlist_combine_in;
+      split; auto; lia.
+Qed.
+
+Fact E0_add_zero : ∀ e, E0_add e E0_zero = e.
+Proof. intros []; simpl; auto. Qed.
+
+Fact E0_add_one e : cnf e → E0_add e E0_one = E0_succ e.
+Proof.
+  intros He.
+  apply E0_succ_graph_fun with (2 := E0_succ_spec _).
+  destruct e as [l]; apply cnf_fix in He as [He1 He2].
+  unfold E0_add, E0_one, E0_zero.
+  destruct (wlist_combine_spec_cons E0_lt_sdec l ω[[]] 1 [])
+    as [ (H1 & ->) 
+     | [ (k & a & b & E & H1 & ->) 
+       | (z & k & a & b & E & H1 & H2 & ->) ] ]; subst.
+  + destruct l as [ | ([[]],j) l _ ] using rev_ind.
+    * constructor.
+    * now apply Forall_app, proj2, Forall_cons_iff, proj1, E0_lt_irrefl in H1.
+    * rewrite <- ! app_assoc; simpl; now constructor 3.
+  + destruct b as [ | (y,j) b ]; simpl.
+    * replace (k+1) with (S k) by lia; constructor.
+    * rewrite map_app in He1; simpl in He1.
+      now apply ordered_app_tail, ordered_inv, ordered_from_inv, proj1, E0_zero_not_gt in He1.
+  + now apply E0_zero_not_gt in H2.
+Qed.
+
+(* Proof that if cnf u then
+   either u is E0_zero                             (limit ordinal)
+      or  u is ω[l++[(E0_zero,i)]])                (successor)
+      or  u is ω[l++[(e,i)]]) with  E0_zero <E₀ e  (limit ordinal) *)
+
+Fact E0_add_mono u v e : cnf u → cnf v → cnf e → u ≤E₀ v → E0_add u e ≤E₀ E0_add v e.
+Proof.
+  intros Hu Hv He [ H | -> ]; [ | right ]; auto.
+  revert u v e Hu Hv He H.
+  intros [l] [m] [[|(z,h) k]] Hl Hm Hk.
+  1: rewrite !E0_add_zero; left; auto.
+  intros H; revert H Hl Hm.
+  intros [ q p | p (x,i) (y,j) l' m' H ]%E0_lt_inv%lex_list_invert Hp Hq; clear l m.
+  + unfold E0_add.
+    destruct (wlist_cut_choice E0_lt_sdec (p++q) z)
+      as [ G1 
+       | [ (i & l & r & E & G1) 
+       |   (x & i & l & r & E & G1) ] ].
+    * rewrite wlist_combine_spec1 with (l := _++_); auto.
+      apply Forall_app in G1 as [ G1 G2 ].
+      rewrite  wlist_combine_spec1; auto.
+      left; constructor; rewrite <- app_assoc.
+      apply lex_list_app_head.
+      destruct q as [ | (v,j) q ]; [ easy | ].
+      constructor 2; left.
+      apply Forall_cons_iff in G2; tauto.
+    * admit.
+    * admit.
+  + apply lex2_inv in H as [ H | (<- & ?) ].
 Admitted.
+
+Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
+
+(** The lub is preserved *)
+Theorem E0_add_lub P u v : 
+     (∀e, P e → cnf e)
+   → cnf u
+   → cnf v
+   → is_lub E0_le P u
+   → is_lub E0_le (λ x, ∃e, P e ∧ x = E0_add e v) (E0_add u v).
 
 (** Then show that 
       E0_add e E0_zero = e
@@ -707,9 +980,6 @@ Admitted.
 Definition eps0 := { e | cnf e }.
 
 Notation ε₀ := eps0.
-
-Notation π₁ := proj1_sig.
-Notation π₂ := proj2_sig.
 
 Fact eps0_eq_iff (e f : ε₀) : e = f ↔ π₁ e = π₁ f.
 Proof.
@@ -799,63 +1069,6 @@ Proof.
   + left; apply eps0_eq_iff; auto.
   + right; cbv; repeat constructor.
 Qed.
-
-Fact rev_rect X (P : list X → Type) :
-      P [] → (∀ l x, P l → P (l++[x])) → ∀l, P l.
-Proof.
-  intros H1 H2 l; revert l P H1 H2.
-  induction l as [ | x l IH ]; intros P H1 H2; auto.
-  apply IH.
-  + apply (H2 []); auto.
-  + intros ? ? ?; now apply (H2 (_::_)).
-Qed.
-
-Fact in_snoc_iff X (l : list X) x y : y ∈ l++[x] ↔ x = y ∨ y ∈ l.
-Proof. rewrite in_app_iff; simpl; tauto. Qed.
-
-Fact snoc_assoc X l (x y : X) : l++[x;y] = (l++[x])++[y].
-Proof. now rewrite <- app_assoc. Qed.
-
-Inductive E0_succ_graph : E0 → E0 → Prop :=
-  | E0_succ_graph0   : E0_succ_graph ω[[]] ω[[(ω[[]],1)]]
-  | E0_succ_graph1 l i : E0_succ_graph ω[l++[(ω[[]],i)]] ω[l++[(ω[[]],S i)]] 
-  | E0_succ_graph2 l x i : x ≠ E0_zero → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
-
-(* Inversion lemma for the graph of E0_succ *)
-Lemma E0_succ_graph_inv e f :
-    E0_succ_graph e f
-  → (e = ω[[]] → f = ω[[(ω[[]],1)]])
-  ∧ (∀ l i, e = ω[l++[(ω[[]],i)]] → f = ω[l++[(ω[[]],S i)]])
-  ∧ (∀ l x i, x ≠ E0_zero → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
-Proof.
-  destruct 1 as [ | l i | l x i H ]; (split; [ | split ]); eauto;
-    try now intros [].
-  + now destruct l.
-  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst i'; auto.
-  + intros l' x i' H (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
-  + now destruct l.
-  + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
-  + intros m y j G (<- & [=])%E0_eq_inv%app_inj_tail; subst; auto.
-Qed.
-
-Corollary E0_succ_graph_fun e f g :
-   E0_succ_graph e f → E0_succ_graph e g → f = g.
-Proof. intros [] G%E0_succ_graph_inv; symmetry; apply G; auto. Qed.
-
-Definition E0_succ_pwc (e : E0) : sig (E0_succ_graph e).
-Proof.
-  destruct e as [l].
-  destruct l as [ | l (x,i) _ ] using rev_rect.
-  + exists ω[(ω[nil],1)::nil]; constructor.
-  + destruct x as [ [ | y m ] ].
-    * exists ω[l++[(ω[[]],S i)]]; constructor.
-    * exists ω[l⊣⊢[(ω[y::m],i);(ω[[]],1)]]; now constructor.
-Qed.
-
-Definition E0_succ e := π₁ (E0_succ_pwc e).
-
-Fact E0_succ_spec e : E0_succ_graph e (E0_succ e).
-Proof. apply (proj2_sig _). Qed.
 
 Fact E0_succ_correct : ∀e, cnf e → cnf (E0_succ e).
 Proof.
