@@ -44,6 +44,8 @@ Proof. split; auto. Qed.
 Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
 Proof. unfold transitive; eauto. Qed.
 
+#[local] Hint Resolve transitive_rev : core.
+
 Fact rev_rect X (P : list X → Type) :
       P [] → (∀ l x, P l → P (l++[x])) → ∀l, P l.
 Proof.
@@ -317,6 +319,25 @@ Section wlist_combine.
     + f_equal; auto.
   Qed.
 
+  Fact wlist_cut_gt_list l r y j :
+      Forall (λ x, R y (fst x)) l
+    → wlist_cut (l++r) y j = l++wlist_cut r y j.
+  Proof.
+    induction 1 as [ | (x,k) m H1 H2 IH2 ]; simpl; auto.
+    + destruct (R_sdec x y) as [ x y H | x | x y H ].
+      * destruct (@R_irrefl x); eauto.
+      * destruct (R_irrefl H1).
+      * f_equal; auto.
+  Qed.
+
+  Fact wlist_cut_gt x i r y j :
+      R y x
+    → wlist_cut ((x,i)::r) y j = (x,i)::wlist_cut r y j.
+  Proof.
+    intro; apply wlist_cut_gt_list with (l := [_]).
+    constructor; auto.
+  Qed.
+
   Local Fact R_sdec_refl x y : 
       x = y
     → match R_sdec x y with
@@ -325,6 +346,21 @@ Section wlist_combine.
       | sdec_gt _ _ _ _ => False
       end.
   Proof. intros; destruct (R_sdec x y); auto; subst; eapply R_irrefl; eauto. Qed.
+
+  Fact wlist_cut_eq i r y j : wlist_cut ((y,i)::r) y j = [(y,i+j)].
+  Proof.
+    simpl.
+    generalize (@R_sdec_refl y y eq_refl).
+    destruct (R_sdec y y); tauto.
+  Qed.
+
+  Fact wlist_cut_lt x i r y j : R x y → wlist_cut ((x,i)::r) y j = [(y,j)].
+  Proof.
+    simpl; intro H.
+    destruct (R_sdec x y); auto.
+    + destruct (R_irrefl H).
+    + destruct (@R_irrefl x); eauto.
+  Qed.
 
   Fact wlist_cut_spec2 l y i r j :
       Forall (λ x, R y (fst x)) l
@@ -412,6 +448,38 @@ Section wlist_combine.
     + do 2 right; exists z, k, a, b; auto.
   Qed.
 
+  Fact wlist_combine_gt_list l r y j m :
+      Forall (λ x, R y (fst x)) l
+    → wlist_combine (l++r) ((y,j)::m) = l++wlist_combine r ((y,j)::m).
+  Proof.
+    simpl; intros.
+    rewrite wlist_cut_gt_list; auto.
+    now rewrite app_assoc.
+  Qed.
+
+  Fact wlist_combine_gt x i r y j m :
+      R y x
+    → wlist_combine ((x,i)::r) ((y,j)::m) = (x,i)::wlist_combine r ((y,j)::m).
+  Proof.
+    intros.
+    apply wlist_combine_gt_list with (l := [_]).
+    constructor; auto.
+  Qed.
+
+  Fact wlist_combine_eq i r y j m :
+      wlist_combine ((y,i)::r) ((y,j)::m) = (y,i+j)::m.
+  Proof.
+    unfold wlist_combine.
+    now rewrite wlist_cut_eq.
+  Qed.
+
+  Fact wlist_combine_lt x i r y j m :
+      R x y -> wlist_combine ((x,i)::r) ((y,j)::m) = (y,j)::m.
+  Proof.
+    unfold wlist_combine; intro.
+    now rewrite wlist_cut_lt.
+  Qed.
+
   Fact wlist_combine_in l m x i : (x,i) ∈ wlist_combine l m → ∃j, j ≤ i ∧ ((x,j) ∈ l ∨ (x,j) ∈ m).
   Proof.
     destruct m as [ | (y,j) m ].
@@ -465,9 +533,8 @@ Section wlist_combine.
     apply wlist_cut_ordered with (y := y) (j := j) in Hl.
     generalize (wlist_cut_ub l y j); intros H.
     apply ordered_from_app_middle with y; eauto.
-    + now apply transitive_rev.
-    + intros ? ((x,i) & <- & ?)%in_map_iff; simpl; eauto.
-      destruct (H x i) as [ | <- ]; eauto.
+    intros ? ((x,i) & <- & ?)%in_map_iff; simpl; eauto.
+    destruct (H x i) as [ | <- ]; eauto.
   Qed. 
 
 End wlist_combine.
@@ -961,10 +1028,10 @@ Fact E0_add_mono u v e : cnf u → cnf v → cnf e → u ≤E₀ v → E0_add u 
 Proof.
   intros Hu Hv He [ H | -> ]; [ | right ]; auto.
   revert u v e Hu Hv He H.
-  intros [l] [m] [[|(z,h) k]] Hl Hm Hk.
+  intros [l] [m] [[|(z,h) k]] Hl Hm Hk.
   1: rewrite !E0_add_zero; left; auto.
   intros H; revert H Hl Hm.
-  intros [ q p | p (x,i) (y,j) l' m' H ]%E0_lt_inv%lex_list_invert Hp Hq; clear l m.
+  intros [ q p | p (x,i) (y,j) l' m' [ H | (<- & ?) ]%lex2_inv ]%E0_lt_inv%lex_list_invert Hp Hq; clear l m.
   + unfold E0_add.
     destruct (wlist_cut_choice E0_lt_sdec (p++q) z)
       as [ G1 
@@ -972,7 +1039,7 @@ Proof.
        |   (x & i & l & r & E & G1 & G2) ] ].
     * rewrite wlist_combine_spec1 with (l := _++_); auto.
       apply Forall_app in G1 as [ G1 G2 ].
-      rewrite  wlist_combine_spec1; auto.
+      rewrite wlist_combine_spec1; auto.
       left; constructor; rewrite <- app_assoc.
       apply lex_list_app_head.
       destruct q as [ | (v,j) q ]; [ easy | ].
@@ -999,10 +1066,7 @@ Proof.
            destruct (Hq2 z i); try lia.
            apply in_app_iff; simpl; auto.
         ++ constructor 2; left.
-           simpl in Hq1; apply ordered_inv in Hq1.
-           apply E0_lt_trans', clos_trans_rev.
-           apply ordered_from_clos_trans with (1 := Hq1).
-           apply in_app_iff; auto.
+           simpl in Hq1; apply ordered_cons_iff, proj2 in Hq1; auto.
       - rewrite wlist_combine_spec2; auto; right; auto.
     * rewrite E.
       rewrite wlist_combine_spec3; auto.
@@ -1018,12 +1082,36 @@ Proof.
         apply lex_list_app_head.
         constructor 2; left.
         apply Forall_cons_iff, proj1 in G3; auto.
-      - 
-
-rewrite wlist_combine_spec2; auto; right; auto.
-admit.
+      - rewrite wlist_combine_spec3; auto; right; auto.
+  + unfold E0_add.
+    destruct (wlist_cut_choice E0_lt_sdec (p++[(y,j)]++m') z)
+      as [ G1 
+       | [ (i' & l & r & E & G1) 
+       |   (x' & i' & l & r & E & G1 & G2) ] ].
+    * rewrite wlist_combine_spec1 with (3 := G1); auto.
+      simpl in G1; rewrite Forall_app, Forall_cons_iff in G1; simpl in G1.
+      destruct G1 as (G1 & G2 & G3).
+      rewrite wlist_combine_gt_list; auto.
+      simpl app at 2.
+      destruct (E0_lt_sdec x z) as [ x z H1 | x | x z H1 ].
+      - rewrite wlist_combine_lt; auto.
+        left; constructor.
+        rewrite <- app_assoc.
+        apply lex_list_app_head.
+        constructor 2; left; eauto.
+      - rewrite wlist_combine_eq; eauto.
+        left; constructor.
+        rewrite <- app_assoc.
+        apply lex_list_app_head.
+        constructor 2; left; eauto.
+      - rewrite wlist_combine_gt; auto.
+        left; constructor.
+        rewrite <- app_assoc. 
+        apply lex_list_app_head.
+        constructor 2; left; auto.
     * admit.
-  + apply lex2_inv in H as [ H | (<- & ?) ].
+    * admit.
+  + admit.
 Admitted.
 
 Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.

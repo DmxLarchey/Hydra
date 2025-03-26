@@ -89,7 +89,7 @@ Section ordered.
   Fact ordered_from_app_middle R l x m : 
        transitive _ R
      → ordered R l 
-     → (forall y, In y l -> R y x \/ y = x)
+     → (∀y, y ∈ l → R y x ∨ y = x)
      → ordered_from R x m
      → ordered R (l++m).
   Proof.
@@ -265,6 +265,45 @@ Section ordered_morphism.
   Proof. intros ? H; induction 1; inversion H; subst; constructor; eauto. Qed.
 
 End ordered_morphism.
+
+Section ordered_trans.
+
+  Variables (X : Type) (R : X → X → Prop) (HR : transitive _ R).
+
+  Local Fact transitive_clos_trans x y : clos_trans R x y → R x y.
+  Proof. induction 1; eauto. Qed.
+
+  Hint Resolve transitive_clos_trans
+               ordered_from_ordered
+               ordered_from_clos_trans : core.
+
+  Fact ordered_cons_iff x l : ordered R (x::l) ↔ ordered R l ∧ ∀y, y ∈ l → R x y.
+  Proof.
+    split.
+    + intros ?%ordered_inv; eauto.
+    + intros (H1 & H2); constructor.
+      induction H1; constructor; eauto.
+  Qed.
+
+  Fact ordered_app_iff l m : ordered R (l++m) ↔ ordered R l ∧ ordered R m ∧ ∀ x y, x ∈ l → y ∈ m → R x y.
+  Proof.
+    induction l as [ | x l IH ]; simpl; split; try tauto.
+    + repeat split; tauto || constructor.
+    + rewrite !ordered_cons_iff, IH; firstorder; subst; eauto.
+    + rewrite !ordered_cons_iff, IH; intros ([] & ? & ?); repeat split; auto.
+      intros ? []%in_app_iff; eauto.
+  Qed.
+
+  Fact ordered_snoc_iff x l : ordered R (l++[x]) ↔ ordered R l ∧ ∀y, y ∈ l → R y x.
+  Proof.
+    rewrite ordered_app_iff; split.
+    + intros (? & _ & ?); eauto.
+    + intros []; repeat split; eauto.
+      * repeat constructor.
+      * intros ? ? ? [ <- | [] ]; eauto.
+  Qed.
+
+End ordered_trans.
 
 Section list_plus.
 
