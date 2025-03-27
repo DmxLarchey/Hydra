@@ -770,6 +770,12 @@ Proof. intros ? ? ? [] []; subst; red; eauto. Qed.
 
 #[local] Hint Resolve E0_le_refl E0_le_trans : core.
 
+Fact E0_le_lt_trans e f g : e ≤E₀ f → f <E₀ g → e <E₀ g.
+Proof. intros [] ?; subst; eauto. Qed.
+
+Fact E0_lt_le_trans e f g : e <E₀ f → f ≤E₀ g → e <E₀ g.
+Proof. intros ? []; subst; eauto. Qed.
+
 Definition E0_zero := ω[[]].
 
 Notation "0₀" := E0_zero.
@@ -779,6 +785,8 @@ Proof.
   destruct e as [ [] ]; [ right | left ]; eauto.
   repeat constructor.
 Qed.
+
+#[local] Hint Resolve E0_zero_le : core.
 
 Fact E0_zero_not_gt e : ¬ e <E₀ 0₀.
 Proof.
@@ -902,6 +910,23 @@ Qed.
 Theorem E0_lt_ht e f : cnf e → cnf f → e <E₀ f → E0_ht e ≤ E0_ht f.
 Proof. apply E0_lt_ht_rec with (n := 1+E0_ht e+E0_ht f); lia. Qed.
 
+Corollary E0_ht_lt e f : cnf e → cnf f → E0_ht e < E0_ht f → e <E₀ f.
+Proof.
+  intros H1 H2 H3.
+  destruct (E0_lt_sdec e f) as [ e f H | e | e f H ]; auto.
+  + lia.
+  + apply E0_lt_ht in H; auto; lia.
+Qed.
+
+Corollary E0_lt_sub x i l : cnf ω[l] → (x,i) ∈ l → x <E₀ ω[l].
+Proof.
+  intros H1 H2.
+  apply E0_ht_lt; auto.
+  + apply cnf_fix, proj2 in H1.
+    apply (H1 _ _ H2).
+  + eapply E0_ht_in; eauto.
+Qed.
+
 (** Complete this thing that show that the height is easy quick to compute on cnf *)
 Fact cnf_ht e i l : cnf ω[(e,i)::l] → E0_ht ω[(e,i)::l] = 1+E0_ht e.
 Proof.
@@ -958,7 +983,7 @@ Proof.
   + inversion H; subst; auto.
 Qed.
 
-Fact cnf_zero : cnf ω[nil].
+Fact cnf_zero : cnf 0₀.
 Proof.
   apply cnf_fix; simpl; split.
   + constructor.
@@ -967,7 +992,9 @@ Qed.
 
 #[local] Hint Resolve cnf_zero : core.
 
-Definition E0_one := ω[[(E0_zero, 1)]].
+Definition E0_one := ω[[(0₀, 1)]].
+
+Notation "1₀" := E0_one.
 
 Fact cnf_one : cnf E0_one.
 Proof.
@@ -978,7 +1005,7 @@ Qed.
 
 #[local] Hint Resolve cnf_one : core.
 
-Fact E0_one_ge r : r ≠ [] → cnf ω[r] → E0_one ≤E₀ ω[r].
+Fact E0_one_ge r : r ≠ [] → cnf ω[r] → 1₀ ≤E₀ ω[r].
 Proof.
   destruct r as [ | (x,i) r ]; [ easy | intros _ Hr ].
   destruct (E0_zero_le x) as [ Hx | <- ].
@@ -994,16 +1021,16 @@ Proof.
 Qed.
 
 Inductive E0_succ_graph : E0 → E0 → Prop :=
-  | E0_succ_graph0   : E0_succ_graph ω[[]] ω[[(ω[[]],1)]]
-  | E0_succ_graph1 l i : E0_succ_graph ω[l++[(ω[[]],i)]] ω[l++[(ω[[]],S i)]] 
-  | E0_succ_graph2 l x i : x ≠ E0_zero → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
+  | E0_succ_graph0   : E0_succ_graph 0₀ 1₀
+  | E0_succ_graph1 l i : E0_succ_graph ω[l++[(0₀,i)]] ω[l++[(0₀,S i)]] 
+  | E0_succ_graph2 l x i : x ≠ 0₀ → E0_succ_graph ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
 
 (* Inversion lemma for the graph of E0_succ *)
 Lemma E0_succ_graph_inv e f :
     E0_succ_graph e f
-  → (e = ω[[]] → f = ω[[(ω[[]],1)]])
-  ∧ (∀ l i, e = ω[l++[(ω[[]],i)]] → f = ω[l++[(ω[[]],S i)]])
-  ∧ (∀ l x i, x ≠ E0_zero → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
+  → (e = 0₀ → f = 1₀)
+  ∧ (∀ l i, e = ω[l++[(0₀,i)]] → f = ω[l++[(0₀,S i)]])
+  ∧ (∀ l x i, x ≠ 0₀ → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
 Proof.
   destruct 1 as [ | l i | l x i H ]; (split; [ | split ]); eauto;
     try now intros [].
@@ -1048,10 +1075,10 @@ Proof.
       split; auto; lia.
 Qed.
 
-Fact E0_add_zero : ∀ e, E0_add e E0_zero = e.
+Fact E0_add_zero : ∀ e, E0_add e 0₀ = e.
 Proof. intros []; simpl; auto. Qed.
 
-Fact E0_add_one e : cnf e → E0_add e E0_one = E0_succ e.
+Fact E0_add_one e : cnf e → E0_add e 1₀ = E0_succ e.
 Proof.
   intros He.
   apply E0_succ_graph_fun with (2 := E0_succ_spec _).
@@ -1071,6 +1098,9 @@ Proof.
       now apply ordered_app_tail, ordered_inv, ordered_from_inv, proj1, E0_zero_not_gt in He1.
   + now apply E0_zero_not_gt in H2.
 Qed.
+
+Fact E0_add_zero_left e : E0_add 0₀ e = e.
+Proof. destruct e as [[ | (x,i) l ]]; auto. Qed.
 
 (* Proof that if cnf u then
    either u is E0_zero                             (limit ordinal)
@@ -1356,6 +1386,21 @@ Qed.
 Definition E0_is_succ e := ∃f, e = E0_succ f.
 Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f.
 
+Fact E0_add_is_limit a e : e ≠ 0₀ → E0_is_limit (E0_add a ω[[(e, 1)]]).
+Proof.
+  intros He.
+  destruct a as [[ | (a,i) l ]].
+  + simpl; split; [ easy | ].
+    intros (f & Hf); revert Hf.
+    generalize (E0_succ f) (E0_succ_spec f).
+    induction 1 as [ | l | l ]; injection 1; try easy; intros G.
+    * destruct l as [ | ? [] ]; try easy.
+      inversion G; now subst.
+    * destruct l as [ | ? [] ]; try easy.
+  + (* show wlist_combine _ ω[[(e, 1)]] is of the form ω[...++[(e, _)]] 
+       which is enough for not being a successor *)
+Admitted.
+
 Inductive E0_decomp : E0 → Type :=
   | E0_decomp_zero : E0_decomp 0₀
   | E0_decomp_succ e : cnf e → E0_decomp (E0_succ e)
@@ -1422,6 +1467,15 @@ Proof.
               intros [] ?; now apply H1, in_map.
 Qed.
 
+#[local] Hint Resolve cnf_lt_lpo : core.
+
+Theorem E0_lt_wf : well_founded (λ x y, x <E₀ y ∧ cnf x ∧ cnf y).
+Proof.
+  generalize wf_E0_lpo.
+  apply wf_rel_morph with (f := fun x y => x = y); eauto.
+  intros ? ? ? ? -> -> (? & ? & ?); eauto.
+Qed.
+
 Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
   | E0_fseq_gr_0 g b   : cnf g
                        → cnf b
@@ -1431,15 +1485,34 @@ Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
                        → E0_fseq_gr b r
                        → E0_fseq_gr (E0_add g ω[[(b,1)]]) (λ n, E0_add g ω[[(r n,1)]]).
 
+#[local] Hint Resolve E0_add_cnf cnf_sg : core.
+
 (** WF Induction on e st cnf e *)
 Theorem E0_fseq_pwc e : cnf e → E0_is_limit e → sig (E0_fseq_gr e).
 Proof.
-(*
-  induction e as [ e IHe ] using (well_founded_induction_type E0_lt_wf).
-  induction 1 as [ m H1 H2 H3 IH ] using cnf_rect; intros (G1 & G2).
-  destruct 
-*)
-Admitted.
+  induction e as [ e IH ] using (well_founded_induction_type E0_lt_wf).
+  intros G1%E0_decomp_compute G2.
+  destruct G1 as [ | e He | g e H0 Hg He ].
+  + exfalso; now destruct G2.
+  + exfalso; destruct G2 as (_ & []); eauto.
+  + clear G2.
+    apply E0_decomp_compute in He.
+    destruct He as [ | b Hb | a e H1 H2 H3 ].
+    * now destruct H0.
+    * exists (λ n, E0_add g ω[[(b,1+n)]]).
+      now constructor.
+    * destruct (IH (E0_add a ω[[(e, 1)]])) as (lam & Hlam); eauto.
+      - repeat split; eauto.
+        ++ rewrite <- (E0_add_zero_left (E0_add a _)) at 1.
+           apply E0_le_lt_trans with (E0_add g (E0_add a ω[[(e, 1)]])).
+           ** apply E0_add_mono_left; auto.
+           ** apply E0_add_mono_right; eauto.
+              1: apply cnf_sg; eauto.
+              apply E0_lt_sub with 1; auto.
+        ++ apply E0_add_cnf; auto.
+      - now apply E0_add_is_limit.
+      - exists (λ n, E0_add g ω[[(lam n,1)]]); constructor; eauto.
+Qed.
 
 Definition E0_fseq {e} (h : cnf e) (l : E0_is_limit e) := proj1_sig (@E0_fseq_pwc e h l).
 Fact E0_fseq_spec e h l : E0_fseq_gr e (@E0_fseq e h l).
@@ -1508,13 +1581,11 @@ Proof.
     admit.
   + intros H x (e & He & ->).
     apply E0_le_trans with (2 := H).
-    assert (e ≤E₀ v) as [ G | ].
+(*    assert (e ≤E₀ v) as [ G | ].
     1: apply H4; try red; auto.
     * left; apply E0_add_mono_right; eauto.
-    * subst; now right.
+    * subst; now right. *)
 Admitted.
-
-    exists  *)
 
 (** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
 
