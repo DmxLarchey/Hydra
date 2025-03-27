@@ -1809,9 +1809,17 @@ Proof.
     apply lex_list_app_head; now constructor 2.
 Qed.
 
-(** contre example
- 
+(** Proof
+   a = l++(x,i)++k
+   f = (x,j)++r
 
+   a+f = l++(x,i+j)++r
+
+   e = l++(x,i+j)++r' -> g = (x,j)++r' 
+   e = l++(x,i)++r'   -> g = r' ou k
+        si k < r' alors e = a ++ r' (induction ?)
+        si k = r' alors e = a -> g = 0
+        si k > r' alors e < a ok 
  *)
 
 Lemma E0_lt_add_inv e a f :
