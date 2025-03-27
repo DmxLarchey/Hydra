@@ -139,6 +139,21 @@ Section lex_list.
     + now constructor 2 with (p := _::_).
   Qed.
 
+  Local Fact lex_list_app_inv_right_rec l m :
+       lex_list l m
+    -> forall m1 m2, m = m1++m2 -> lex_list l m1 \/ exists r, l = m1++r /\ lex_list r m2.
+  Proof.
+    induction 1 as [ x m | x y l m H | z l m H IH ];
+      (intros [] ?; simpl; [ intros <-; right | intros [=]; subst ]; eauto).
+    destruct (IH _ _ eq_refl) as [ | (? & -> & ?) ]; eauto.
+  Qed.
+
+  Lemma lex_list_app_inv_right l m₁ m₂ :
+      lex_list l (m₁++m₂)
+    → lex_list l m₁ 
+    ∨ ∃r, l = m₁++r ∧ lex_list r m₂.
+  Proof. intros; eapply lex_list_app_inv_right_rec; eauto. Qed.
+
   Inductive lex_list_snoc_inv_shape_l x : list X → list X → Prop :=
     | in_lex_list_snoc_inv_shape0_l0 l a b r r' : R a b → lex_list_snoc_inv_shape_l x (l++[a]++r) (l++[b]++r')
     | in_lex_list_snoc_inv_shape0_l1 y l r : R x y → lex_list_snoc_inv_shape_l x l (l++[y]++r)
