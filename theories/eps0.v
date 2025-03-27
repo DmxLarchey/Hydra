@@ -433,6 +433,17 @@ Section wlist_combine.
       * simpl in IH2; rewrite IH2; auto.
   Qed.
 
+  Fact wlist_cut_last l y j : ∃m k, j ≤ k ∧ wlist_cut l y j = m++[(y,k)].
+  Proof.
+    induction l as [ | (x,i) l (m & k & Hk & Hw) ]; simpl.
+    + exists [], j; auto.
+    + destruct (R_sdec x y) as [ x y H | x | x y H ].
+      * exists [], j; auto.
+      * exists [], (i+j); split; auto; lia.
+      * exists ((x,i)::m), k; split; simpl; auto.
+        now f_equal.
+  Qed. 
+
   Local Fact wlist_cut_ordered_from a l y j : R y a → ordered_from R⁻¹ a (map fst l) → ordered_from R⁻¹ a (map fst (wlist_cut l y j)).
   Proof.
     induction l as [ | (x,i) l IHl ] in a |- *; simpl; intros Ha.
@@ -580,6 +591,16 @@ Section wlist_combine.
     intros H1 H2.
     unfold wlist_combine.
     rewrite wlist_cut_spec3, <- app_assoc; auto.
+  Qed.
+
+  Fact wlist_combine_last l m y j :
+    ∃ r k, j ≤ k ∧ wlist_combine l (m++[(y,j)]) = r++[(y,k)].
+  Proof.
+    destruct m as [ | (z,p) m ]; simpl.
+    + destruct (wlist_cut_last l y j) as (r & k & ? & E).
+      exists r, k; split; auto; now rewrite app_nil_r.
+    + exists (wlist_cut l z p ++ m), j; split; auto.
+      now rewrite app_assoc.
   Qed.
 
   Fact wlist_combine_ordered l m : ordered R⁻¹ (map fst l) → ordered R⁻¹ (map fst m) → ordered R⁻¹ (map fst (wlist_combine l m)).
@@ -1386,20 +1407,103 @@ Qed.
 Definition E0_is_succ e := ∃f, e = E0_succ f.
 Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f.
 
-Fact E0_add_is_limit a e : e ≠ 0₀ → E0_is_limit (E0_add a ω[[(e, 1)]]).
+Lemma E0_is_succ_iff e :
+     cnf e
+   → E0_is_succ e
+   ↔ ∃ l i, 0 < i ∧ e = ω[l++[(0₀,i)]].
+Proof.
+  intros He; split.
+  + intros (f & ->).
+    generalize (E0_succ f) (E0_succ_spec f).
+    induction 1 as [ | l i | l x i ].
+    * exists [], 1; split; auto.
+    * exists l, (S i); split; auto; lia.
+    * exists (l++[(x,i)]), 1; split; auto.
+      now rewrite <- app_assoc.
+  + intros (l & [ | [|i] ] & H1 & ->).
+    * lia.
+    * exists ω[l].
+      apply E0_succ_graph_fun with (2 := E0_succ_spec _).
+      destruct l as [ | l (x,i) _ ] using rev_rect.
+      1: constructor 1.
+      rewrite <- app_assoc; simpl.
+      constructor 3.
+      intros ->.
+      rewrite <- app_assoc, cnf_fix, map_app in He.
+      simpl in He.
+      apply proj1, ordered_app_tail, 
+            ordered_cons_iff, proj2 in He; auto.
+      apply (@E0_lt_irrefl 0₀), He; auto. 
+    * exists ω[l++[(0₀,S i)]].
+      apply E0_succ_graph_fun with (2 := E0_succ_spec _).
+      constructor 2.
+Qed.
+
+Lemma E0_is_limit_iff e :
+    cnf e 
+  → E0_is_limit e 
+  ↔ ∃ l b i, 0 < i ∧ b ≠ 0₀ ∧ e = ω[l++[(b,i)]].
 Proof.
   intros He.
-  destruct a as [[ | (a,i) l ]].
-  + simpl; split; [ easy | ].
-    intros (f & Hf); revert Hf.
-    generalize (E0_succ f) (E0_succ_spec f).
-    induction 1 as [ | l | l ]; injection 1; try easy; intros G.
-    * destruct l as [ | ? [] ]; try easy.
-      inversion G; now subst.
-    * destruct l as [ | ? [] ]; try easy.
-  + (* show wlist_combine _ ω[[(e, 1)]] is of the form ω[...++[(e, _)]] 
-       which is enough for not being a successor *)
-Admitted.
+  split.
+  + intros (H1 & H2); destruct e as [ l ].
+    destruct l as [ | l (b,i) _ ] using rev_rect.
+    1: easy.
+    destruct i as [ | i ].
+    1:{ apply cnf_fix, proj2 in He.
+        destruct (He b 0); eauto; lia. }
+    exists l, b, (S i); repeat split; auto.
+    * lia.
+    * intros ->.
+      apply H2, E0_is_succ_iff; auto.
+      exists l, (S i); split; auto; lia.
+  + intros (l & b & i & H1 & H2 & ->).
+    split.
+    1: now destruct l.
+    intros (m & j & H3 & H4)%E0_is_succ_iff; auto.
+    injection H4; clear H4.
+    intros (_ & [=])%app_inj_tail; now subst.
+Qed.
+
+#[local] Hint Resolve E0_add_cnf : core.
+
+(** e + l is a limit if l is *)
+Lemma E0_add_is_limit a e : 
+    cnf a
+  → cnf e
+  → E0_is_limit e
+  → E0_is_limit (E0_add a e).
+Proof.
+  intros Ha He (m & b & i & Hi & Hb & ->)%E0_is_limit_iff; auto.
+  apply E0_is_limit_iff; eauto.
+  destruct a as [l].
+  unfold E0_add.
+  destruct (wlist_combine_last E0_lt_sdec l m b i)
+    as (r & j & ? & ->).
+  exists r, b, j; split; auto; lia.
+Qed.
+
+Fact E0_omega_is_limit e i :
+    cnf e
+  → e ≠ 0₀
+  → 0 < i
+  → E0_is_limit ω[[(e,i)]].
+Proof.
+  intros H1 H2 H3.
+  apply E0_is_limit_iff; auto.
+  exists [], e, i; auto.
+Qed.
+
+#[local] Hint Resolve E0_add_is_limit E0_omega_is_limit : core.
+
+(** a + ω^e is a limit ordinal *)
+Fact E0_add_omega_is_limit a e i : 
+    cnf a
+  → cnf e
+  → e ≠ 0₀
+  → 0 < i
+  → E0_is_limit (E0_add a ω[[(e,i)]]).
+Proof. eauto. Qed.
 
 Inductive E0_decomp : E0 → Type :=
   | E0_decomp_zero : E0_decomp 0₀
@@ -1510,7 +1614,7 @@ Proof.
               1: apply cnf_sg; eauto.
               apply E0_lt_sub with 1; auto.
         ++ apply E0_add_cnf; auto.
-      - now apply E0_add_is_limit.
+      - apply E0_add_is_limit; auto.
       - exists (λ n, E0_add g ω[[(lam n,1)]]); constructor; eauto.
 Qed.
 
@@ -1544,6 +1648,181 @@ Proof.
     1,2: apply cnf_sg; eauto.
     constructor; constructor 2; left; eauto.
 Qed.
+
+(** The successor is <ε₀-greater *)
+Fact E0_succ_lt e : e <E₀ E0_succ e.
+Proof.
+  generalize (E0_succ e) (E0_succ_spec e).
+  induction 1; constructor.
+  + constructor.
+  + apply lex_list_app_head.
+    constructor 2; right; lia.
+  + apply lex_list_app_head.
+    constructor 3; constructor.
+Qed.
+
+#[local] Hint Resolve E0_succ_lt : core. 
+
+Lemma E0_succ_next e f : cnf e → cnf f → e <E₀ f → E0_succ e ≤E₀ f.
+Proof.
+  intros He Hf.
+  generalize (E0_succ e) (E0_succ_spec e).
+  induction 1 as [ | li | l x i Hx ].
+  + destruct f as [ [ | (x,j) l ] ].
+    * intros []%E0_lt_irrefl.
+    * intros _.
+      apply cnf_fix in Hf as (Hl & Hf).
+      simpl in Hl; apply ordered_inv in Hl.
+      generalize (ordered_from_clos_trans Hl); intros Hl'.
+      destruct x as [ [ | u m ] ].
+      - destruct j as [ | [| j] ].
+        ++ destruct (Hf ω[[]] 0); eauto; lia.
+        ++ constructor 2; repeat f_equal.
+           destruct l as [ | (g,j) l ]; auto.
+           destruct (@E0_zero_not_gt g).
+           apply E0_lt_trans', clos_trans_rev_iff, Hl'; simpl; auto.
+        ++ left; constructor 1; constructor 2; right; lia.
+      - left; constructor; constructor 2; left.
+        constructor; constructor.
+  + destruct f as [ m ].
+    intros H%E0_lt_inv%lex_list_snoc_inv_left.
+    destruct H as [ | (y,j) l r H | ].
+    * left; constructor.
+      rewrite <- !app_assoc.
+      apply lex_list_app_head.
+      now constructor 2.
+    * apply lex2_inv in H as [ H | (<- & H) ].
+      - constructor 1.
+        constructor.
+        apply lex_list_app_head.
+        constructor 2; now left.
+      - destruct (eq_nat_dec (S i) j) as [ <- | ].
+        ++ destruct r.
+           ** now right.
+           ** left.
+              constructor 1.
+              apply lex_list_app_head.
+              constructor 3; constructor 1.
+        ++ left.
+           constructor.
+           apply lex_list_app_head.
+           constructor 2; right; lia.
+    * exfalso.
+      apply cnf_fix, proj1 in Hf.
+      rewrite map_app in Hf; simpl in Hf.
+      apply ordered_app_tail, ordered_inv in Hf.
+      destruct r as [ | y r ]; [ easy | ].
+      simpl in Hf; now apply ordered_from_inv, proj1, E0_zero_not_gt in Hf.
+  + destruct f as [ m ].
+    intros H%E0_lt_inv%lex_list_snoc_inv_left.
+    destruct H as [ | (y,j) l r H | ].
+    * left; constructor.
+      rewrite <- app_assoc; apply lex_list_app_head.
+      now constructor 2.
+    * left; constructor.
+      apply lex_list_app_head.
+      now constructor 2.
+    * apply E0_le_app_head.
+      apply E0_le_app_head with (l := [_]).
+      apply E0_one_ge; auto.
+      rewrite cnf_fix in Hf |- *.
+      destruct Hf as (H1 & H2); split; eauto.
+      - rewrite map_app in H1; simpl in H1.
+        now apply ordered_app_tail, ordered_cons_inv in H1.
+      - intros ? ? ?; apply H2; eauto.
+Qed.
+
+Lemma E0_succ_next_inv e f : cnf e → cnf f → e <E₀ E0_succ f → e ≤E₀ f.
+Proof.
+  intros He Hf H.
+  destruct (E0_lt_sdec e f) as [ e f H1 | e | e f H1 ].
+  + now left.
+  + now right.
+  + apply E0_succ_next in H1; auto.
+    destruct (@E0_lt_irrefl e).
+    now apply E0_lt_le_trans with (2 := H1).
+Qed.
+
+Lemma E0_limit_1 l f b :
+    cnf f
+  → cnf b
+  → cnf ω[l⊣⊢[(E0_succ b, 1)]]
+  → f <E₀ ω[l⊣⊢[(E0_succ b, 1)]]
+  → ∃n, 0 < n ∧ f <E₀ ω[l⊣⊢[(b, n)]].
+Proof.
+  intros Hf Hb Hl.
+  destruct f as [m].
+  intros H; revert H Hf Hb Hl.
+  intros [ l1 l2 | (x,i) l1 l2 [ | [] ]%lex2_inv | p u v l1 l2 H1 ]%E0_lt_inv%lex_list_snoc_inv Hf Hb Hl.
+  + exists 1; split; auto; constructor; rewrite <- app_assoc.
+    apply lex_list_prefix; now destruct l2.
+  + apply E0_succ_next_inv in H; auto.
+    * exists (1+i); split; try lia; constructor.
+      apply lex_list_app_head; constructor 2.
+      destruct H; [ left; auto | subst; right; lia ].
+    * apply cnf_fix, proj2 in Hf.
+      eapply Hf; eauto.
+  + exfalso; apply cnf_fix, proj2 in Hf.
+    destruct (Hf x i); eauto; lia.
+  + exists 1; split; auto.
+    constructor; simpl; rewrite <- app_assoc. 
+    apply lex_list_app_head; now constructor 2.
+Qed.
+
+Lemma E0_limit_2 l f b i :
+    cnf f
+  → cnf b
+  → cnf ω[l⊣⊢[(E0_succ b, i+1)]]
+  → 0 < i
+  → f <E₀ ω[l⊣⊢[(E0_succ b, i+1)]]
+  → ∃n, 0 < n ∧ f <E₀ ω[l⊣⊢[(E0_succ b, i);(b, n)]].
+Proof.
+Admitted.
+
+(** The fundemental sequence converges, ie it eventually 
+    grows over any ordinal below its limit *)
+Theorem E0_fseq_over e h l f : cnf f → f <E₀ e → ∃n, f <E₀ @E0_fseq e h l n.
+Proof.
+  revert f.
+  generalize (E0_fseq h l) (E0_fseq_spec h l).
+  intros f H; revert H h; clear l.
+  induction 1 as [ [l] b Hg Hb | g b r Hg Hb Hr IH ]; intros He f Hf H.
+  + unfold E0_add in *.
+    destruct (wlist_cut_choice E0_lt_sdec l (E0_succ b))
+       as [ G1 
+        | [ (i & l' & r' & E & G1) 
+        |   (x & i & l' & r' & E & G1 & G2) ] ].
+    * rewrite wlist_combine_spec1 in H, He; eauto; simpl in H.
+      apply E0_limit_1 in H as (n & Hn & H); eauto.
+      exists (pred n).
+      rewrite wlist_combine_spec1; eauto.
+      2: revert G1; apply Forall_impl; eauto.
+      rewrite app_nil_r.
+      now replace (1+pred n) with n by lia.
+    * subst l; rewrite wlist_combine_spec2 in H, He; eauto.
+      rewrite app_nil_r in He, H.
+      apply E0_limit_2 in H as (n & H1 & H2); eauto.
+      - exists n.
+        rewrite app_assoc. 
+        rewrite wlist_combine_gt_list; eauto.
+        ++ admit.
+        ++ admit.
+      - admit.
+    * subst.
+      rewrite wlist_combine_spec3, app_nil_r in H, He; eauto.
+      apply E0_limit_1 in H as (n & H1 & H2); eauto.
+      exists n.
+      rewrite wlist_combine_gt_list; eauto.
+      2: revert G1; apply Forall_impl; eauto.
+      apply E0_succ_next_inv in G2; auto.
+      2: apply cnf_fix, proj2 in Hg; eapply Hg; eauto.
+      apply E0_lt_trans with (1 := H2).
+      destruct G2.
+      - simpl app at 3; rewrite wlist_combine_lt; eauto.
+        constructor; apply lex_list_app_head; constructor 2; right; lia.
+      - subst; simpl app at 3; rewrite wlist_combine_eq; eauto.
+        constructor; apply lex_list_app_head; constructor 2; right; lia.
+Admitted.
 
 (** We need to show that n E0_fseq e h l n *)
 
