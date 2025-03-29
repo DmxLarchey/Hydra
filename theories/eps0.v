@@ -1108,6 +1108,14 @@ Notation S₀ := E0_succ.
 Fact E0_succ_spec e : E0_succ_gr e (S₀ e).
 Proof. apply (proj2_sig _). Qed.
 
+Fact E0_succ_zero : S₀ 0₀ = 1₀.
+Proof.
+  apply E0_succ_gr_fun with (1 := E0_succ_spec _).
+  constructor.
+Qed.
+
+#[local] Hint Resolve E0_succ_zero : core.
+
 Fact E0_succ_cnf : ∀e, cnf e → cnf (S₀ e).
 Proof.
   intros e.
@@ -1485,6 +1493,32 @@ Proof.
   + destruct (@E0_lt_irrefl (E0_add e u)); rewrite H at 2; now apply E0_add_mono_right.
   + destruct (@E0_lt_irrefl (E0_add e u)); rewrite H at 1; now apply E0_add_mono_right.
 Qed.
+
+Fact E0_succ_mono e f : cnf e → cnf f → e <E₀ f → S₀ e <E₀ S₀ f.
+Proof.
+  intros He Hf.
+  generalize (E0_succ f) (E0_succ_spec f).
+  induction 1 as [ | m j | m j ].
+  1: now intros ?%E0_zero_not_gt.
+  + generalize (E0_succ e) (E0_succ_spec e).
+    induction 1 as [ | l i | l i ].
+    * destruct m as [ | (x,i) ].
+      - constructor; constructor; right.
+        apply cnf_fix, proj2 in Hf.
+        rewrite <- Nat.succ_lt_mono.
+        eapply Hf; eauto.
+      - constructor; constructor; left.
+        apply cnf_fix, proj1 in Hf; simpl in Hf.
+        rewrite ordered_cons_iff in Hf; auto.
+        apply Hf, in_map_iff.
+        exists (0₀,j); auto.
+    * intros H%E0_lt_inv; constructor.
+      apply lex_list_app_inv_right in H.
+      admit.
+    *   
+ 
+
+
 
 #[local] Hint Resolve in_map : core.
 
@@ -1948,46 +1982,6 @@ Proof.
     constructor; constructor 2; left; auto.
 Qed.
 
-Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
-Definition dwnwc {X} (R : X → X → Prop) (P : X → Prop) x := ∃y, R x y ∧ P y.
-
-Fact is_lub_dwnwc P u : is_lub E0_le P u → is_lub E0_le (dwnwc E0_le P) u.
-Proof.
-  intros H v; red in H; split.
-  + intros G.
-    rewrite <- H.
-    intros x Hx; apply G; exists x; split; auto.
-  + intros Hu x (e & He & G).
-    rewrite <- H in Hu.
-    apply E0_le_trans with (1 := He); auto.
-Qed.
-
-(** The lub is preserved; for this we need the fundemental sequence *)
-Theorem E0_add_lub P u v : 
-     (∀e, P e → cnf e)
-   → cnf u
-   → cnf v
-   → is_lub E0_le P v
-   → is_lub E0_le (λ x, ∃e, P e ∧ x = E0_add u e) (E0_add u v).
-Proof.
-  intros H1 H2 H3 H4%is_lub_dwnwc f; split.
-  + intros H.
-    assert (H' : ∀e, P e → E0_add u e ≤E₀ f).
-    1:{ intros e He; apply H; eauto. }
-    clear H.
-    (* if v is zero
-       if v is succ
-       if v is limit w[l++(e,i)] with 0₀ < e
-       then w[l++(e,i-1)++k] in dwnwc E0_le P (otherwise v is not upper bound) *)
-    admit.
-  + intros H x (e & He & ->).
-    apply E0_le_trans with (2 := H).
-(*    assert (e ≤E₀ v) as [ G | ].
-    1: apply H4; try red; auto.
-    * left; apply E0_add_mono_right; eauto.
-    * subst; now right. *)
-Admitted.
-
 (** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
 
 Definition eps0 := { e | cnf e }.
@@ -2030,7 +2024,7 @@ Qed.
 (* <ε₀ is well-founded *)
 Theorem wf_eps0_lt : well_founded eps0_lt.
 Proof.
-  generalize wf_E0_lpo.
+  generalize E0_lt_wf.
   apply wf_rel_morph with (f := fun x y => x = π₁ y).
   + intros []; eauto.
   + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
@@ -2056,7 +2050,7 @@ Fact eps0_zero_least e : eps0_zero ≤ε₀ e.
 Proof.
   apply eps0_le_iff.
   destruct e as [ [l] He ]; simpl.
-  destruct l as [ | x l ]; [ right | left ]; auto.
+  destruct l; [ right | left ]; auto.
   constructor; constructor.
 Qed.
 
@@ -2067,7 +2061,7 @@ Definition eps0_is_sub (P : ε₀ → Prop) e := ∀x, P x → x <ε₀ e.
 Definition eps0_is_lub (P : ε₀ → Prop) e := eps0_is_sub P e ∧ ∀x, eps0_is_sub P x → e ≤ε₀ x.
 
 (* A limit ordinal is a strict upperbound (of lesser ordinals) *)
-Definition eps0_is_limit e := exists P, eps0_is_lub P e.
+Definition eps0_is_limit e := ∃P, eps0_is_lub P e.
 
 Fact eps0_zero_is_limit : eps0_is_limit eps0_zero.
 Proof.
@@ -2086,30 +2080,16 @@ Qed.
 Definition eps0_succ (e : ε₀) : ε₀.
 Proof.
   destruct e as [ e He ].
-  exists (E0_succ e).
-  now apply E0_succ_correct.
+  exists (E0_succ e); eauto.
 Defined.
 
 (** The successor of E0_zero is E0_one *) 
 Fact eps0_succ_zero_is_one : eps0_succ eps0_zero = eps0_one.
-Proof.
-  apply eps0_eq_iff; simpl.
-  apply E0_succ_graph_fun with (1 := E0_succ_spec _).
-  constructor.
-Qed.
+Proof. apply eps0_eq_iff; simpl; auto. Qed.
 
 (** The successor is <ε₀-greater *)
 Fact eps0_succ_lt e : e <ε₀ eps0_succ e.
-Proof.
-  destruct e as (e & He); simpl.
-  generalize (E0_succ e) (E0_succ_spec e).
-  induction 1; constructor.
-  + constructor.
-  + apply lex_list_app_head.
-    constructor 2; right; lia.
-  + apply lex_list_app_head.
-    constructor 3; constructor.
-Qed. 
+Proof. destruct e; simpl; auto. Qed.
 
 (* We show that there is nothing inbetween
    e and eps0_succ e.
@@ -2119,6 +2099,9 @@ Qed.
 Lemma eps0_succ_next e f : e <ε₀ f → eps0_succ e ≤ε₀ f.
 Proof.
   rewrite eps0_le_iff; unfold eps0_lt.
+  destruct e; destruct f; simpl.
+  intro; apply E0_succ_next_inv; auto.
+  Search E0_succ.
   revert e f; intros [ e He ] [ f Hf ]; simpl.
   generalize (E0_succ e) (E0_succ_spec e).
   induction 1 as [ | li | l x i Hx ].
@@ -2202,6 +2185,55 @@ Qed.
    Limit is either ω[[]] or ω[_++[(x,i)]] with 0 < i and x <> ω[[]] *)
 
 
+Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
+
+Theorem E0_fseq_is_lub e h l : is_lub E0_le (λ x, ∃n, x = @E0_fseq e l h n) e.
+Proof.
+  intros x; split.
+  + intros Hx.
+    destruct (E0_lt_sdec x e) as [ x e H | | ].
+    2,3: red; auto.
+    
+
+
+Definition dwnwc {X} (R : X → X → Prop) (P : X → Prop) x := ∃y, R x y ∧ P y.
+
+Fact is_lub_dwnwc P u : is_lub E0_le P u → is_lub E0_le (dwnwc E0_le P) u.
+Proof.
+  intros H v; red in H; split.
+  + intros G.
+    rewrite <- H.
+    intros x Hx; apply G; exists x; split; auto.
+  + intros Hu x (e & He & G).
+    rewrite <- H in Hu.
+    apply E0_le_trans with (1 := He); auto.
+Qed.
+
+(** The lub is preserved; for this we need the fundemental sequence *)
+Theorem E0_add_lub P u v : 
+     (∀e, P e → cnf e)
+   → cnf u
+   → cnf v
+   → is_lub E0_le P v
+   → is_lub E0_le (λ x, ∃e, P e ∧ x = E0_add u e) (E0_add u v).
+Proof.
+  intros H1 H2 H3 H4%is_lub_dwnwc f; split.
+  + intros H.
+    assert (H' : ∀e, P e → E0_add u e ≤E₀ f).
+    1:{ intros e He; apply H; eauto. }
+    clear H.
+    (* if v is zero
+       if v is succ
+       if v is limit w[l++(e,i)] with 0₀ < e
+       then w[l++(e,i-1)++k] in dwnwc E0_le P (otherwise v is not upper bound) *)
+    admit.
+  + intros H x (e & He & ->).
+    apply E0_le_trans with (2 := H).
+(*    assert (e ≤E₀ v) as [ G | ].
+    1: apply H4; try red; auto.
+    * left; apply E0_add_mono_right; eauto.
+    * subst; now right. *)
+Admitted.
 
 
 
