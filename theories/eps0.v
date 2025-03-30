@@ -487,6 +487,9 @@ Section wlist_combine.
   Fact wlist_combine_spec_nil l : wlist_combine l [] = l.
   Proof. trivial. Qed.
 
+  Fact wlist_combine_nil_left m : wlist_combine [] m = m.
+  Proof. destruct m as [ | [] ]; simpl; auto. Qed.
+
   Fact wlist_combine_spec_cons l y j m :
       Forall (fun x => R y (fst x)) l ∧ wlist_combine l ((y,j)::m) = l++[(y,j)]++m
     ∨ (∃ i a b,   l = a++[(y,i)]++b ∧ Forall (fun x => R y (fst x)) a ∧ wlist_combine l ((y,j)::m) = a++[(y,i+j)]++m)
@@ -601,6 +604,17 @@ Section wlist_combine.
       exists r, k; split; auto; now rewrite app_nil_r.
     + exists (wlist_cut l z p ++ m), j; split; auto.
       now rewrite app_assoc.
+  Qed.
+
+  Fact wlist_combine_middle_lt l x i r y j m :
+    R x y → wlist_combine (l++(x,i)::r) ((y,j)::m) = wlist_combine l ((y,j)::m).
+  Proof.
+    intros Hxy; simpl.
+    induction l as [ | (z,p) l IHl ]; simpl.
+    + destruct (R_sdec x y) as [ x y H | x | x y H ]; auto.
+      * now apply R_irrefl in Hxy.
+      * destruct (@R_irrefl x); eauto.
+    + destruct (R_sdec z y); simpl; f_equal; auto.
   Qed.
 
   Fact wlist_combine_ordered l m : ordered R⁻¹ (map fst l) → ordered R⁻¹ (map fst m) → ordered R⁻¹ (map fst (wlist_combine l m)).
@@ -1163,7 +1177,7 @@ Definition E0_add e f :=
   | ω[l], ω[m] => ω[wlist_combine E0_lt_sdec l m]
   end.
   
-Notation "a '+₀' b" := (E0_add a b) (at level 30, format "a  +₀  b" ).
+Notation "a '+₀' b" := (E0_add a b) (at level 31, left associativity, format "a  +₀  b" ).
 
 Fact E0_add_cnf : ∀ e f, cnf e → cnf f → cnf (e +₀ f).
 Proof.
@@ -1201,6 +1215,76 @@ Qed.
 Fact E0_add_zero_left e : 0₀ +₀ e = e.
 Proof. destruct e as [[ | [] ]]; auto. Qed.
 
+(** Already wlist_combine is associative !! *)
+Theorem E0_add_assoc u v w : u +₀ v +₀ w =  u +₀ (v +₀ w).
+Proof.
+  revert u v w; intros [l] [m] [k].
+  unfold E0_add; f_equal.
+  destruct m as [ | (y,j) m ].
+  1: simpl; now rewrite wlist_combine_nil_left.
+  destruct k as [ | (z,p) k ].
+  1: simpl; auto.
+  destruct (wlist_cut_choice E0_lt_sdec l y)
+    as [ G1 
+     | [ (i' & l' & r' & E & G1) 
+     |   (x' & i' & l' & r' & E & G1 & G2) ] ].
+  + rewrite <- (app_nil_r l) at 1.
+    rewrite wlist_combine_gt_list; auto.
+    rewrite wlist_combine_nil_left; auto.
+    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
+    * rewrite wlist_combine_lt; auto.
+      rewrite wlist_combine_middle_lt; auto.
+    * rewrite wlist_combine_gt_list; auto.
+      rewrite !wlist_combine_eq; auto.
+      rewrite <- (app_nil_r l) at 2.
+      rewrite wlist_combine_gt_list; auto.
+    * rewrite wlist_combine_gt; auto.
+      rewrite wlist_combine_gt_list; auto.
+      2: revert G1; apply Forall_impl; eauto.
+      rewrite wlist_combine_gt; auto.
+      rewrite <- (app_nil_r l) at 2.
+      rewrite wlist_combine_gt_list; auto.
+  + subst l.
+    rewrite wlist_combine_gt_list; auto.
+    simpl app at 2; rewrite wlist_combine_eq; auto.
+    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
+    * rewrite wlist_combine_lt; auto.
+      simpl app; rewrite !wlist_combine_middle_lt; auto.
+    * rewrite wlist_combine_eq; auto.
+      simpl app.
+      rewrite !wlist_combine_gt_list; auto.
+      rewrite !wlist_combine_eq; auto.
+      do 3 f_equal; lia.
+    * rewrite wlist_combine_gt; auto.
+      rewrite wlist_combine_gt_list; auto.
+      2: revert G1; apply Forall_impl; eauto.
+      simpl app at 2.
+      rewrite wlist_combine_gt_list; auto.
+      rewrite wlist_combine_eq; auto.
+      rewrite wlist_combine_gt; auto.
+  + subst l.
+    rewrite wlist_combine_gt_list; auto.
+    simpl app at 2.
+    rewrite wlist_combine_lt; auto.
+    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
+    * rewrite wlist_combine_lt; auto.
+      simpl app.
+      rewrite !wlist_combine_middle_lt; eauto.
+    * rewrite wlist_combine_gt_list; auto.
+      rewrite !wlist_combine_eq; auto.
+      rewrite wlist_combine_gt_list; auto.
+      simpl app at 3.
+      rewrite wlist_combine_lt; auto.
+    * rewrite wlist_combine_gt; auto.
+      simpl app at 2.
+      rewrite wlist_combine_middle_lt with (y := y); auto.
+      rewrite wlist_combine_gt_list; auto.
+      2: revert G1; apply Forall_impl; eauto.
+      rewrite wlist_combine_gt; auto.
+      rewrite <- (app_nil_r l') at 2. 
+      rewrite wlist_combine_gt_list with (y := y); auto.
+Qed.
+ 
 (* Proof that if cnf u then
    either u is E0_zero                             (limit ordinal)
       or  u is ω[l++[(E0_zero,i)]])                (successor)
