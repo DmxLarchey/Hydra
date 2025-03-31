@@ -2097,6 +2097,8 @@ Proof. destruct e; apply E0_lt_irrefl. Qed.
 Theorem eps0_lt_trans : transitive eps0_lt.
 Proof. intros [] [] []; apply E0_lt_trans. Qed.
 
+#[local] Hint Constructors sdec : core.
+
 Theorem eps0_lt_sdec e f : sdec eps0_lt e f.
 Proof.
   revert e f; intros (e & He) (f & Hf).
@@ -2115,6 +2117,8 @@ Proof.
   + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
 Qed.
 
+#[local] Hint Resolve cnf_zero cnf_one : core.
+
 Definition eps0_zero : ε₀.
 Proof. now exists E0_zero. Defined.
 
@@ -2125,7 +2129,7 @@ Definition eps0_le e f := e <ε₀ f ∨ e = f.
 
 Notation "e '≤ε₀' f" := (eps0_le e f) (at level 70, format "e  ≤ε₀  f").
 
-Fact eps0_le_iff e f : e ≤ε₀ f ↔ π₁ e ≤E₀ π₁ f.
+Fact eps0_le_iff e f : e ≤ε₀ f ↔ E0_le (π₁ e) (π₁ f).
 Proof.
   unfold eps0_le, E0_le; rewrite eps0_eq_iff.  
   revert e f; intros [ e He ] [ f Hf ]; simpl; tauto.
@@ -2168,11 +2172,15 @@ Proof.
   + right; cbv; repeat constructor.
 Qed.
 
+#[local] Hint Resolve E0_succ_cnf : core.
+
 Definition eps0_succ (e : ε₀) : ε₀.
 Proof.
   destruct e as [ e He ].
   exists (E0_succ e); eauto.
 Defined.
+
+#[local] Hint Resolve E0_succ_zero E0_succ_lt : core.
 
 (** The successor of E0_zero is E0_one *) 
 Fact eps0_succ_zero_is_one : eps0_succ eps0_zero = eps0_one.
@@ -2203,6 +2211,8 @@ Proof.
   + apply (@eps0_lt_irrefl f), eps0_lt_trans with (1 := H2); auto.
   + revert H2; apply eps0_lt_irrefl.
 Qed.
+
+#[local] Hint Resolve E0_add_cnf : core.
 
 Definition eps0_add : ε₀ → ε₀ → ε₀.
 Proof. intros [e] [f]; exists (E0_add e f); eauto. Defined.
@@ -2276,6 +2286,8 @@ Proof.
   + intros H y (n & ->); left.
     apply eps0_lt_le_trans with (2 := H), eps0_fseq_lt.
 Qed.
+
+#[local] Hint Resolve E0_le_refl : core.
 
 Definition dwnwc {X} (R : X → X → Prop) (P : X → Prop) x := ∃y, R x y ∧ P y.
 
