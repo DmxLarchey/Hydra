@@ -627,7 +627,76 @@ Section wlist_combine.
     apply ordered_from_app_middle with y; eauto.
     intros ? ((x,i) & <- & ?)%in_map_iff; simpl; eauto.
     destruct (H x i) as [ | <- ]; eauto.
-  Qed. 
+  Qed.
+
+  Fact wlist_combine_assoc l m k :
+      wlist_combine (wlist_combine l m) k 
+    = wlist_combine l (wlist_combine m k).
+  Proof.
+    destruct m as [ | (y,j) m ].
+    1: simpl; now rewrite wlist_combine_nil_left.
+    destruct k as [ | (z,p) k ].
+    1: simpl; auto.
+    destruct (wlist_cut_choice l y)
+      as [ G1 
+       | [ (i' & l' & r' & E & G1) 
+       |   (x' & i' & l' & r' & E & G1 & G2) ] ].
+    + rewrite <- (app_nil_r l) at 1.
+      rewrite wlist_combine_gt_list; auto.
+      rewrite wlist_combine_nil_left; auto.
+      destruct (R_sdec y z) as [ y z F | y | y z F ].
+      * rewrite wlist_combine_lt; auto.
+        rewrite wlist_combine_middle_lt; auto.
+      * rewrite wlist_combine_gt_list; auto.
+        rewrite !wlist_combine_eq; auto.
+        rewrite <- (app_nil_r l) at 2.
+        rewrite wlist_combine_gt_list; auto.
+      * rewrite wlist_combine_gt; auto.
+        rewrite wlist_combine_gt_list; auto.
+        2: revert G1; apply Forall_impl; eauto.
+        rewrite wlist_combine_gt; auto.
+        rewrite <- (app_nil_r l) at 2.
+        rewrite wlist_combine_gt_list; auto.
+    + subst l.
+      rewrite wlist_combine_gt_list; auto.
+      simpl app at 2; rewrite wlist_combine_eq; auto.
+      destruct (R_sdec y z) as [ y z F | y | y z F ].
+      * rewrite wlist_combine_lt; auto.
+        simpl app; rewrite !wlist_combine_middle_lt; auto.
+      * rewrite wlist_combine_eq; auto.
+        simpl app.
+        rewrite !wlist_combine_gt_list; auto.
+        rewrite !wlist_combine_eq; auto.
+        do 3 f_equal; lia.
+      * rewrite wlist_combine_gt; auto.
+        rewrite wlist_combine_gt_list; auto.
+        2: revert G1; apply Forall_impl; eauto.
+        simpl app at 2.
+        rewrite wlist_combine_gt_list; auto.
+        rewrite wlist_combine_eq; auto.
+        rewrite wlist_combine_gt; auto.
+    + subst l.
+      rewrite wlist_combine_gt_list; auto.
+      simpl app at 2.
+      rewrite wlist_combine_lt; auto.
+      destruct (R_sdec y z) as [ y z F | y | y z F ].
+      * rewrite wlist_combine_lt; auto.
+        simpl app.
+        rewrite !wlist_combine_middle_lt; eauto.
+      * rewrite wlist_combine_gt_list; auto.
+        rewrite !wlist_combine_eq; auto.
+        rewrite wlist_combine_gt_list; auto.
+        simpl app at 3.
+        rewrite wlist_combine_lt; auto.
+      * rewrite wlist_combine_gt; auto.
+        simpl app at 2.
+        rewrite wlist_combine_middle_lt with (y := y); auto.
+        rewrite wlist_combine_gt_list; auto.
+        2: revert G1; apply Forall_impl; eauto.
+        rewrite wlist_combine_gt; auto.
+        rewrite <- (app_nil_r l') at 2. 
+        rewrite wlist_combine_gt_list with (y := y); auto.
+  Qed.
 
 End wlist_combine.
 
@@ -1216,73 +1285,10 @@ Fact E0_add_zero_left e : 0₀ +₀ e = e.
 Proof. destruct e as [[ | [] ]]; auto. Qed.
 
 (** Already wlist_combine is associative !! *)
-Theorem E0_add_assoc u v w : u +₀ v +₀ w =  u +₀ (v +₀ w).
+Theorem E0_add_assoc : ∀ u v w, u +₀ v +₀ w =  u +₀ (v +₀ w).
 Proof.
-  revert u v w; intros [l] [m] [k].
-  unfold E0_add; f_equal.
-  destruct m as [ | (y,j) m ].
-  1: simpl; now rewrite wlist_combine_nil_left.
-  destruct k as [ | (z,p) k ].
-  1: simpl; auto.
-  destruct (wlist_cut_choice E0_lt_sdec l y)
-    as [ G1 
-     | [ (i' & l' & r' & E & G1) 
-     |   (x' & i' & l' & r' & E & G1 & G2) ] ].
-  + rewrite <- (app_nil_r l) at 1.
-    rewrite wlist_combine_gt_list; auto.
-    rewrite wlist_combine_nil_left; auto.
-    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
-    * rewrite wlist_combine_lt; auto.
-      rewrite wlist_combine_middle_lt; auto.
-    * rewrite wlist_combine_gt_list; auto.
-      rewrite !wlist_combine_eq; auto.
-      rewrite <- (app_nil_r l) at 2.
-      rewrite wlist_combine_gt_list; auto.
-    * rewrite wlist_combine_gt; auto.
-      rewrite wlist_combine_gt_list; auto.
-      2: revert G1; apply Forall_impl; eauto.
-      rewrite wlist_combine_gt; auto.
-      rewrite <- (app_nil_r l) at 2.
-      rewrite wlist_combine_gt_list; auto.
-  + subst l.
-    rewrite wlist_combine_gt_list; auto.
-    simpl app at 2; rewrite wlist_combine_eq; auto.
-    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
-    * rewrite wlist_combine_lt; auto.
-      simpl app; rewrite !wlist_combine_middle_lt; auto.
-    * rewrite wlist_combine_eq; auto.
-      simpl app.
-      rewrite !wlist_combine_gt_list; auto.
-      rewrite !wlist_combine_eq; auto.
-      do 3 f_equal; lia.
-    * rewrite wlist_combine_gt; auto.
-      rewrite wlist_combine_gt_list; auto.
-      2: revert G1; apply Forall_impl; eauto.
-      simpl app at 2.
-      rewrite wlist_combine_gt_list; auto.
-      rewrite wlist_combine_eq; auto.
-      rewrite wlist_combine_gt; auto.
-  + subst l.
-    rewrite wlist_combine_gt_list; auto.
-    simpl app at 2.
-    rewrite wlist_combine_lt; auto.
-    destruct (E0_lt_sdec y z) as [ y z F | y | y z F ].
-    * rewrite wlist_combine_lt; auto.
-      simpl app.
-      rewrite !wlist_combine_middle_lt; eauto.
-    * rewrite wlist_combine_gt_list; auto.
-      rewrite !wlist_combine_eq; auto.
-      rewrite wlist_combine_gt_list; auto.
-      simpl app at 3.
-      rewrite wlist_combine_lt; auto.
-    * rewrite wlist_combine_gt; auto.
-      simpl app at 2.
-      rewrite wlist_combine_middle_lt with (y := y); auto.
-      rewrite wlist_combine_gt_list; auto.
-      2: revert G1; apply Forall_impl; eauto.
-      rewrite wlist_combine_gt; auto.
-      rewrite <- (app_nil_r l') at 2. 
-      rewrite wlist_combine_gt_list with (y := y); auto.
+  intros [] [] []; unfold E0_add; f_equal.
+  apply wlist_combine_assoc; auto.
 Qed.
  
 (* Proof that if cnf u then
@@ -1732,12 +1738,23 @@ Fact E0_add_omega_is_limit a e i :
   cnf a → cnf e → e ≠ 0₀ → 0 < i → E0_is_limit (a +₀ ω[[(e,i)]]).
 Proof. eauto. Qed.
 
+(** TODO: maybe add notation for ω[[(e,n)]] ie ω^(e.n) *)
+
+Definition E0_omega_exp e := ω[[(e,1)]].
+
+Notation "'ω' '^' e" := (E0_omega_exp e) (at level 1). 
+
+Fact E0_omega_exp_cnf e : cnf e → cnf ω^e.
+Proof. intros; apply cnf_sg; auto. Qed.
+
+#[local] Hint Resolve E0_omega_exp_cnf : core.
+
 (** any ordinal is either 0, a successor or a limit ordinal *)
 
 Inductive E0_decomp : E0 → Type :=
   | E0_decomp_zero : E0_decomp 0₀
   | E0_decomp_succ e : cnf e → E0_decomp (S₀ e)
-  | E0_decomp_limit g e : e ≠ 0₀ → cnf g → cnf e → E0_decomp (g +₀ ω[[(e,1)]]).
+  | E0_decomp_limit g e : e ≠ 0₀ → cnf g → cnf e → E0_decomp (g +₀ ω^e).
 
 Lemma E0_decomp_compute e : cnf e → E0_decomp e.
 Proof.
@@ -1805,14 +1822,13 @@ Qed.
 Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
   | E0_fseq_gr_0 g b   : cnf g
                        → cnf b
-                       → E0_fseq_gr (g +₀ ω[[(S₀ b,1)]]) (λ n, g +₀ ω[[(b,1+n)]])
+                       → E0_fseq_gr (g +₀ ω^(S₀ b)) (λ n, g +₀ ω[[(b,1+n)]])
   | E0_fseq_gr_1 g b r : cnf g
                        → cnf b
                        → E0_fseq_gr b r
-                       → E0_fseq_gr (g +₀ ω[[(b,1)]]) (λ n, g +₀ ω[[(r n,1)]]).
+                       → E0_fseq_gr (g +₀ ω^b) (λ n, g +₀ ω^(r n)).
 
 #[local] Hint Resolve E0_add_cnf cnf_sg : core.
-
 (** WF Induction on e st cnf e *)
 Theorem E0_fseq_pwc e : cnf e → E0_is_limit e → sig (E0_fseq_gr e).
 Proof.
@@ -1833,9 +1849,7 @@ Proof.
            apply E0_le_lt_trans with (E0_add g (E0_add a ω[[(e, 1)]])).
            ** apply E0_add_mono_left; auto.
            ** apply E0_add_mono_right; eauto.
-              1: apply cnf_sg; eauto.
               apply E0_lt_sub with 1; auto.
-        ++ apply E0_add_cnf; auto.
       - apply E0_add_is_limit; auto.
       - exists (λ n, E0_add g ω[[(lam n,1)]]); constructor; eauto.
 Qed.
@@ -1858,8 +1872,8 @@ Proof. generalize (E0_fseq_spec h l) n; apply E0_fseq_gr_cnf. Qed.
 
 #[local] Hint Resolve E0_fseq_gr_cnf E0_fseq_cnf : core.
 
-(** The fundemental sequence is increasing *)
-Fact E0_fseq_incr e h l : ∀ n m, n < m → @E0_fseq e h l n <E₀ E0_fseq h l m.
+(** The fundemental sequence is monotonic *)
+Fact E0_fseq_mono e h l : ∀ n m, n < m → @E0_fseq e h l n <E₀ E0_fseq h l m.
 Proof.
   generalize (E0_fseq h l) (E0_fseq_spec h l); clear l.
   induction 1; intros.
@@ -1972,7 +1986,7 @@ Qed.
 Lemma E0_lt_omega_inv f b :
     cnf f
   → cnf b
-  → f <E₀ ω[[(b, 1)]]
+  → f <E₀ ω^b
   → f = 0₀
   ∨ ∃n a, 0 < n ∧ f <E₀ ω[[(a, n)]] ∧ a <E₀ b ∧ cnf a.
 Proof.
@@ -1997,7 +2011,7 @@ Qed.
 Lemma E0_lt_omega_succ_inv f b :
     cnf f
   → cnf b
-  → f <E₀ ω[[(E0_succ b, 1)]]
+  → f <E₀ ω^(S₀ b)
   → ∃n, 0 < n ∧ f <E₀ ω[[(b, n)]].
 Proof.
   intros Hf Hb [ -> | (n & x & H1 & H2 & H3 & H4) ]%E0_lt_omega_inv; eauto.
@@ -2196,6 +2210,38 @@ Proof.
   + revert H2; apply eps0_lt_irrefl.
 Qed.
 
+Definition eps0_add : ε₀ → ε₀ → ε₀.
+Proof. intros [e] [f]; exists (E0_add e f); eauto. Defined.
+
+Fact eps0_add_assoc : ∀ e f g, eps0_add (eps0_add e f) g = eps0_add e (eps0_add f g).
+Proof. intros [] [] []; apply eps0_eq_iff; simpl; apply E0_add_assoc. Qed.
+
+Fact esp0_add_mono_left : ∀ e f g, e ≤ε₀ f → eps0_add e g ≤ε₀ eps0_add f g.
+Proof. intros [] [] []; rewrite !eps0_le_iff; simpl; apply E0_add_mono_left; auto. Qed.
+
+Fact esp0_add_mono_right : ∀ e f g, f <ε₀ g → eps0_add e f <ε₀ eps0_add e g.
+Proof. intros [] [] []; simpl; apply E0_add_mono_right; auto. Qed.
+
+Fact eps0_add_lt_cancel : ∀ e u v, eps0_add e u <ε₀ eps0_add e v → u <ε₀ v.
+Proof. intros [] [] []; simpl; apply E0_add_lt_cancel; auto. Qed.
+
+Fact eps0_add_cancel : ∀ e u v, eps0_add e u = eps0_add e v → u = v.
+Proof. intros [] [] []; rewrite !eps0_eq_iff; simpl; apply E0_add_cancel; auto. Qed.
+
+Fact eps0_lt_inv_add : ∀ e f, e <ε₀ f → ∃a, f = eps0_add e a ∧ eps0_zero <ε₀ a.
+Proof.
+  intros [e] [f] (a & ? & ? & Ha)%E0_lt_inv_add; auto; simpl in *.
+  exists (exist _ a Ha); rewrite eps0_eq_iff; simpl; auto.
+Qed.
+
+Lemma eps0_lt_add_inv_add : ∀ e a f, e <ε₀ eps0_add a f 
+                                   → e <ε₀ a ∨ ∃g, e = eps0_add a g ∧ g <ε₀ f.
+Proof.
+  intros [e] [f] [a]; simpl.
+  intros [ | (g & Hg & ? & ?) ]%E0_lt_add_inv_add; auto.
+  right; exists (exist _ g Hg); rewrite eps0_eq_iff; simpl; auto.
+Qed.
+
 (* Hence a successor is not a limit ordinal 
 
    Successor is of shape ω[_++[(ω[[]],1+i)]]
@@ -2210,6 +2256,9 @@ Proof.
   exists (E0_fseq He l n).
   apply E0_fseq_cnf.
 Defined.
+
+Fact eps0_fseq_mono : ∀ e l n m, n < m → @eps0_fseq e l n <ε₀ eps0_fseq l m.
+Proof. intros [] ?; apply E0_fseq_mono. Qed.
 
 Fact eps0_lt_fseq_inv e l f : f <ε₀ e → ∃n, f <ε₀ @eps0_fseq e l n.
 Proof. revert e f l; intros [] [] ?; now apply E0_lt_fseq_inv. Qed.
