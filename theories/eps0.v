@@ -1809,7 +1809,9 @@ Section E0.
                 intros [] ?; now apply H1, in_map.
   Qed.
 
-  (** The specification of the fundemental sequence *)
+  (** The specification of the fundemental sequence
+      This specification does not characterize a unique
+      fundemental sequence, even up to extensionality *)
 
   Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
     | E0_fseq_gr_0 g b   : cnf g
@@ -1819,6 +1821,21 @@ Section E0.
                          → cnf b
                          → E0_fseq_gr b r
                          → E0_fseq_gr (g +₀ ω^b) (λ n, g +₀ ω^(r n)).
+
+  Fact E0_fseq_gr_fun e se f sf :
+       E0_fseq_gr e se → E0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  Proof.
+    intros H; revert H f sf.
+    induction 1 as [ g b Hg Hb | g b r Hg Hb H1 IH1 ].
+    + induction 1 as [ g' b' Hg' Hb' | g' b' r' Hg' Hb' H2 IH2 ].
+      * (* This property does not hold since the decomposition is not
+           unique ... this only holds for n high enough 
+
+           We need to force the decomposition to be unique
+           by choosing g +₀ ω^b with g minimal for instance *)
+        admit.
+      * admit.  
+  Admitted.
 
   (* Hint Resolve E0_add_cnf cnf_sg : core. *)
 
@@ -1973,6 +1990,13 @@ Section E0.
       apply E0_add_mono_left; auto.
   Qed.
 
+  Fact E0_succ_inj e f : cnf e → cnf f → S₀ e = S₀ f → e = f.
+  Proof.
+    intros He Hf H.
+    destruct (E0_lt_sdec e f) as [ e f G | e | e f G ]; auto.
+    all: apply E0_succ_mono in G; auto; rewrite H in G; destruct (E0_lt_irrefl G).
+  Qed.
+
   (** inversion for f < ω^b:
       - either f is 0 (and b is also 0)
       - or f is below ω^a.n for some a < b and some n > 0 *)
@@ -2125,6 +2149,8 @@ Proof. now exists E0_zero. Defined.
 Definition eps0_one : ε₀.
 Proof. now exists E0_one. Defined.
 
+Notation "0₀" := eps0_zero.
+
 Definition eps0_le e f := e <ε₀ f ∨ e = f.
 
 Notation "e '≤ε₀' f" := (eps0_le e f) (at level 70, format "e  ≤ε₀  f").
@@ -2177,8 +2203,10 @@ Qed.
 Definition eps0_succ (e : ε₀) : ε₀.
 Proof.
   destruct e as [ e He ].
-  exists (E0_succ e); eauto.
+  exists (E0_succ e); apply E0_succ_cnf, He.
 Defined.
+
+Notation "'S₀' e" := (eps0_succ e) (at level 1).
 
 #[local] Hint Resolve E0_succ_zero E0_succ_lt : core.
 
@@ -2189,6 +2217,22 @@ Proof. apply eps0_eq_iff; simpl; auto. Qed.
 (** The successor is <ε₀-greater *)
 Fact eps0_succ_lt e : e <ε₀ eps0_succ e.
 Proof. destruct e; simpl; auto. Qed.
+
+Fact eps0_zero_not_succ e : 0₀ ≠ S₀ e.
+Proof.
+  intros H.
+  apply (@eps0_lt_irrefl 0₀).
+  rewrite H at 2.
+  apply eps0_le_lt_trans with (2 := eps0_succ_lt _).
+  apply eps0_zero_least.
+Qed.
+
+Fact eps0_succ_inj e f : S₀ e = S₀ f → e = f.
+Proof.
+  rewrite !eps0_eq_iff.
+  revert e f; intros [] []; simpl.
+  apply E0_succ_inj; auto.
+Qed.
 
 (* We show that there is nothing inbetween
    e and eps0_succ e.
@@ -2253,6 +2297,24 @@ Qed.
 
 Definition eps0_is_limit (e : ε₀) := E0_is_limit (proj1_sig e).
 
+Inductive eps0_choice : ε₀ → Type :=
+  | eps0_choice_0 : eps0_choice 0₀
+  | eps0_choice_1 e : eps0_choice (S₀ e)
+  | eps0_choice_2 e : eps0_is_limit e → eps0_choice e.
+
+Fact eps0_choose : ∀e, eps0_choice e.
+Proof.
+  intros (e & He).
+  destruct E0_decomp_compute with (1 := He).
+  + rewrite (cnf_pirr _ He cnf_zero); constructor.
+  + rewrite (cnf_pirr _ He (E0_succ_cnf _ c)). 
+    exact (eps0_choice_1 (exist _ e c)).
+  + constructor 3; red; simpl.
+    apply E0_add_is_limit; auto.
+    * now apply E0_omega_exp_cnf.
+    * apply E0_omega_is_limit; auto.
+Defined.
+
 Definition eps0_fseq e (l : eps0_is_limit e) : nat → ε₀.
 Proof.
   destruct e as (e & He).
@@ -2269,6 +2331,113 @@ Proof. revert e f l; intros [] [] ?; now apply E0_lt_fseq_inv. Qed.
 
 Fact eps0_fseq_lt e l n : @eps0_fseq e l n <ε₀ e.
 Proof. destruct e; apply E0_fseq_lt. Qed.
+
+Section iter.
+
+  Variable (X : Type).
+
+  Implicit Type (f : X → X).
+
+  Definition iter f :=
+    fix loop n x := 
+      match n with
+      | 0   => x
+      | S n => loop n (f x)
+      end.
+
+  Fact iter_ext f g : (forall x, f x = g x) → forall n x, iter f n x = iter g n x.
+  Proof.
+    intros E n.
+    induction n; intros x; simpl; auto. 
+    now rewrite E, IHn.
+  Qed.
+
+End iter.
+
+Arguments iter {_}.
+
+(** F 0 n = S n
+    F (S₀ e) n = (F e)^{S n} n 
+    F l n = F l[n] n *)
+
+Inductive fgh_gr : ε₀ → (nat → nat) → Prop :=
+  | fgh_gr_0 : fgh_gr 0₀ S
+  | fgh_gr_1 e F : fgh_gr e F → fgh_gr (S₀ e) (λ n, iter F (S n) n)
+  | fgh_gr_2 e l F : (∀n, fgh_gr (@eps0_fseq e l n) (F n)) → fgh_gr e (λ n, F n n).
+
+Fact fgh_gr_fun e E f F : fgh_gr e E → fgh_gr f F → e = f → ∀n, E n = F n.
+Proof.
+  intros H; revert H f F.
+  induction 1 as [ | e E H1 IH1 | e l E H1 IH1 ].
+  + induction 1 as [ | f F H2 IH2 | f m F H2 IH2 ]; auto.
+    * intros C; exfalso; revert C; apply eps0_zero_not_succ.
+    * intros <-; destruct m as [ [] _ ]; auto.
+  + induction 1 as [ | f F H2 _ | f m F H2 _ ].
+    * intros C; symmetry in C; exfalso; revert C; apply eps0_zero_not_succ.
+    * intros ?%eps0_succ_inj ?.
+      apply iter_ext; eauto.
+    * intros <-; destruct m as [ ? [] ].
+      exists (proj1_sig e).
+      now destruct e.
+  + induction 1 as [ | f F H2 _ | f m F H2 _ ].
+    * intros ->; destruct l as [ [] _ ]; auto.
+    * intros ->; destruct l as [ ? [] ].
+      exists (proj1_sig f); now destruct f.
+    * intros <- n; eapply IH1; eauto.
+      (* Here I need a characterization of fseq !! *)
+      apply eps0_eq_iff; destruct e as [ e He ]; simpl. 
+      apply (@E0_fseq_gr_fun e) with (3 := eq_refl);
+      apply E0_fseq_spec.
+Qed.
+
+#[local] Hint Resolve eps0_succ_lt : core.
+
+(** This is the Grzegorczyk hierarchy *)
+Definition fg_hierarchy e : sig (fgh_gr e).
+Proof.
+  induction e as [ e IH ] using (well_founded_induction_type wf_eps0_lt).
+  destruct (eps0_choose e) as [ | e | e l ].
+  + exists S; constructor.
+  + destruct (IH e) as (F & HF); auto.
+    exists (fun n => iter F (S n) n).
+    now constructor.
+  + set (F i := proj1_sig (IH (eps0_fseq l i) (eps0_fseq_lt _ _))).
+    exists (fun n => F n n).
+    constructor 3 with l.
+    intro; apply (proj2_sig (IH (eps0_fseq l n) (eps0_fseq_lt _ _))).
+Qed.
+
+(* The hierarchy is uniquely characterized, up to extensionality 
+   provided the fundemental sequence is uniquely characterized 
+   as well !! *)
+
+Definition F e := proj1_sig (fg_hierarchy e).
+Fact F_spec e : fgh_gr e (F e).
+Proof. apply (proj2_sig _). Qed.
+
+Theorem F_fix_zero : ∀n, F 0₀ n = S n.
+Proof.
+  intro.
+  apply fgh_gr_fun with (1 := F_spec _) (3 := eq_refl).
+  constructor.
+Qed.
+
+Theorem F_fix_succ e : ∀n, F (S₀ e) n = iter (F e) (S n) n.
+Proof.
+  intro n.
+  change (F (S₀ e) n = (fun n => iter (F e) (S n) n) n).
+  apply fgh_gr_fun with (1 := F_spec _) (3 := eq_refl).
+  constructor; apply F_spec.
+Qed.
+
+Theorem F_fix_limit e l : ∀n, F e n = F (@eps0_fseq e l n) n.
+Proof.
+  intro n.
+  change (F e n = (fun n => F (@eps0_fseq e l n) n) n).
+  apply fgh_gr_fun with (1 := F_spec _) (3 := eq_refl).
+  constructor 3 with l.
+  intro; apply F_spec.
+Qed.
 
 Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
 
