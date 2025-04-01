@@ -657,6 +657,32 @@ Section wlist_combine.
         rewrite <- (app_nil_r l') at 2. 
         rewrite wlist_combine_gt_list with (y := y); auto.
   Qed.
+  
+  Fact wlist_combine_eq_snoc_inv m x i l y j:
+      wlist_combine m [(x,i)] = l⊣⊢[(y,j)]
+    → ∃r, m = l++r ∧ x = y ∧ Forall (λ x, R y (fst x)) l ∧ (i = j \/ exists p r', p+i = j /\ r = (x,p)::r').
+  Proof.
+    destruct (wlist_cut_choice m x)
+      as [ G1 
+       | [ (i' & l' & r' & E & G1) 
+       |   (x' & i' & l' & r' & E & G1 & G2) ] ].
+    + rewrite wlist_combine_spec1; auto.
+      rewrite app_nil_r.
+      intros (<- & [=])%app_inj_tail; subst.
+      exists []; repeat split; auto.
+      now rewrite app_nil_r.
+    + subst m.
+      rewrite wlist_combine_spec2; auto.
+      rewrite app_nil_r.
+      intros (<- & [=])%app_inj_tail; subst.
+      exists ((y,i')::r'); repeat split; auto.
+      right; exists i', r'; auto.
+    + subst m.
+      rewrite wlist_combine_spec3; auto.
+      rewrite app_nil_r.
+      intros (<- & [=])%app_inj_tail; subst.
+      exists ((x',i')::r'); repeat split; auto.
+  Qed.
 
 End wlist_combine.
 
@@ -910,8 +936,14 @@ Section E0.
 
   Fact E0_le_trans : transitive E0_le.
   Proof. intros ? ? ? [] []; subst; red; eauto. Qed.
+  
+  Fact E0_le_antisym e f : e ≤E₀ f → f ≤E₀ e → e = f.
+  Proof.
+    intros [H1 |]  [H2 |]; auto.
+    edestruct E0_lt_irrefl; eauto.
+  Qed.
 
-  Hint Resolve E0_le_refl E0_le_trans : core.
+  Hint Resolve E0_le_refl E0_le_trans E0_le_antisym : core.
 
   Fact E0_le_lt_trans e f g : e ≤E₀ f → f <E₀ g → e <E₀ g.
   Proof. intros [] ?; subst; eauto. Qed.
@@ -1637,264 +1669,7 @@ Section E0.
       right; exists g; repeat split; auto.
       eapply E0_add_lt_cancel with a; eauto.
   Qed.
-
-  Definition E0_is_succ e := ∃f, e = E0_succ f.
-  Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f.
-
-  Lemma E0_is_succ_iff e :
-    cnf e → E0_is_succ e ↔ ∃ l i, 0 < i ∧ e = ω[l++[(0₀,i)]].
-  Proof.
-    intros He; split.
-    + intros (f & ->).
-      generalize (E0_succ f) (E0_succ_spec f).
-      induction 1 as [ | l i | l x i ].
-      * exists [], 1; split; auto.
-      * exists l, (S i); split; auto; lia.
-      * exists (l++[(x,i)]), 1; split; auto.
-        now rewrite <- app_assoc.
-    + intros (l & [ | [|i] ] & H1 & ->).
-      * lia.
-      * exists ω[l].
-        apply E0_succ_gr_fun with (2 := E0_succ_spec _).
-        destruct l as [ | l (x,i) _ ] using rev_rect.
-        1: constructor 1.
-        rewrite <- app_assoc; simpl.
-        constructor 3.
-        intros ->.
-        rewrite <- app_assoc, cnf_fix, map_app in He.
-        simpl in He.
-        apply proj1, ordered_app_tail, 
-              ordered_cons_iff, proj2 in He; auto.
-        apply (@E0_lt_irrefl 0₀), He; auto. 
-      * exists ω[l++[(0₀,S i)]].
-        apply E0_succ_gr_fun with (2 := E0_succ_spec _).
-        constructor 2.
-  Qed.
-
-  Lemma E0_is_limit_iff e :
-    cnf e → E0_is_limit e ↔ ∃ l b i, 0 < i ∧ b ≠ 0₀ ∧ e = ω[l++[(b,i)]].
-  Proof.
-    intros He.
-    split.
-    + intros (H1 & H2); destruct e as [ l ].
-      destruct l as [ | l (b,i) _ ] using rev_rect.
-      1: easy.
-      destruct i as [ | i ].
-      1:{ apply cnf_fix, proj2 in He.
-          destruct (He b 0); eauto; lia. }
-      exists l, b, (S i); repeat split; auto.
-      * lia.
-      * intros ->.
-        apply H2, E0_is_succ_iff; auto.
-        exists l, (S i); split; auto; lia.
-    + intros (l & b & i & H1 & H2 & ->).
-      split.
-      1: now destruct l.
-      intros (m & j & H3 & H4)%E0_is_succ_iff; auto.
-      injection H4; clear H4.
-      intros (_ & [=])%app_inj_tail; now subst.
-  Qed.
-
-  Hint Resolve E0_add_cnf : core.
-
-  (** e + l is a limit if l is *)
-  Lemma E0_add_is_limit a e : 
-    cnf a → cnf e → E0_is_limit e → E0_is_limit (a +₀ e).
-  Proof.
-    intros Ha He (m & b & i & Hi & Hb & ->)%E0_is_limit_iff; auto.
-    apply E0_is_limit_iff; eauto.
-    destruct a as [l].
-    unfold E0_add.
-    destruct (wlist_combine_last E0_lt_sdec l m b i)
-      as (r & j & ? & ->).
-    exists r, b, j; split; auto; lia.
-  Qed.
-
-  Fact E0_omega_is_limit e i :
-    cnf e → e ≠ 0₀ → 0 < i → E0_is_limit ω[[(e,i)]].
-  Proof.
-    intros H1 H2 H3.
-    apply E0_is_limit_iff; auto.
-    exists [], e, i; auto.
-  Qed.
-
-  Hint Resolve E0_add_is_limit E0_omega_is_limit : core.
-
-  (** a + ω^(e.i) is a limit ordinal *)
-  Fact E0_add_omega_is_limit a e i : 
-    cnf a → cnf e → e ≠ 0₀ → 0 < i → E0_is_limit (a +₀ ω[[(e,i)]]).
-  Proof. eauto. Qed.
-
-  (** TODO: maybe add notation for ω[[(e,n)]] ie ω^(e.n) *)
-
-  Definition E0_omega_exp e := ω[[(e,1)]].
-
-  Notation "'ω' '^' e" := (E0_omega_exp e) (at level 1). 
-
-  Fact E0_omega_exp_cnf e : cnf e → cnf ω^e.
-  Proof. intros; apply cnf_sg; auto. Qed.
-
-  Hint Resolve E0_omega_exp_cnf : core.
-
-  (** any ordinal is either 0, a successor or a limit ordinal *)
-
-  Inductive E0_decomp : E0 → Type :=
-    | E0_decomp_zero : E0_decomp 0₀
-    | E0_decomp_succ e : cnf e → E0_decomp (S₀ e)
-    | E0_decomp_limit g e : e ≠ 0₀ → cnf g → cnf e → E0_decomp (g +₀ ω^e).
-
-  (* Proof that if cnf u then
-     either u is E0_zero                             (limit ordinal)
-      or  u is ω[l++[(E0_zero,i)]])                (successor)
-      or  u is ω[l++[(e,i)]]) with  E0_zero <E₀ e  (limit ordinal) *)
-
-  Lemma E0_decomp_compute e : cnf e → E0_decomp e.
-  Proof.
-    induction 1 as [ m H1 H2 H3 _ ] using cnf_rect.
-    destruct m as [ | m (e,i) _ ] using rev_rect.
-    + constructor 1.
-    + destruct i as [ | i ].
-      1: destruct (@lt_irrefl 0); eauto.
-      destruct e as [[ | yj e ]].
-      * destruct i as [ | i ].
-        - replace ω[m++[(ω[[]],1)]]
-            with (E0_succ ω[m]).
-          ++ constructor.
-             apply cnf_fix; repeat split; eauto.
-             rewrite map_app in H1.
-             now apply ordered_app_head in H1.
-          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
-             destruct m as [ | m (x,i) _ ] using rev_rect.
-             ** constructor.
-             ** rewrite <- app_assoc.
-                constructor.
-                intros ->.
-                rewrite !map_app, <- app_assoc in H1.
-                now apply ordered_app_tail, ordered_inv,
-                      ordered_from_inv, proj1, E0_lt_irrefl in H1.
-        - replace ω[m++[(ω[[]],S (S i))]]
-            with (E0_succ ω[m++[(0₀,S i)]]).
-          ++ constructor 2.
-             apply cnf_fix; split.
-             ** rewrite map_app in H1 |- *; auto.
-             ** intros ? ? [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
-          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
-             constructor 2.
-      * destruct i as [ | i ].
-        - replace ω[m++[(ω[yj::e],1)]]
-            with (E0_add ω[m] ω[[(ω[yj::e],1)]]).
-          ++ constructor 3; easy || eauto.
-             apply cnf_fix; repeat split; eauto.
-             rewrite map_app in H1.
-             now apply ordered_app_head in H1.
-          ++ unfold E0_add.
-             rewrite wlist_combine_spec1; eauto.
-             rewrite map_app in H1; simpl in H1.
-             apply ordered_snoc_iff, proj2 in H1; auto.
-             apply Forall_forall.
-             now intros (f,i) H; apply H1, in_map.
-        - replace ω[m++[(ω[yj::e], S (S i))]]
-            with (E0_add ω[m++[(ω[yj::e],S i)]] ω[[(ω[yj::e],1)]]).
-          ++ constructor 3; easy || eauto.
-             apply cnf_fix; split.
-             ** rewrite map_app in H1 |- *; auto.
-             ** intros f j [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
-          ++ unfold E0_add.
-             rewrite <- (app_nil_r (_++[_])), <- app_assoc.
-             rewrite wlist_combine_spec2; auto.
-             ** rewrite app_nil_r; do 4 f_equal; lia.
-             ** rewrite map_app in H1; simpl in H1. 
-                apply ordered_snoc_iff, proj2 in H1; auto.
-                apply Forall_forall.
-                intros [] ?; now apply H1, in_map.
-  Qed.
-
-  (** The specification of the fundemental sequence
-      This specification does not characterize a unique
-      fundemental sequence, even up to extensionality *)
-
-  Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
-    | E0_fseq_gr_0 g b   : cnf g
-                         → cnf b
-                         → E0_fseq_gr (g +₀ ω^(S₀ b)) (λ n, g +₀ ω[[(b,1+n)]])
-    | E0_fseq_gr_1 g b r : cnf g
-                         → cnf b
-                         → E0_fseq_gr b r
-                         → E0_fseq_gr (g +₀ ω^b) (λ n, g +₀ ω^(r n)).
-
-  Fact E0_fseq_gr_fun e se f sf :
-       E0_fseq_gr e se → E0_fseq_gr f sf → e = f → ∀n, se n = sf n.
-  Proof.
-    intros H; revert H f sf.
-    induction 1 as [ g b Hg Hb | g b r Hg Hb H1 IH1 ].
-    + induction 1 as [ g' b' Hg' Hb' | g' b' r' Hg' Hb' H2 IH2 ].
-      * (* This property does not hold since the decomposition is not
-           unique ... this only holds for n high enough 
-
-           We need to force the decomposition to be unique
-           by choosing g +₀ ω^b with g minimal for instance *)
-        admit.
-      * admit.  
-  Admitted.
-
-  (* Hint Resolve E0_add_cnf cnf_sg : core. *)
-
-  (** WF Induction on e st cnf e *)
-  Theorem E0_fseq_pwc e : cnf e → E0_is_limit e → sig (E0_fseq_gr e).
-  Proof.
-    induction e as [ e IH ] using (well_founded_induction_type E0_lt_wf).
-    intros G1%E0_decomp_compute G2.
-    destruct G1 as [ | e He | g e H0 Hg He ].
-    + exfalso; now destruct G2.
-    + exfalso; destruct G2 as (_ & []); eauto.
-    + clear G2.
-      apply E0_decomp_compute in He.
-      destruct He as [ | b Hb | a e H1 H2 H3 ].
-      * now destruct H0.
-      * exists (λ n, E0_add g ω[[(b,1+n)]]).
-        now constructor.
-      * destruct (IH (E0_add a ω[[(e, 1)]])) as (lam & Hlam); eauto.
-        - repeat split; eauto.
-          ++ rewrite <- (E0_add_zero_left (E0_add a _)) at 1.
-             apply E0_le_lt_trans with (E0_add g (E0_add a ω[[(e, 1)]])).
-             ** apply E0_add_mono_left; auto.
-             ** apply E0_add_mono_right; eauto.
-                apply E0_lt_sub with 1; auto.
-        - apply E0_add_is_limit; auto.
-        - exists (λ n, E0_add g ω[[(lam n,1)]]); constructor; eauto.
-  Qed.
-
-  Definition E0_fseq {e} (h : cnf e) (l : E0_is_limit e) := π₁ (@E0_fseq_pwc e h l).
-  Fact E0_fseq_spec e h l : E0_fseq_gr e (@E0_fseq e h l).
-  Proof. apply (proj2_sig _). Qed.
-
-  Local Fact E0_fseq_gr_cnf e r : E0_fseq_gr e r → ∀n, cnf (r n).
-  Proof.
-    induction 1; intro.
-    + apply E0_add_cnf; auto.
-      apply cnf_sg; auto; lia.
-    + apply E0_add_cnf; auto.
-  Qed. 
-
-  (** The fundemental sequence is cnf *)
-  Fact E0_fseq_cnf e h l n : cnf (@E0_fseq e h l n).
-  Proof. generalize (E0_fseq_spec h l) n; apply E0_fseq_gr_cnf. Qed.
-
-  Hint Resolve E0_fseq_gr_cnf E0_fseq_cnf : core.
-
-  (** The fundemental sequence is monotonic *)
-  Fact E0_fseq_mono e h l : ∀ n m, n < m → @E0_fseq e h l n <E₀ E0_fseq h l m.
-  Proof.
-    generalize (E0_fseq h l) (E0_fseq_spec h l); clear l.
-    induction 1; intros.
-    + apply E0_add_mono_right; auto.
-      1,2: apply cnf_sg; auto; lia.
-      constructor; constructor 2; right; lia.
-    + apply E0_add_mono_right; auto.
-      1,2: apply cnf_sg; eauto.
-      constructor; constructor 2; left; eauto.
-  Qed.
-
+  
   Fact E0_le_one e : e ≠ 0₀ → cnf e → 1₀ ≤E₀ e.
   Proof.
     destruct e as [ [ | (x,i) m ] ]; try easy.
@@ -1997,6 +1772,342 @@ Section E0.
     all: apply E0_succ_mono in G; auto; rewrite H in G; destruct (E0_lt_irrefl G).
   Qed.
 
+  Definition E0_is_succ e := ∃f, e = E0_succ f.
+  Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f.
+
+  Lemma E0_is_succ_iff e :
+    cnf e → E0_is_succ e ↔ ∃ l i, 0 < i ∧ e = ω[l++[(0₀,i)]].
+  Proof.
+    intros He; split.
+    + intros (f & ->).
+      generalize (E0_succ f) (E0_succ_spec f).
+      induction 1 as [ | l i | l x i ].
+      * exists [], 1; split; auto.
+      * exists l, (S i); split; auto; lia.
+      * exists (l++[(x,i)]), 1; split; auto.
+        now rewrite <- app_assoc.
+    + intros (l & [ | [|i] ] & H1 & ->).
+      * lia.
+      * exists ω[l].
+        apply E0_succ_gr_fun with (2 := E0_succ_spec _).
+        destruct l as [ | l (x,i) _ ] using rev_rect.
+        1: constructor 1.
+        rewrite <- app_assoc; simpl.
+        constructor 3.
+        intros ->.
+        rewrite <- app_assoc, cnf_fix, map_app in He.
+        simpl in He.
+        apply proj1, ordered_app_tail, 
+              ordered_cons_iff, proj2 in He; auto.
+        apply (@E0_lt_irrefl 0₀), He; auto. 
+      * exists ω[l++[(0₀,S i)]].
+        apply E0_succ_gr_fun with (2 := E0_succ_spec _).
+        constructor 2.
+  Qed.
+
+  Lemma E0_is_limit_iff e :
+    cnf e → E0_is_limit e ↔ ∃ l b i, 0 < i ∧ b ≠ 0₀ ∧ e = ω[l++[(b,i)]].
+  Proof.
+    intros He.
+    split.
+    + intros (H1 & H2); destruct e as [ l ].
+      destruct l as [ | l (b,i) _ ] using rev_rect.
+      1: easy.
+      destruct i as [ | i ].
+      1:{ apply cnf_fix, proj2 in He.
+          destruct (He b 0); eauto; lia. }
+      exists l, b, (S i); repeat split; auto.
+      * lia.
+      * intros ->.
+        apply H2, E0_is_succ_iff; auto.
+        exists l, (S i); split; auto; lia.
+    + intros (l & b & i & H1 & H2 & ->).
+      split.
+      1: now destruct l.
+      intros (m & j & H3 & H4)%E0_is_succ_iff; auto.
+      injection H4; clear H4.
+      intros (_ & [=])%app_inj_tail; now subst.
+  Qed.
+
+  Hint Resolve E0_add_cnf : core.
+
+  (** e + l is a limit if l is *)
+  Lemma E0_add_is_limit a e : 
+    cnf a → cnf e → E0_is_limit e → E0_is_limit (a +₀ e).
+  Proof.
+    intros Ha He (m & b & i & Hi & Hb & ->)%E0_is_limit_iff; auto.
+    apply E0_is_limit_iff; eauto.
+    destruct a as [l].
+    unfold E0_add.
+    destruct (wlist_combine_last E0_lt_sdec l m b i)
+      as (r & j & ? & ->).
+    exists r, b, j; split; auto; lia.
+  Qed.
+
+  Fact E0_omega_is_limit e i :
+    cnf e → e ≠ 0₀ → 0 < i → E0_is_limit ω[[(e,i)]].
+  Proof.
+    intros H1 H2 H3.
+    apply E0_is_limit_iff; auto.
+    exists [], e, i; auto.
+  Qed.
+
+  Hint Resolve E0_add_is_limit E0_omega_is_limit : core.
+
+  (** a + ω^(e.i) is a limit ordinal *)
+  Fact E0_add_omega_is_limit a e i : 
+    cnf a → cnf e → e ≠ 0₀ → 0 < i → E0_is_limit (a +₀ ω[[(e,i)]]).
+  Proof. eauto. Qed.
+
+  (** TODO: maybe add notation for ω[[(e,n)]] ie ω^(e.n) *)
+
+  Definition E0_omega_exp e := ω[[(e,1)]].
+
+  Notation "'ω' '^' e" := (E0_omega_exp e) (at level 1, format "ω ^ e").
+  
+  Fact E0_omega_zero : ω^0₀ = 1₀.
+  Proof. trivial. Qed.
+
+  Fact E0_omega_exp_cnf e : cnf e → cnf ω^e.
+  Proof. intros; apply cnf_sg; auto. Qed.
+
+  Hint Resolve E0_omega_exp_cnf : core.
+  
+  Lemma E0_add_omega_fun_right a b e f : a +₀ ω^e = b +₀ ω^f → e = f.
+  Proof.
+    revert a b e f.
+    intros [a] [b] e f; unfold E0_omega_exp, E0_add.
+    destruct (wlist_combine_last E0_lt_sdec a [] e 1)
+      as (l & i & H1 & H2).
+    destruct (wlist_combine_last E0_lt_sdec b [] f 1)
+      as (m & j & H3 & H4).
+    simpl app in H2, H4; rewrite H2, H4.
+    injection 1.
+    intros (_ & [=])%app_inj_tail; now subst.
+  Qed.
+  
+  (* a +₀ ω^e is the limit decomposition of that ordinal
+     - e is unique 
+     - but a is not and we choose the least one *)
+  Definition E0_least_split (a e : E0) :=
+    ∀b, cnf b → a +₀ ω^e = b +₀ ω^e → a ≤E₀ b.
+    
+  Fact E0_split_least_uniq a b e f : 
+      cnf a
+    → cnf b
+    → E0_least_split a e
+    → E0_least_split b f
+    → a +₀ ω^e = b +₀ ω^f
+    → a = b ∧ e = f.
+  Proof.
+    intros Ha Hb He Hf E.
+    assert (e = f) as <-.
+    1: now apply E0_add_omega_fun_right in E.
+    split; auto.
+  Qed.
+  
+  (** any ordinal is either 0, a successor or a limit ordinal *)
+
+  Inductive E0_decomp : E0 → Type :=
+    | E0_decomp_zero : E0_decomp 0₀
+    | E0_decomp_succ e : cnf e → E0_decomp (S₀ e)
+    | E0_decomp_limit g e : e ≠ 0₀ → cnf g → cnf e → E0_least_split g e → E0_decomp (g +₀ ω^e).
+
+  (* Proof that if cnf u then
+     either u is E0_zero                             (limit ordinal)
+      or  u is ω[l++[(E0_zero,i)]])                (successor)
+      or  u is ω[l++[(e,i)]]) with  E0_zero <E₀ e  (limit ordinal) *)
+
+  Lemma E0_decomp_compute e : cnf e → E0_decomp e.
+  Proof.
+    induction 1 as [ m H1 H2 H3 _ ] using cnf_rect.
+    destruct m as [ | m (e,i) _ ] using rev_rect.
+    + constructor 1.
+    + destruct i as [ | i ].
+      1: destruct (@lt_irrefl 0); eauto.
+      destruct e as [[ | yj e ]].
+      * destruct i as [ | i ].
+        - replace ω[m++[(ω[[]],1)]]
+            with (E0_succ ω[m]).
+          ++ constructor.
+             apply cnf_fix; repeat split; eauto.
+             rewrite map_app in H1.
+             now apply ordered_app_head in H1.
+          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
+             destruct m as [ | m (x,i) _ ] using rev_rect.
+             ** constructor.
+             ** rewrite <- app_assoc.
+                constructor.
+                intros ->.
+                rewrite !map_app, <- app_assoc in H1.
+                now apply ordered_app_tail, ordered_inv,
+                      ordered_from_inv, proj1, E0_lt_irrefl in H1.
+        - replace ω[m++[(ω[[]],S (S i))]]
+            with (E0_succ ω[m++[(0₀,S i)]]).
+          ++ constructor 2.
+             apply cnf_fix; split.
+             ** rewrite map_app in H1 |- *; auto.
+             ** intros ? ? [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
+          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
+             constructor 2.
+      * destruct i as [ | i ].
+        - replace ω[m++[(ω[yj::e],1)]]
+            with (E0_add ω[m] ω[[(ω[yj::e],1)]]).
+          ++ constructor 3; easy || eauto.
+             ** apply cnf_fix; repeat split; eauto.
+                rewrite map_app in H1.
+                now apply ordered_app_head in H1.
+             ** intros [k] Hk; unfold E0_omega_exp, E0_add.
+                intros E%E0_eq_inv.
+                rewrite <- (app_nil_r m) in E.
+                rewrite map_app, ordered_app_iff in H1; eauto.
+                rewrite wlist_combine_gt_list in E; eauto.
+                2:{ apply Forall_forall.
+                    intros (x,i) Hxi; apply H1; simpl; eauto.
+                    apply in_map_iff; exists (x,i); auto. }
+                simpl wlist_combine at 1 in E.
+                symmetry in E.
+                apply wlist_combine_eq_snoc_inv in E
+                  as (r & -> & _); auto.
+                destruct r.
+                -- rewrite app_nil_r; now right.
+                -- left; constructor.
+                   apply lex_list_prefix'.
+          ++ unfold E0_add.
+             rewrite wlist_combine_spec1; eauto.
+             rewrite map_app in H1; simpl in H1.
+             apply ordered_snoc_iff, proj2 in H1; auto.
+             apply Forall_forall.
+             now intros (f,i) H; apply H1, in_map.
+        - replace ω[m++[(ω[yj::e], S (S i))]]
+            with (E0_add ω[m++[(ω[yj::e],S i)]] ω[[(ω[yj::e],1)]]).
+          ++ constructor 3; easy || eauto.
+             ** apply cnf_fix; split.
+                -- rewrite map_app in H1 |- *; auto.
+                -- intros f j [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
+             ** intros [k] Hk; unfold E0_omega_exp, E0_add.
+                intros E%E0_eq_inv.
+                rewrite map_app, ordered_app_iff in H1; eauto.
+                rewrite wlist_combine_gt_list in E; eauto.
+                2:{ apply Forall_forall.
+                    intros (y,j) Hxi; apply H1; simpl; eauto.
+                    apply in_map_iff; exists (y,j); auto. }
+                rewrite wlist_combine_eq in E; auto.
+                symmetry in E.
+                apply wlist_combine_eq_snoc_inv in E
+                  as (r & -> & _ & _ & [ H | (p & r' & ? & ->) ]); auto.
+                1: exfalso; lia.
+                replace p with (S i) by lia.
+                destruct r'; [ now right | ].
+                left; constructor.
+                apply lex_list_app_head.
+                constructor 3; constructor 1.
+          ++ unfold E0_add.
+             rewrite <- (app_nil_r (_++[_])), <- app_assoc.
+             rewrite wlist_combine_spec2; auto.
+             ** rewrite app_nil_r; do 4 f_equal; lia.
+             ** rewrite map_app in H1; simpl in H1. 
+                apply ordered_snoc_iff, proj2 in H1; auto.
+                apply Forall_forall.
+                intros [] ?; now apply H1, in_map.
+  Qed.
+
+  (** The specification of the fundemental sequence
+      This specification does not characterize a unique
+      fundemental sequence, even up to extensionality *)
+
+  Inductive E0_fseq_gr : E0 → (nat → E0) → Prop :=
+    | E0_fseq_gr_0 g b   : cnf g
+                         → cnf b
+                         → E0_least_split g (S₀ b)
+                         → E0_fseq_gr (g +₀ ω^(S₀ b)) (λ n, g +₀ ω[[(b,1+n)]])
+    | E0_fseq_gr_1 g b r : cnf g
+                         → cnf b
+                         → E0_is_limit b
+                         → E0_least_split g b
+                         → E0_fseq_gr b r
+                         → E0_fseq_gr (g +₀ ω^b) (λ n, g +₀ ω^(r n)).
+
+  Local Lemma E0_fseq_gr_fun_rec e se f sf :
+       E0_fseq_gr e se → E0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  Proof.
+    intros H; revert H f sf.
+    induction 1 as [ g b Hg Hb Hs | g b r Hg Hb H0 Hs H1 IH1 ].
+    + induction 1 as [ g' b' Hg' Hb' Hs' | g' b' r' Hg' Hb' H0' Hs' H2 IH2 ].
+      * intros (<- & <-%E0_succ_inj)%E0_split_least_uniq; auto.
+      * intros <-%E0_add_omega_fun_right; eauto.
+        destruct H0' as (_ & []); eauto.
+    + induction 1 as [ g' b' Hg' Hb' Hs' | g' b' r' Hg' Hb' H0' Hs' H2 IH2 ].
+      * intros ->%E0_add_omega_fun_right; eauto.
+        destruct H0 as (_ & []); eauto.
+      * intros (<- & <-)%E0_split_least_uniq; auto.
+        intros n.
+        now rewrite IH1 with (1 := H2).
+  Qed.
+  
+  Lemma E0_fseq_gr_fun e r r' : E0_fseq_gr e r → E0_fseq_gr e r' → ∀n, r n = r' n.
+  Proof. intros H1 H2; now apply (E0_fseq_gr_fun_rec H1 H2). Qed.
+
+  (* Hint Resolve E0_add_cnf cnf_sg : core. *)
+
+  (** WF Induction on e st cnf e *)
+  Theorem E0_fseq_pwc e : cnf e → E0_is_limit e → sig (E0_fseq_gr e).
+  Proof.
+    induction e as [ e IH ] using (well_founded_induction_type E0_lt_wf).
+    intros G1%E0_decomp_compute G2.
+    destruct G1 as [ | e He | g e H0 Hg He ].
+    + exfalso; now destruct G2.
+    + exfalso; destruct G2 as (_ & []); eauto.
+    + clear G2.
+      apply E0_decomp_compute in He.
+      destruct He as [ | b Hb | a e H1 H2 H3 ].
+      * now destruct H0.
+      * exists (λ n, E0_add g ω[[(b,1+n)]]).
+        now constructor.
+      * destruct (IH (E0_add a ω[[(e, 1)]])) as (lam & Hlam); eauto.
+        - repeat split; eauto.
+          ++ rewrite <- (E0_add_zero_left (E0_add a _)) at 1.
+             apply E0_le_lt_trans with (E0_add g (E0_add a ω[[(e, 1)]])).
+             ** apply E0_add_mono_left; auto.
+             ** apply E0_add_mono_right; eauto.
+                apply E0_lt_sub with 1; auto.
+        - apply E0_add_is_limit; auto.
+        - exists (λ n, E0_add g ω[[(lam n,1)]]); constructor; eauto.
+          apply E0_add_omega_is_limit; auto.
+  Qed.
+
+  Definition E0_fseq {e} (h : cnf e) (l : E0_is_limit e) := π₁ (@E0_fseq_pwc e h l).
+  Fact E0_fseq_spec e h l : E0_fseq_gr e (@E0_fseq e h l).
+  Proof. apply (proj2_sig _). Qed.
+
+  Local Fact E0_fseq_gr_cnf e r : E0_fseq_gr e r → ∀n, cnf (r n).
+  Proof.
+    induction 1; intro.
+    + apply E0_add_cnf; auto.
+      apply cnf_sg; auto; lia.
+    + apply E0_add_cnf; auto.
+  Qed. 
+
+  (** The fundemental sequence is cnf *)
+  Fact E0_fseq_cnf e h l n : cnf (@E0_fseq e h l n).
+  Proof. generalize (E0_fseq_spec h l) n; apply E0_fseq_gr_cnf. Qed.
+
+  Hint Resolve E0_fseq_gr_cnf E0_fseq_cnf : core.
+
+  (** The fundemental sequence is monotonic *)
+  Fact E0_fseq_mono e h l : ∀ n m, n < m → @E0_fseq e h l n <E₀ E0_fseq h l m.
+  Proof.
+    generalize (E0_fseq h l) (E0_fseq_spec h l); clear l.
+    induction 1; intros.
+    + apply E0_add_mono_right; auto.
+      1,2: apply cnf_sg; auto; lia.
+      constructor; constructor 2; right; lia.
+    + apply E0_add_mono_right; auto.
+      1,2: apply cnf_sg; eauto.
+      constructor; constructor 2; left; eauto.
+  Qed.
+
+
   (** inversion for f < ω^b:
       - either f is 0 (and b is also 0)
       - or f is below ω^a.n for some a < b and some n > 0 *)
@@ -2050,7 +2161,7 @@ Section E0.
     (* We capture the fundemental sequence via its inductive spec *)
     revert f; generalize (E0_fseq h l) (E0_fseq_spec h l).
     intros f H; revert H h; clear l.
-    induction 1 as [ e b Hg Hb | e b r Hg Hb Hr IH ]; intros He f Hf H.
+    induction 1 as [ e b Hg Hb Hs | e b r Hg Hb Hr H0 Hs IH ]; intros He f Hf H.
     + (* e is _ + ω^{b+1} *)
       apply E0_lt_add_inv_add in H as [ H | (g & H1 & -> & H3) ]; eauto.
       * exists 0.
@@ -2386,8 +2497,7 @@ Proof.
     * intros <- n; eapply IH1; eauto.
       (* Here I need a characterization of fseq !! *)
       apply eps0_eq_iff; destruct e as [ e He ]; simpl. 
-      apply (@E0_fseq_gr_fun e) with (3 := eq_refl);
-      apply E0_fseq_spec.
+      apply (@E0_fseq_gr_fun e); apply E0_fseq_spec.
 Qed.
 
 #[local] Hint Resolve eps0_succ_lt : core.
