@@ -1653,6 +1653,9 @@ Section E0.
   Proof. intros; apply cnf_sg; auto. Qed.
 
   Hint Resolve E0_omega_cnf : core.
+
+  Fact E0_lt_omega e : cnf e → e <E₀ ω^e.
+  Proof. intro; apply E0_lt_sub with 1; auto. Qed.
   
   Lemma E0_add_omega_fun_right a b e f : a +₀ ω^e = b +₀ ω^f → e = f.
   Proof.
@@ -1822,6 +1825,32 @@ Section E0.
                 intros [] ?; now apply H1, in_map.
   Qed.
 
+  Section cnf_add_rect.
+
+    Variables (P : ∀e, cnf e → Type)
+              (HP0 : ∀ h, P 0₀ h)
+              (HP1 : ∀ e he h, P e he → P (S₀ e) h)
+              (HP2 : ∀ g e hg he h, e ≠ 0₀ → E0_least_split g e → P g hg → P e he → P (g +₀ ω^e) h).
+
+    Theorem cnf_add_rect e he : P e he.
+    Proof.
+      induction e as [ e IHe ] in he |- * using (well_founded_induction_type E0_lt_wf).
+      destruct (E0_decomp_compute e he) as [ | e h | g e h hg he' ]; auto.
+      + apply HP1 with h, IHe; auto.
+      + apply HP2 with (hg := hg) (he := he'); auto.
+      * apply IHe; split; auto.
+        rewrite <- (E0_add_zero_right g) at 1.
+        apply E0_add_mono_right; auto.
+        apply E0_le_lt_trans with (2 := E0_lt_omega _ he'); auto.
+      * apply IHe; split; auto.
+        apply E0_le_lt_trans with (g +₀ e).
+        - rewrite <- (E0_add_zero_left e) at 1.
+          apply E0_add_mono_left; auto.
+        - apply E0_add_mono_right, E0_lt_omega; auto.
+    Qed.
+
+  End cnf_add_rect.
+
 End E0.
 
 (** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
@@ -1863,6 +1892,12 @@ Proof.
   revert e f; intros (e & He) (f & Hf).
   destruct (E0_lt_sdec e f) as []; eauto.
   rewrite (cnf_pirr _ He Hf); auto.
+Qed.
+
+Fact eps0_eq_dec (e f : ε₀) : { e = f } + { e ≠ f }.
+Proof.
+  destruct (eps0_lt_sdec e f) as [ e f H | | e f H ]; auto;
+    right; intros <-; revert H; apply eps0_lt_irrefl.
 Qed.
 
 #[local] Hint Resolve cnf_lt_lpo : core.
@@ -2196,7 +2231,7 @@ Qed.
 
 (* ω^e *)
 Definition eps0_omega : ε₀ → ε₀.
-Proof. intro e; apply (eps0_exp_S e 0); auto. Defined.
+Proof. intro e; apply (eps0_exp_S e 0). Defined.
 
 Notation "'ω' '^' e" := (eps0_omega e) (at level 1, format "ω ^ e").
 
@@ -2236,31 +2271,119 @@ Proof.
   1: now apply eps0_add_omega_fun_right in E.
 Qed.
 
-Inductive eps0_decomp : ε₀ → Type :=
-  | eps0_decomp_zero   : eps0_decomp 0₀
-  | eps0_decomp_succ e : eps0_decomp (S₀ e)
-  | eps0_decomp_limit g e : e ≠ 0₀ → eps0_least_split g e → eps0_decomp (g +₀ ω^e).
-  
-Fact eps0_decomp_compute e : eps0_decomp e.
+Section eps0_add_rect.
+
+  (** Induction principle corresponding to the following building rules 
+      for ordinals below ε₀:
+
+                    e      g  e  e≠0₀  eps0_least_split g e
+        ------   ------   ----------------------------------
+          0₀      S₀ e             g +₀ ω^e
+   *)
+
+  Variables (P : ε₀ → Type)
+            (HP0 : P 0₀)
+            (HP1 : ∀ e, P e → P (S₀ e))
+            (HP2 : ∀ g e, e ≠ 0₀ → eps0_least_split g e → P g → P e → P (g +₀ ω^e)).
+
+  Local Fact P_pirr e h1 h2 : P (exist _ e h1) → P (exist _ e h2).
+  Proof. now rewrite (cnf_pirr _ h1 h2). Qed.
+
+  Theorem eps0_add_rect e : P e.
+  Proof.
+    destruct e as (e & He); revert e He; apply cnf_add_rect.
+    + intro; eapply P_pirr, HP0.
+    + intros e he h H; eapply P_pirr, (HP1 H).
+    + intros g e hg he h H1 H2 H3 H4.
+      eapply P_pirr.
+      apply HP2 with (3 := H3) (4 := H4).
+      * now intros ?%eps0_eq_iff.
+      * intros []; rewrite !eps0_eq_iff, eps0_le_iff; simpl; auto.
+  Qed.
+
+End eps0_add_rect.
+
+(* can we define multiplication using 
+   the decomposition 0, S α or α + ω^γ decomposition ?
+    α.0 = 0
+    α· S(β) = (α · β) + α
+    α(β + γ) = αβ + αγ
+
+    α^1 = α.
+    α^β·α^γ = α^(β + γ).
+    α.(β + ω^γ) = αβ + α.ω^γ
+
+    So we need α.ω^γ which 
+   
+    0.ω^γ -> 0
+    n.ω^γ = (ω^0.n).ω^γ = ω^(0+γ) = ω^γ (n > 0)
+    
+    (S α).ω^γ -> (α+1).ω^γ -> α = 0 -> ω^γ
+                           -> α <> 0 -> α.ω^γ
+
+    (α+ω^β).ω^γ -> α < ω^β then α+ω^β = ω^β and (α+ω^β).ω^γ = ω^(β+γ) 
+                -> α >= ω^β then (α+ω^β).ω^γ = α.ω^γ. *)
+
+Inductive eps0_mult_omega_gr γ : ε₀ → ε₀ → Prop :=
+  | eps0_mult_omega_gr_0 :       eps0_mult_omega_gr γ 0₀ 0₀
+  | eps0_mult_omega_gr_1 :       eps0_mult_omega_gr γ 1₀ ω^γ
+  | eps0_mult_omega_gr_2 α r :   α ≠ 0₀
+                               → eps0_mult_omega_gr γ α r
+                               → eps0_mult_omega_gr γ (S₀ α) r
+  | eps0_mult_omega_gr_3 α β :   β ≠ 0₀
+                               → α <ε₀ ω^β
+                               → eps0_least_split α β
+                               → eps0_mult_omega_gr γ (α+₀ω^β) ω^(β+₀γ)
+  | eps0_mult_omega_gr_4 α β r : β ≠ 0₀
+                               → ω^β ≤ε₀ α
+                               → eps0_least_split α β
+                               → eps0_mult_omega_gr γ α r 
+                               → eps0_mult_omega_gr γ (α+₀ω^β) r
+  .
+
+Definition eps0_mult_omega_pwc γ e : sig (eps0_mult_omega_gr γ e).
 Proof.
-  destruct e as [ e He ].
-  destruct E0_decomp_compute
-    with (1 := He)
-    as [ | f Hf | g f H Hg Hf G ].
-  + replace (exist (fun e => cnf e) E0_zero He) with 0₀.
-    * constructor.
-    * now apply eps0_eq_iff.
-  + replace (exist (fun e => cnf e) (E0_succ f) He) with (S₀ (exist cnf f Hf)).
-    * constructor.
-    * now apply eps0_eq_iff.
-  + replace (exist (λ e, cnf e) (E0_add g (E0_omega f)) He)
-       with ((exist cnf g Hg) +₀ ω^(exist cnf f Hf)).
-    * constructor.
-      - contradict H; now apply eps0_eq_iff in H.
-      - intros [b Hb] E%eps0_eq_iff%G; auto.
-        now apply eps0_le_iff.
-    * now apply eps0_eq_iff.
+  induction e as [ | e (r & Hr) | g e H1 H2 (r & Hr) _ ] using eps0_add_rect.
+  + exists 0₀; constructor.
+  + destruct (eps0_eq_dec e 0₀) as [ -> | He ].
+    * exists ω^γ; rewrite eps0_succ_zero_is_one; constructor.
+    * exists r; now constructor.
+  + destruct (eps0_le_lt_dec ω^e g) as [ H | H ].
+    * exists r; now constructor.
+    * exists ω^(e+₀γ); now constructor.
 Qed.
+
+Inductive eps0_mult_gr α : ε₀ → ε₀ → Prop :=
+  | eps0_mult_gr_0         : eps0_mult_gr α 0₀ 0₀
+  | eps0_mult_gr_1 β r     : eps0_mult_gr α β r
+                           → eps0_mult_gr α (S₀ β) (r+₀α)
+  | eps0_mult_gr_2 β γ r s : γ ≠ 0₀
+                           → eps0_least_split β γ
+                           → eps0_mult_gr α β r
+                           → eps0_mult_omega_gr γ α s
+                           → eps0_mult_gr α (β+₀ω^γ) (r+₀s)
+  .
+
+Definition eps0_mult_pwc α e : sig (eps0_mult_gr α e).
+Proof.
+  induction e as [ | e (r & Hr) | g e H1 H2 (r & Hr) _ ] using eps0_add_rect.
+  + exists 0₀; constructor.
+  + exists (r+₀α); now constructor 2.
+  + destruct (eps0_mult_omega_pwc e α) as (s & Hs).
+    exists (r+₀s); now constructor 3.
+Qed.
+
+Definition eps0_mult e f := proj1_sig (eps0_mult_pwc e f).
+
+Notation "e '*₀' f" := (eps0_mult e f) (at level 30).
+
+Fact eps0_mult_spec e f : eps0_mult_gr e f (e*₀f).
+Proof. apply (proj2_sig _). Qed.
+
+(** Now we need to show the equations for multiplication 
+    and exponentiation based on these specs *)
+
+(** We build the fundemental sequence *)
 
 Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
   | eps0_fseq_gr_0 g b   : eps0_least_split g (S₀ b)
@@ -2271,7 +2394,7 @@ Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
                          → eps0_fseq_gr (g +₀ ω^b) (λ n, g +₀ ω^(r n)).
 
 Local Lemma eps0_fseq_gr_fun_rec e se f sf :
-       eps0_fseq_gr e se → eps0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  eps0_fseq_gr e se → eps0_fseq_gr f sf → e = f → ∀n, se n = sf n.
 Proof.
   intros H; revert H f sf.
   induction 1 as [ g b Hs | g b r H0 Hs H1 IH1 ].
@@ -2296,22 +2419,19 @@ Proof. intros H1 H2; now apply (eps0_fseq_gr_fun_rec H1 H2). Qed.
     ordinal, packed with conformity (pwc) as spec'd with eps0_fseq_gr *)
 Theorem eps0_fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
 Proof.
-  induction e as [ e IH ] using (well_founded_induction_type wf_eps0_lt).
-  destruct (eps0_decomp_compute e) as [ | e | g e He Hge ].
+  destruct e as [ | e | g e H1 H2 _ _ ]
+    using eps0_add_rect.
   + now intros [ [] _ ].
   + intros [ _ [] ]; eauto.
   + intros _.
-    destruct (eps0_decomp_compute e) as [ | f | h f Hf Hhf ].
-    * now destruct He.
-    * exists (λ n, g +₀ eps0_exp_S f n); now constructor.
-    * destruct (IH (h +₀ ω^f)) as (lam & Hlam); auto.
-      - rewrite <- (eps0_add_zero_left (h +₀ _)) at 1.
-        apply eps0_le_lt_trans with (g +₀ (h +₀ ω^f)).
-        ++ apply eps0_add_mono_left; auto.
-        ++ apply eps0_add_mono_right; auto.
-           apply eps0_lt_omega.
-      - exists (λ n, g +₀ ω^(lam n)).
-        constructor; auto.
+    induction e as [ | e | h e H3 H4 _ IH ]
+      in H1, g, H2 |- *
+      using eps0_add_rect.
+    * now destruct H1.
+    * exists (λ n, g +₀ eps0_exp_S e n); now constructor.
+    * destruct (IH h) as (lam & Hlam); auto.
+      exists (λ n, g +₀ ω^(lam n)).
+      constructor; auto.
 Qed.
 
 Definition eps0_fseq {e} (l : eps0_is_limit e) := π₁ (@eps0_fseq_pwc e l).
