@@ -2197,11 +2197,17 @@ Hint Resolve eps0_zero_least
              eps0_le_trans eps0_le_lt_trans
              eps0_lt_le_trans : core.
 
-Fact eps0_zero_or_pos e : { e = eps0_zero } + { eps0_zero <ε₀ e }.
+Fact eps0_zero_or_pos e : { e = 0₀ } + { 0₀ <ε₀ e }.
 Proof.
   destruct e as [ [ [ | x l ] ] Hl ].
   + left; apply eps0_eq_iff; auto.
   + right; cbv; repeat constructor.
+Qed.
+
+Fact eps0_le_lt_dec e f : { e ≤ε₀ f } + { f <ε₀ e }.
+Proof.
+  destruct (eps0_lt_sdec e f); auto.
+  now left; left.
 Qed.
 
 #[local] Hint Resolve E0_succ_cnf : core.
@@ -2283,6 +2289,9 @@ Proof. intros [] [] []; simpl; apply E0_add_lt_cancel; auto. Qed.
 
 Fact eps0_add_cancel : ∀ e u v, e +₀ u = e +₀ v → u = v.
 Proof. intros [] [] []; rewrite !eps0_eq_iff; simpl; apply E0_add_cancel; auto. Qed.
+
+Fact eps0_add_le_cancel e u v : e +₀ u ≤ε₀ e +₀ v → u ≤ε₀ v.
+Proof. now intros [ ?%eps0_add_lt_cancel | ?%eps0_add_cancel ]; [ left | right ]. Qed.
 
 Fact eps0_add_incr : ∀ e f, 0₀ <ε₀ f → e <ε₀ e +₀ f.
 Proof. intros [] []; apply E0_add_incr; auto. Qed.
@@ -2598,6 +2607,106 @@ Proof.
   + intros; apply eps0_add_mono_right; eauto.
     apply eps0_exp_S_mono_left, eps0_lt_succ.
   + intros; apply eps0_add_mono_right, eps0_exp_S_mono_left; auto.
+Qed.
+
+Section upper_bound.
+
+  Variables (X : Type) (R : X → X → Prop).
+  
+  Implicit Type (P : X → Prop).
+
+  Definition ub P u := ∀x, P x → R x u.
+  Definition lub P u := ub P u ∧ ∀v, ub P v → R u v.
+  
+  Fact ub_mono P Q : (∀x, P x → Q x) → ∀u, ub Q u → ub P u.
+  Proof. intros H ? ? ? ?%H; auto. Qed.
+  
+  Fact lub_uniq P u v : lub P u → lub P v → R u v ∧ R v u.
+  Proof.
+    intros H1 H2; split.
+    + apply H1, H2.
+    + apply H2, H1.
+  Qed.
+
+  Hypothesis (R_refl : reflexive _ R)
+             (R_trans : transitive R).
+
+  Fact lub_iff P u : lub P u ↔ ∀v, ub P v ↔ R u v.
+  Proof.
+    split.
+    + intros Hu v; split.
+      * apply Hu.
+      * intros Huv x Hx.
+        now apply R_trans with (2 := Huv), Hu.
+    + intros Hu; split.
+      * apply Hu, R_refl.
+      * intro; apply Hu.
+  Qed.
+  
+End upper_bound.
+
+(* for a limit ordinal e, it is the ≤ε₀-lub of its fundemental sequence *) 
+Theorem eps0_fseq_lub e l : lub eps0_le (λ x, ∃n, x = @eps0_fseq e l n) e.
+Proof.
+  split.
+  + intros x (n & ->); left; apply eps0_fseq_lt.
+  + intros u Hu.
+    destruct (eps0_lt_sdec u e) as [ x e H | | ].
+    2,3: red; auto.
+    apply eps0_lt_fseq_inv with (l := l) in H as (n & Hn); auto.
+    exfalso.
+    apply (@eps0_lt_irrefl x).
+    apply eps0_lt_le_trans with (1 := Hn); eauto.
+Qed.
+
+(* A limit ordinal is the ≤ε₀-lub of <ε₀-smaller ordinals.
+   This is also the case of 0₀. But of course, this is not
+   the case for successor ordinals *)
+Theorem eps0_is_limit_lub e : eps0_is_limit e → lub eps0_le (λ x, x <ε₀ e) e.
+Proof.
+  intros l; split.
+  + now left.
+  + intros v Hv.
+    destruct (eps0_le_lt_dec e v) as [ | C ]; auto; exfalso.
+    apply eps0_lt_fseq_inv with (l := l) in C as (n & Hn).
+    apply (@eps0_lt_irrefl v).
+    apply eps0_lt_le_trans with (1 := Hn), Hv.
+    apply eps0_fseq_lt.
+Qed.
+
+(* For a successor ordinal S₀ e, the lub of its <ε₀-smaller ordinals
+   is e (and not S₀ e). *)
+Theorem eps0_is_succ_lub e : lub eps0_le (λ x, x <ε₀ S₀ e) e.
+Proof.
+  split.
+  + now intros ? ?%eps0_succ_next_inv.
+  + intros v Hv; apply Hv, eps0_lt_succ.
+Qed.
+
+(** Addition respects the limit *)
+Theorem eps0_add_lub e u :
+    eps0_is_limit u
+  → lub eps0_le (λ x, ∃v, x = e +₀ v ∧ v <ε₀ u) (e +₀ u).
+Proof.
+  intros l.
+  split.
+  + intros ? (v & -> & Hv).
+    left; now apply eps0_add_mono_right.
+  + intros v Hv.
+    red in Hv.
+    destruct (eps0_le_lt_dec (e +₀ u) v) as [ |H1]; auto; exfalso.
+    apply eps0_lt_add_inv_add in H1 as [ H1 | (g & -> & Hg) ].
+    * apply (@eps0_lt_irrefl v).
+      apply eps0_lt_le_trans with (1 := H1), Hv.
+      exists 0₀; split.
+      - now rewrite eps0_add_zero_right.
+      - destruct (eps0_zero_or_pos u) as [ C%l | ]; now auto.
+    * apply eps0_lt_fseq_inv with (l := l) in Hg as (n & Hn).
+      destruct (@eps0_lt_irrefl g).
+      apply eps0_lt_le_trans with (1 := Hn).
+      apply eps0_add_le_cancel with e, Hv.
+      exists (eps0_fseq l n); split; auto.
+      apply eps0_fseq_lt.
 Qed.
 
 (** Construction of the Grzegorczyk Fast Growing Hierarchy 
