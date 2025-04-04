@@ -1656,7 +1656,18 @@ Section E0.
 
   Fact E0_lt_omega e : cnf e → e <E₀ ω^e.
   Proof. intro; apply E0_lt_sub with 1; auto. Qed.
-  
+
+  Fact E0_add_lt_omega a e : cnf a → e ≠ 0₀ → a <E₀ ω^e → a +₀ ω^e = ω^e.
+  Proof.
+    destruct a as [ l ]; intros Ha He H.
+    revert H Ha He.
+    intros [ | (x,i) m [ H | (_ & H) ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right Ha He; unfold E0_add, E0_omega; f_equal.
+    + rewrite wlist_combine_lt; eauto.
+    + apply cnf_fix in Ha.
+      assert (0 < i); [ | lia ].
+      eapply Ha; eauto.
+  Qed.
+
   Lemma E0_add_omega_fun_right a b e f : a +₀ ω^e = b +₀ ω^f → e = f.
   Proof.
     revert a b e f.
@@ -1976,6 +1987,9 @@ Qed.
 Fact eps0_le_lt_dec e f : { e ≤ε₀ f } + { f <ε₀ e }.
 Proof. destruct (eps0_lt_sdec e f); auto. Qed.
 
+Fact eps0_le_zero e : e ≤ε₀ 0₀ → e = 0₀.
+Proof. intros []; auto. Qed.
+
 #[local] Hint Resolve E0_succ_cnf : core.
 
 Definition eps0_succ (e : ε₀) : ε₀.
@@ -2241,11 +2255,82 @@ Proof. apply eps0_eq_iff; trivial. Qed.
 Fact eps0_lt_omega e : e <ε₀ ω^e.
 Proof. apply eps0_lt_exp_S. Qed.
 
-Fact eps0_omega_mono : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
+Fact eps0_omega_mono_lt : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
 Proof. intros [] [] ?; constructor; constructor 2; left; auto. Qed.
+
+Fact eps0_omega_mono_le e f : e ≤ε₀ f → ω^e ≤ε₀ ω^f.
+Proof. intros [ | <- ]; auto; left; now apply eps0_omega_mono_lt. Qed.
+
+Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
+Proof.
+  intros E.
+  destruct (eps0_lt_sdec e f) as [ e f H | | e f H ]; auto;
+    apply eps0_omega_mono_lt in H; rewrite E in H; now apply eps0_lt_irrefl in H.
+Qed.
+
+Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
+Proof.
+  rewrite <- eps0_omega_zero.
+  now intros <-%eps0_omega_inj.
+Qed. 
+
+Fact eps0_zero_lt_omega e : 0₀ <ε₀ ω^e.
+Proof. apply eps0_lt_zero_exp_S. Qed.
+
+Hint Resolve eps0_zero_lt_omega : core.
+
+Fact eps0_zero_neq_omega e : 0₀ ≠ ω^e.
+Proof. 
+  intros H.
+  apply (@eps0_lt_irrefl 0₀).
+  rewrite H at 2.
+  apply eps0_zero_lt_omega.
+Qed.
 
 Fact eps0_is_limit_omega e : e ≠ 0₀ → eps0_is_limit ω^e.
 Proof. apply eps0_is_limit_exp_S. Qed.
+
+Fact eps0_is_limit_add_omega a e : e ≠ 0₀ → eps0_is_limit (a +₀ ω^e).
+Proof. intro; apply eps0_add_is_limit, eps0_is_limit_omega; auto. Qed.
+
+Fact eps0_add_omega_not_zero a e : 0₀ ≠ a +₀ ω^e.
+Proof.
+  intros H.
+  apply (@eps0_lt_irrefl (a+₀ω^e)).
+  rewrite <- H at 1.
+  apply eps0_lt_le_trans with (1 := eps0_zero_lt_omega e).
+  rewrite <- (eps0_add_zero_left ω^e) at 1.
+  apply eps0_add_mono_left, eps0_zero_least.
+Qed.
+
+Fact eps0_add_omega_not_succ a b e : e ≠ 0₀ → S₀ a ≠ b +₀ ω^e.
+Proof.
+  intros E H.
+  assert (eps0_is_limit (S₀ a)) as [ _ [] ]; eauto.
+  rewrite H.
+  now apply eps0_is_limit_add_omega.
+Qed.
+
+Fact eps0_succ_eq_add_omega a b e : S₀ a = b +₀ ω^e → e = 0₀.
+Proof.
+  intros H.
+  destruct (eps0_eq_dec e 0₀); auto.
+  now apply eps0_add_omega_not_succ in H.
+Qed.
+
+Fact eps0_succ_eq_omega a e : S₀ a = ω^e → e = 0₀.
+Proof.
+  rewrite <- (eps0_add_zero_left ω^e).
+  apply eps0_succ_eq_add_omega.
+Qed.
+
+Fact eps0_add_lt_omega : ∀ a e, e ≠ 0₀ → a <ε₀ ω^e → a +₀ ω^e = ω^e.
+Proof.
+  intros [a Ha] [e He] He' H.
+  apply eps0_eq_iff; simpl in H |- *.
+  revert H; apply E0_add_lt_omega; auto.
+  contradict He'; subst; now apply eps0_eq_iff.
+Qed.
 
 Lemma eps0_add_omega_fun_right : ∀ a b e f, a +₀ ω^e = b +₀ ω^f → e = f.
 Proof.
@@ -2269,6 +2354,29 @@ Proof.
   intros a b e f H1 H2 E.
   assert (e = f) as <-; auto.
   1: now apply eps0_add_omega_fun_right in E.
+Qed.
+
+Fact eps0_one_eq_least_split a e :
+    eps0_least_split a e
+  → 1₀ = a +₀ ω^e
+  → a = 0₀ ∧ e = 0₀.
+Proof.
+  intros H1.
+  replace 1₀ with (0₀ +₀ ω^0₀).
+  + intros (<- & <-)%eps0_split_least_uniq; eauto.
+    red; eauto.
+  + now rewrite eps0_add_zero_left, eps0_omega_zero.
+Qed.
+
+Fact eps0_omega_eq_least_split a b e :
+    eps0_least_split b e
+  → ω^a = b +₀ ω^e
+  → b = 0₀ ∧ a = e.
+Proof.
+  intros H.
+  rewrite <- (eps0_add_zero_left ω^a).
+  intros (<- & <-)%eps0_split_least_uniq; auto.
+  red; auto.
 Qed.
 
 Section eps0_add_rect.
@@ -2325,21 +2433,74 @@ End eps0_add_rect.
                 -> α >= ω^β then (α+ω^β).ω^γ = α.ω^γ. *)
 
 Inductive eps0_mult_omega_gr γ : ε₀ → ε₀ → Prop :=
-  | eps0_mult_omega_gr_0 :       eps0_mult_omega_gr γ 0₀ 0₀
-  | eps0_mult_omega_gr_1 :       eps0_mult_omega_gr γ 1₀ ω^γ
-  | eps0_mult_omega_gr_2 α r :   α ≠ 0₀
+  | eps0_mult_omega_gr_0       : eps0_mult_omega_gr γ 0₀ 0₀
+  | eps0_mult_omega_gr_1       : eps0_mult_omega_gr γ 1₀ ω^γ
+  | eps0_mult_omega_gr_2 α r   : α ≠ 0₀
                                → eps0_mult_omega_gr γ α r
                                → eps0_mult_omega_gr γ (S₀ α) r
-  | eps0_mult_omega_gr_3 α β :   β ≠ 0₀
-                               → α <ε₀ ω^β
-                               → eps0_least_split α β
-                               → eps0_mult_omega_gr γ (α+₀ω^β) ω^(β+₀γ)
+  | eps0_mult_omega_gr_3 β     : β ≠ 0₀
+                               → eps0_mult_omega_gr γ ω^β ω^(β+₀γ)
   | eps0_mult_omega_gr_4 α β r : β ≠ 0₀
                                → ω^β ≤ε₀ α
                                → eps0_least_split α β
                                → eps0_mult_omega_gr γ α r 
                                → eps0_mult_omega_gr γ (α+₀ω^β) r
   .
+
+Local Lemma eps0_mult_omega_gr_fun_rec γ e f r s :
+    eps0_mult_omega_gr γ e r
+  → eps0_mult_omega_gr γ f s
+  → e = f
+  → r = s.
+Proof.
+  intros H1 H2; revert H1 f s H2.
+  induction 1 as [ | | a r H1 H2 IH2 | b H1 | a b r H1 H2 H3 H4 IH4 ].
+  + induction 1 as [ | | a' r' G1 G2 IG2 | b' G1 | a' b' r' G1 G2 G3 G4 IG4 ]; easy || auto.
+    * now intros ?%eps0_zero_not_succ.
+    * now intros ?%eps0_zero_neq_omega.
+    * now intros ?%eps0_add_omega_not_zero.
+  + induction 1 as [ | | a' r' G1 G2 IG2 | b' G1 | a' b' r' G1 G2 G3 G4 IG4 ]; easy || auto.
+    * rewrite <- eps0_succ_zero_is_one.
+      now intros <-%eps0_succ_inj.
+    * now intros ->%eps0_one_eq_omega.
+    * now intros (-> & ->)%eps0_one_eq_least_split.
+  + induction 1 as [ | | a' r' G1 G2 IG2 | b' G1 | a' b' r' G1 G2 G3 G4 IG4 ]; easy || auto.
+    * intros H; symmetry in H; now apply eps0_zero_not_succ in H.
+    * rewrite <- eps0_succ_zero_is_one.
+      now intros ->%eps0_succ_inj.
+    * intros <-%eps0_succ_inj; eauto.
+    * now intros ->%eps0_succ_eq_omega.
+    * now intros ->%eps0_succ_eq_add_omega.
+  + induction 1 as [ | | a' r' G1 G2 IG2 | b' G1 | a' b' r' G1 G2 G3 G4 IG4 ]; easy || auto.
+    * intros H; symmetry in H; revert H.
+      now intros ?%eps0_zero_neq_omega.
+    * intros H; symmetry in H; revert H.
+      now intros ->%eps0_one_eq_omega.
+    * intros H; symmetry in H; revert H.
+      now intros ->%eps0_succ_eq_omega.
+    * intros <-%eps0_omega_inj; auto.
+    * intros (-> & <-)%eps0_omega_eq_least_split; auto.
+  + induction 1 as [ | | a' r' G1 G2 IG2 | b' G1 | a' b' r' G1 G2 G3 G4 IG4 ]; easy || auto.
+    * intros H; symmetry in H; revert H.
+      now intros ?%eps0_add_omega_not_zero.
+    * intros H; symmetry in H; revert H.
+      now intros (-> & ->)%eps0_one_eq_least_split.
+    * intros H; symmetry in H; revert H.
+      now intros ->%eps0_succ_eq_add_omega.
+    * intros H; symmetry in H; revert H.
+      intros (-> & ->)%eps0_omega_eq_least_split; auto.
+      destruct (@eps0_lt_irrefl ω^b); eauto.
+    * intros (<- & <-)%eps0_split_least_uniq; eauto.
+Qed.
+
+Theorem eps0_mult_omega_gr_fun γ e r s :
+    eps0_mult_omega_gr γ e r
+  → eps0_mult_omega_gr γ e s
+  → r = s.
+Proof.
+  intros H1 H2; generalize (eq_refl e); revert H1 H2.
+  apply eps0_mult_omega_gr_fun_rec.
+Qed.
 
 Definition eps0_mult_omega_pwc γ e : sig (eps0_mult_omega_gr γ e).
 Proof.
@@ -2350,7 +2511,47 @@ Proof.
     * exists r; now constructor.
   + destruct (eps0_le_lt_dec ω^e g) as [ H | H ].
     * exists r; now constructor.
-    * exists ω^(e+₀γ); now constructor.
+    * exists ω^(e+₀γ).
+      assert (g = 0₀) as ->.
+      2: rewrite eps0_add_zero_left; now constructor.
+      apply eps0_le_zero, H2.
+      rewrite eps0_add_zero_left, eps0_add_lt_omega; auto.
+Qed.
+
+Definition eps0_mult_omega e g := proj1_sig (eps0_mult_omega_pwc g e).
+
+Fact eps0_mult_omega_spec e g : eps0_mult_omega_gr g e (eps0_mult_omega e g).
+Proof. apply (proj2_sig _). Qed.
+
+(* 0₀.ω^γ = 0₀ *)
+Fact eps0_mult_omega_fix_0 g : eps0_mult_omega 0₀ g = 0₀.
+Proof. apply eps0_mult_omega_gr_fun with (1 := eps0_mult_omega_spec _ _); constructor. Qed.
+
+(* 1₀.ω^γ = ω^γ *)
+Fact eps0_mult_omega_fix_1 g : eps0_mult_omega 1₀ g = ω^g.
+Proof. apply eps0_mult_omega_gr_fun with (1 := eps0_mult_omega_spec _ _); constructor. Qed.
+
+(* (S₀ a).ω^γ = a.ω^γ if a ≠ 0₀ *)
+Fact eps0_mult_omega_fix_2 a g : a ≠ 0₀ → eps0_mult_omega (S₀ a) g = eps0_mult_omega a g.
+Proof.
+  intro; apply eps0_mult_omega_gr_fun with (1 := eps0_mult_omega_spec _ _).
+  constructor; auto.
+  apply eps0_mult_omega_spec.
+Qed.
+
+Fact eps0_mult_omega_fix_3 b g : b ≠ 0₀ → eps0_mult_omega ω^b g = ω^(b+₀g).
+Proof.
+  intros; apply eps0_mult_omega_gr_fun with (1 := eps0_mult_omega_spec _ _).
+  constructor 4; auto.
+Qed.
+
+Fact eps0_mult_omega_fix_4 a b g :
+  b ≠ 0₀ → ω^b ≤ε₀ a → eps0_least_split a b → eps0_mult_omega (a+₀ω^b) g = eps0_mult_omega a g.
+Proof.
+  intros Hb Ha Hab.
+  apply eps0_mult_omega_gr_fun with (1 := eps0_mult_omega_spec _ _).
+  constructor 5; auto.
+  apply eps0_mult_omega_spec.
 Qed.
 
 Inductive eps0_mult_gr α : ε₀ → ε₀ → Prop :=
@@ -2363,6 +2564,40 @@ Inductive eps0_mult_gr α : ε₀ → ε₀ → Prop :=
                            → eps0_mult_omega_gr γ α s
                            → eps0_mult_gr α (β+₀ω^γ) (r+₀s)
   .
+
+Local Lemma eps0_mult_gr_fun_rec α e f r s :
+    eps0_mult_gr α e r
+  → eps0_mult_gr α f s
+  → e = f
+  → r = s.
+Proof.
+  intros H1 H2; revert H1 f s H2.
+  induction 1 as [ | b r H1 IH1 | b g r s H1 H2 H3 IH3 H4 ].
+  + induction 1 as [ | b' r' G1 IG1 | b' g' r' s' G1 G2 G3 IG3 G4 ]; easy || auto.
+    * now intros ?%eps0_zero_not_succ.
+    * now intros ?%eps0_add_omega_not_zero.
+  + induction 1 as [ | b' r' G1 IG1 | b' g' r' s' G1 G2 G3 IG3 G4 ]; easy || auto.
+    * intros H; symmetry in H; revert H.
+      now intros ?%eps0_zero_not_succ.
+    * intros <-%eps0_succ_inj; f_equal; eauto.
+    * now intros ->%eps0_succ_eq_add_omega.
+  + induction 1 as [ | b' r' G1 IG1 | b' g' r' s' G1 G2 G3 IG3 G4 ]; easy || auto.
+    * intros H; symmetry in H; revert H.
+      now intros ?%eps0_add_omega_not_zero.
+    * intros H; symmetry in H; revert H.
+      now intros ->%eps0_succ_eq_add_omega.
+    * intros (<- & <-)%eps0_split_least_uniq; auto.
+      generalize (eps0_mult_omega_gr_fun H4 G4); intros <-; f_equal; eauto.
+Qed.
+
+Theorem eps0_mult_gr_fun α e r s :
+    eps0_mult_gr α e r
+  → eps0_mult_gr α e s
+  → r = s.
+Proof.
+  intros H1 H2; generalize (eq_refl e); revert H1 H2.
+  apply eps0_mult_gr_fun_rec.
+Qed.
 
 Definition eps0_mult_pwc α e : sig (eps0_mult_gr α e).
 Proof.
@@ -2379,6 +2614,29 @@ Notation "e '*₀' f" := (eps0_mult e f) (at level 30).
 
 Fact eps0_mult_spec e f : eps0_mult_gr e f (e*₀f).
 Proof. apply (proj2_sig _). Qed.
+
+Fact eps0_mult_fix_0 e : e *₀ 0₀ = 0₀.
+Proof.
+  apply eps0_mult_gr_fun with (1 := eps0_mult_spec _ _).
+  constructor.
+Qed.
+
+Fact eps0_mult_fix_1 e f : e *₀ (S₀ f) = e *₀ f +₀ e.
+Proof.
+  apply eps0_mult_gr_fun with (1 := eps0_mult_spec _ _).
+  constructor 2; apply eps0_mult_spec.
+Qed.
+
+(** e.(a+ω^g) = e.a + e.ω^g *)
+Fact eps0_mult_fix_2 e a g : 
+  g ≠ 0₀ → eps0_least_split a g → e *₀ (a +₀ ω^g) = e *₀ a +₀ eps0_mult_omega e g.
+Proof.
+  intros H1 H2.
+  apply eps0_mult_gr_fun with (1 := eps0_mult_spec _ _).
+  constructor; auto.
+  + apply eps0_mult_spec.
+  + apply eps0_mult_omega_spec.
+Qed.
 
 (** Now we need to show the equations for multiplication 
     and exponentiation based on these specs *)
@@ -2448,7 +2706,7 @@ Proof.
     destruct b; simpl.
     constructor; constructor 2; right; lia.
   + apply eps0_add_mono_right; auto.
-    apply eps0_omega_mono; auto.
+    apply eps0_omega_mono_lt; auto.
 Qed.
 
 Lemma eps0_lt_omega_inv : ∀ f b, f <ε₀ ω^b → f = 0₀ ∨ ∃ a n, f <ε₀ eps0_exp_S a n ∧ a <ε₀ b.
@@ -2465,7 +2723,7 @@ Proof. intros ? ?; destruct (eps0_le_lt_dec u v); eauto. Qed.
 
 (** Notice that this does not work for e,f <ε₀ ω^b.n where n > 1
    eg ω < ω.2 and ω+1 < ω.2 but ω+(ω+1) = ω.2+1 is not < ω.2 *)
-Lemma eps0_add_lt_omega e f b : e <ε₀ ω^b → f <ε₀ ω^b → e +₀ f <ε₀ ω^b.
+Lemma eps0_add_lt_omega_both e f b : e <ε₀ ω^b → f <ε₀ ω^b → e +₀ f <ε₀ ω^b.
 Proof.
   intros [ -> | (u & i & H1 & H2) ]%eps0_lt_omega_inv.
   1: now rewrite eps0_add_zero_left.
