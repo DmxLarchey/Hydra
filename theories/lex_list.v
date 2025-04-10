@@ -123,6 +123,11 @@ Section lex_list.
     + intros []; eauto.
     + revert l m; intros [] [] []; eauto.
   Qed.
+  
+  Fact lex_list_cons_inv x l y m :
+      lex_list (x::l) (y::m)
+     → R x y ∨ x = y ∧ lex_list l m.
+  Proof. intros []%lex_list_inv; auto. Qed.
 
   Inductive lex_list_invert_shape : list X → list X → Prop :=
     | in_lex_list_invert_shape0 k l : k ≠ [] → lex_list_invert_shape l (l++k)

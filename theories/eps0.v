@@ -2199,8 +2199,15 @@ Hint Resolve eps0_add_mono_left eps0_add_mono_right : core.
 Fact eps0_add_mono e e' f f' : e ≤ε₀ e' → f ≤ε₀ f' → e +₀ f ≤ε₀ e' +₀ f'.
 Proof. intros ? [ | <- ]; eauto. Qed.
 
+Hint Resolve eps0_add_mono : core.
+
+Fact eps0_add_incr_left e f : e ≤ε₀ f +₀ e.
+Proof. rewrite <- (eps0_add_zero_left e) at 1; auto. Qed. 
+
 Fact eps0_add_incr_right e f : e ≤ε₀ e +₀ f.
-Proof. rewrite <- (eps0_add_zero_right e) at 1; apply eps0_add_mono; auto. Qed.
+Proof. rewrite <- (eps0_add_zero_right e) at 1; auto. Qed.
+
+Hint Resolve eps0_add_incr_left eps0_add_incr_right : core.
 
 Fact eps0_add_lt_cancel e u v : e +₀ u <ε₀ e +₀ v → u <ε₀ v.
 Proof. 
@@ -2371,6 +2378,8 @@ Qed.
 Fact eps0_lt_zero_exp_S e n : 0₀ <ε₀ ω^⟨e,n⟩.
 Proof. apply eps0_le_lt_trans with (2 := eps0_lt_exp_S _ _); auto. Qed.
 
+Hint Resolve eps0_lt_zero_exp_S : core.
+
 Fact eps0_zero_neq_exp_S e n : 0₀ ≠ ω^⟨e,n⟩.
 Proof.
   intros E; apply (@eps0_lt_irrefl 0₀).
@@ -2433,6 +2442,8 @@ Proof. apply eps0_eq_iff; trivial. Qed.
 
 Fact eps0_lt_omega e : e <ε₀ ω^e.
 Proof. apply eps0_lt_exp_S. Qed.
+
+Hint Resolve eps0_lt_omega : core.
 
 Fact eps0_omega_mono_lt : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
 Proof. intros [] [] ?; constructor; constructor 2; left; auto. Qed.
@@ -2560,6 +2571,72 @@ Proof.
   intros (<- & <-)%eps0_split_least_uniq; auto.
   red; auto.
 Qed.
+
+Fact eps0_lt_head_split_inv e₁ i₁ f₁ e₂ i₂ f₂ :
+    f₁ <ε₀ ω^e₁
+  → f₂ <ε₀ ω^e₂
+  → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
+  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ f₁ <ε₀ f₂).
+Proof.
+  rewrite !eps0_eq_iff.
+  revert e₁ i₁ f₁ e₂ i₂ f₂.
+  intros (e & He) i ([l] & Hl) (f & Hf) j ([m] & Hm) H1 H2; simpl in *.
+  rewrite !E0_add_head_normal in *; auto.
+  split; intros H3.
+  + apply E0_lt_inv, lex_list_cons_inv in H3
+      as [ [ | (<- & ?)]%lex2_inv | ([=] & ?)  ]; auto.
+    * right; split; auto; left; lia.
+    * subst; do 2 (right; split; auto).
+      now constructor.
+  + constructor.
+    destruct H3 as [ | (<- & [ | (<- & ?%E0_lt_inv) ]) ].
+    * constructor 2; now left.
+    * constructor 2; right; lia.
+    * now constructor 3.
+Qed.
+
+Fact eps0_lt_head_split_inv_left e₁ i₁ e₂ i₂ f₂ :
+    f₂ <ε₀ ω^e₂
+  → ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
+  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ 0₀ <ε₀ f₂).
+Proof.
+  intro.
+  rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩), eps0_lt_head_split_inv; auto.
+  firstorder.
+Qed.
+
+Fact eps0_lt_head_split_inv_right e₁ i₁ f₁ e₂ i₂ :
+    f₁ <ε₀ ω^e₁
+  → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
+  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+Proof.
+  intro.
+  rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩), eps0_lt_head_split_inv; auto.
+  apply or_iff_compat_l, and_iff_compat_l.
+  split; auto.
+  intros [ | (_ & ?%eps0_zero_not_gt) ]; now auto.
+Qed.
+
+Fact eps0_lt_head_split_inv_both e₁ i₁ e₂ i₂ :
+    ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩
+  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+Proof.
+  rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩).
+  apply eps0_lt_head_split_inv_right; auto.
+Qed.
+
+Hint Resolve eps0_add_incr eps0_add_incr_right : core.
+
+Fact eps0_lt_zero_head_split e i f : 0₀ <ε₀ ω^⟨e,i⟩ +₀ f.
+Proof. apply eps0_lt_le_trans with ω^⟨e,i⟩; auto. Qed.
+
+Hint Resolve eps0_lt_zero_head_split : core.
+
+Fact eps0_not_head_split_lt_zero e i f : ¬ ω^⟨e,i⟩ +₀ f <ε₀ 0₀.
+Proof. apply eps0_zero_not_gt. Qed.
+
+Fact eps0_not_eps_S_lt_zero e i : ¬ ω^⟨e,i⟩ <ε₀ 0₀.
+Proof. apply eps0_zero_not_gt. Qed.
 
 Fact eps0_head_split_uniq e₁ i₁ f₁ e₂ i₂ f₂ :
     ω^⟨e₁,i₁⟩ +₀ f₁ = ω^⟨e₂,i₂⟩ +₀ f₂
@@ -2729,6 +2806,34 @@ Section eps0_head_rect.
 
 End eps0_head_rect.
 
+Lemma eps0_lt_exp_S_inv a e n :
+    a <ε₀ ω^⟨e,n⟩
+  → (a = 0₀)
+  + { i : _ & { b | a = ω^⟨e,i⟩ +₀ b ∧ i < n ∧ b <ε₀ ω^e } }
+  + { f : _ & { i | a <ε₀ ω^⟨f,i⟩ ∧ f <ε₀ e } }.
+Proof.
+  destruct a as [ | g i h H _ _ ] using eps0_head_rect.
+  + now do 2 left.
+  + intros H1.
+    destruct n as [ | n ].
+    * right.
+      exists g, (S i).
+      apply eps0_lt_head_split_inv_right in H1
+        as [ H1 | (_ & ?) ]; lia || auto.
+      split; auto.
+      apply eps0_lt_head_split_inv_right; auto.
+    * apply eps0_lt_head_split_inv_right in H1; auto.
+      destruct (eps0_le_lt_dec e g) as [ C | C ].
+      - left; right; exists i, h.
+        destruct H1 as [ H1 | (-> & H1) ]; eauto.
+        destruct (@eps0_lt_irrefl e); eauto.
+      - right; exists g, (S i); split; auto.
+        apply eps0_lt_head_split_inv_right; auto.
+Qed.
+
+Lemma eps0_lt_omega_inv a e : a <ε₀ ω^e → (a = 0₀) + { f : _ & { n | a <ε₀ ω^⟨f,n⟩ ∧ f <ε₀ e } }.
+Proof. intros [[ -> | (i & ? & ? & ? & _) ] | ]%eps0_lt_exp_S_inv; auto; lia. Qed.
+
 Section eps0_head_pos_rect.
 
   Variables (P : ε₀ → Type)
@@ -2839,8 +2944,6 @@ Proof.
     do 2 f_equal; lia.
 Qed.
 
-Hint Resolve eps0_add_incr eps0_add_incr_right : core.
-
 (*
 Fact eps0_mpos_eps_S_add n α i β : eps0_mpos (ω^⟨α,i⟩ +₀ β) n = ω^⟨α,i*n+i+n⟩ +₀ β.
 Proof.
@@ -2880,17 +2983,64 @@ Proof.
     do 2 f_equal; ring.
 Qed.
 
+Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
+Proof.
+  intros Hab Hmn.
+  destruct a as [ | e i f H1 _ _ ] using eps0_head_rect;
+    destruct b as [ | g j h H2 _ _ ] using eps0_head_rect.
+  + now apply eps0_lt_irrefl in Hab.
+  + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
+  + now apply eps0_not_head_split_lt_zero in Hab.
+  + apply eps0_lt_head_split_inv in Hab; auto.
+    rewrite !eps0_mpos_fix_1; auto.
+    apply eps0_lt_head_split_inv; auto.
+    destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+    * right; split; auto; left.
+      assert (i*m <= j*n); [ | lia ].
+      apply Nat.mul_le_mono; lia.
+    * destruct (eq_nat_dec m n) as [ -> | ? ]; auto.
+      right; split; auto; left.
+      assert (i*m <= i*n); [ | lia ].
+      apply Nat.mul_le_mono; lia.
+Qed.
+
+Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
+Proof.
+  intros H.
+  apply eps0_mpos_mono_left with (n := n) (m := n) in H; auto.
+  now rewrite eps0_mpos_fix_0 in H.
+Qed.
+
+Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+
+Fact eps0_mpos_mono_right a n m : 0₀ <ε₀ a → n < m → eps0_mpos a n <ε₀ eps0_mpos a m.
+Proof.
+  intros H1 H2.
+  destruct a as [ | e i f H _ _ ] using eps0_head_rect.
+  + now apply eps0_lt_irrefl in H1.
+  + rewrite !eps0_mpos_fix_1; auto.
+    apply eps0_lt_head_split_inv; auto.
+    right; split; auto; left.
+    assert (i*n <= i*m); [ | lia ].
+    apply Nat.mul_le_mono_l; lia.
+Qed.
+
+Fact eps0_mpos_mono_right_le a n m : n ≤ m → eps0_mpos a n ≤ε₀ eps0_mpos a m.
+Proof.
+  destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
+  destruct (eps0_zero_or_pos a) as [ -> | ].
+  + rewrite !eps0_mpos_fix_0; auto.
+  + left; apply eps0_mpos_mono_right; auto; lia.
+Qed.
+
 Fact eps0_mpos_below_omega a n e : a <ε₀ ω^e → eps0_mpos a n <ε₀ ω^e.
 Proof.
-  destruct a as [ | g i f H _ _ ] using eps0_head_rect; intros Ha.
+  intros [ -> | (f & i & H1 & H2) ] %eps0_lt_omega_inv.
   + rewrite eps0_mpos_fix_0; auto.
-  + rewrite eps0_mpos_fix_1; auto.
-    destruct (@eps0_exp_S_mono_inv g e i 0) as [ | ].
-    * apply eps0_le_lt_trans with (2 := Ha); auto.
-    * apply eps0_add_below_omega.
-      - now apply eps0_exp_S_mono_left.
-      - now apply eps0_lt_trans with (1 := H), eps0_exp_S_mono_left.
-    * lia.
+  + apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
+    apply eps0_lt_trans with (1 := H1).
+    rewrite eps0_mpos_exp_S.
+    apply eps0_lt_head_split_inv_both; auto.
 Qed.
 
 Fact eps0_mpos_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_mpos a n <ε₀ ω^(S₀ e).
@@ -2935,6 +3085,9 @@ Proof. apply eps0_momega_fun with (1 := eps0_momega_spec _ _) (3 := eq_refl); co
 Fact eps0_momega_fix_1 γ n β α : β <ε₀ ω^γ → eps0_momega (ω^⟨γ,n⟩ +₀ β) α = ω^(γ+₀α).
 Proof. intros; apply eps0_momega_fun with (1 := eps0_momega_spec _ _) (3 := eq_refl); now constructor. Qed.
 
+Fact eps0_momega_exp_S γ n α : eps0_momega ω^⟨γ,n⟩ α = ω^(γ+₀α).
+Proof. rewrite <- (eps0_add_zero_right ω^⟨_,_⟩), eps0_momega_fix_1; auto. Qed.
+
 Fact eps0_add_mpos_momega n k e f :
     0₀ <ε₀ f
   → eps0_mpos e n +₀ eps0_mpos (eps0_momega e f) k
@@ -2962,32 +3115,75 @@ Proof.
     rewrite !eps0_mpos_omega, eps0_add_head_lt''; auto.
 Qed.
 
+Fact eps0_momega_mono_left a b c : a ≤ε₀ b → eps0_momega a c ≤ε₀ eps0_momega b c.
+Proof.
+  intros [ Hab | <- ]; auto.
+  destruct a as [ | e i f H1 _ _ ] using eps0_head_rect;
+    destruct b as [ | g j h H2 _ _ ] using eps0_head_rect.
+  + now apply eps0_lt_irrefl in Hab.
+  + rewrite eps0_momega_fix_0, eps0_momega_fix_1; auto.
+  + now apply eps0_zero_not_gt in Hab.
+  + rewrite !eps0_momega_fix_1; auto.
+    apply eps0_lt_head_split_inv in Hab; auto.
+    apply eps0_omega_mono_le.
+    destruct Hab as [ | (<- & _) ]; auto.
+Qed.
+
+Fact eps0_momega_mono_right a b c : 0₀ <ε₀ a → b <ε₀ c → eps0_momega a b <ε₀ eps0_momega a c.
+Proof.
+  intros H ?.
+  destruct a using eps0_head_rect.
+  + now apply eps0_lt_irrefl in H.
+  + rewrite !eps0_momega_fix_1; auto.
+    apply eps0_omega_mono_lt; auto.
+Qed.
+
+Fact eps0_momega_lt_pos a e : 0₀ <ε₀ a → 0₀ <ε₀ e → ω^e ≤ε₀ eps0_momega a e.
+Proof.
+  intros Ha He.
+  destruct a using eps0_head_rect.
+  + now apply eps0_lt_irrefl in Ha.
+  + rewrite eps0_momega_fix_1; auto.
+    apply eps0_omega_mono_le; auto.
+Qed.
+
+Fact eps0_lt_mpos_momega a n f : 0₀ <ε₀ a → 0₀ <ε₀ f → eps0_mpos a n <ε₀ eps0_momega a f.
+Proof.
+  intros Ha Hf.
+  destruct a using eps0_head_rect.
+  + now apply eps0_lt_irrefl in Ha.
+  + rewrite eps0_mpos_fix_1, eps0_momega_fix_1; auto.
+    apply eps0_lt_head_split_inv_right; auto.
+Qed.
+
 Fact eps0_momega_below_omega a b e f :
     a <ε₀ ω^e
   → b <ε₀ f
   → eps0_momega a b <ε₀ ω^(e +₀ f).
 Proof.
-  intros Ha Hb.
-  destruct a as [ | g i h ? _ _ ] using eps0_head_rect.
+  intros [ -> | (g & i & H1 & H2) ] %eps0_lt_omega_inv Hb.
   + rewrite eps0_momega_fix_0; auto.
-  + rewrite eps0_momega_fix_1; auto.
-    apply eps0_exp_S_mono_left.
-    apply eps0_le_lt_trans with (e +₀ b); auto.
-    apply eps0_add_mono; auto; left.
-    destruct (@eps0_exp_S_mono_inv g e i 0); auto.
-    2: lia.
-    apply eps0_le_lt_trans with (2 := Ha); auto.
+  + apply eps0_le_lt_trans with (eps0_momega ω^⟨g,i⟩ b).
+    * apply eps0_momega_mono_left; auto.
+    * rewrite eps0_momega_exp_S.
+      apply eps0_omega_mono_lt.
+      apply eps0_lt_le_trans with (g +₀ f); auto.
 Qed.
 
-Fact eps0_momega_below_omega' a b e n f :
+Fact eps0_momega_below_exp_S a b e n f :
     a <ε₀ ω^⟨e,n⟩
   → b <ε₀ f
-  → eps0_momega a b <ε₀ ω^(S₀ e +₀ f).
+  → eps0_momega a b <ε₀ ω^(e +₀ f).
 Proof.
-  intros H ?.
-  apply eps0_momega_below_omega; auto.
-  apply eps0_lt_trans with (1 := H),
-        eps0_exp_S_mono_left; auto.
+  intros [ [ -> | (i & c & -> & ? & ?) ] | (g & i & H1 & ?) ]%eps0_lt_exp_S_inv ?.
+  + rewrite eps0_momega_fix_0; auto.
+  + rewrite eps0_momega_fix_1; auto.
+    apply eps0_omega_mono_lt; auto.
+  + apply eps0_lt_le_weak, eps0_momega_mono_left with (c := b) in H1.
+    apply eps0_le_lt_trans with (1 := H1).
+    rewrite eps0_momega_exp_S; auto.
+    apply eps0_omega_mono_lt.
+    apply eps0_le_lt_trans with (e +₀ b); auto.
 Qed.
 
 (* γ._ *)
@@ -3062,7 +3258,8 @@ Proof.
   + rewrite eps0_mult_head_right; auto.
   + destruct (eps0_lt_sdec e f).
     * rewrite eps0_add_head_lt'; auto.
-      rewrite eps0_mult_head_right; eauto.
+      rewrite eps0_mult_head_right; auto.
+      2: eapply eps0_lt_trans; eassumption.
       rewrite <- eps0_add_assoc; f_equal.
       rewrite eps0_mpos_add_momega; auto.
     * rewrite eps0_add_head_eq'; auto.
@@ -3074,6 +3271,16 @@ Proof.
       - apply eps0_lt_trans with (1 := H),
               eps0_omega_mono_lt; auto.
 Qed.
+
+Fact eps0_mpos_momega_eq a n e : 0₀ <ε₀ e → eps0_mpos (eps0_momega a e) n = a *₀ ω^⟨e,n⟩.
+Proof.
+  intro.
+  rewrite <- (eps0_add_zero_right ω^⟨_,_⟩), eps0_mult_right; auto.
+  now rewrite eps0_mult_zero_right, eps0_add_zero_right.
+Qed.
+
+Fact eps0_momega_eq a e : 0₀ <ε₀ e → eps0_momega a e = a *₀ ω^e.
+Proof. intro; unfold eps0_omega; rewrite <- eps0_mpos_momega_eq, eps0_mpos_O; auto. Qed.
 
 Fact eps0_mult_zero_left e : 0₀ *₀ e = 0₀.
 Proof.
@@ -3104,42 +3311,50 @@ Proof.
     rewrite eps0_mult_right; auto.
 Qed.
 
-Fact eps0_momega_eq a e : 0₀ <ε₀ e → eps0_momega a e = a *₀ ω^e.
-Proof.
-  intros H.
-  rewrite <- (eps0_add_zero_right ω^e).
-  unfold eps0_omega.
-  rewrite eps0_mult_right; auto.
-  now rewrite eps0_mpos_O, eps0_mult_zero_right, eps0_add_zero_right.
-Qed.
-
-(* SHOW monotonicity first *)
+(* SHOW monotonicity first 
+   Try by well_founded induction instead ? *)
 Theorem eps0_mult_mono_right a e f :
     0₀ <ε₀ a
   → e <ε₀ f
   → a *₀ e <ε₀ a *₀ f.
 Proof.
-  intros Ha.
-  induction e as [ | n | e n g H1 IH1 IH2 ] in f |- * using eps0_head_pos_rect; intros Hf.
+  intros Ha; revert e.
+  induction f as [ f IH ] using (well_founded_induction wf_eps0_lt).
+  intros e Hf.
+  destruct e as [ | n | e n g H1 H2 _ _ ] using eps0_head_pos_rect.
   + rewrite eps0_mult_zero_right.
-    destruct f as [ | m | f m h H2 ] using eps0_head_pos_rect.
+    destruct f as [ | m | f m h G1 G2 ] using eps0_head_pos_rect.
     * contradict Hf; apply eps0_lt_irrefl.
     * rewrite eps0_mult_pos_right.
-      admit.
+      apply eps0_mpos_mono_left with (n := m) (m := m) in Ha; auto.
+      now rewrite eps0_mpos_fix_0 in Ha.
     * rewrite eps0_mult_right; auto.
-      admit.
+      eapply eps0_lt_le_trans with (1 := eps0_mpos_gt_zero _ _); auto.
   + rewrite eps0_mult_pos_right.
-    destruct f as [ | m | f m h H2 ] using eps0_head_pos_rect.
-    * admit.
+    destruct f as [ | m | f m h G1 G2 _ _ ] using eps0_head_pos_rect.
+    * now apply eps0_zero_not_gt in Hf.
     * rewrite eps0_mult_pos_right.
-      apply eps0_exp_S_mono_inv in Hf as [ []%eps0_lt_irrefl | ].
-      admit.
+      apply eps0_exp_S_mono_inv in Hf as [ []%eps0_lt_irrefl | (_ & Hf) ].
+      now apply eps0_mpos_mono_right.
     * rewrite eps0_mult_right; auto.
-      admit.
-  + destruct f as [ | m | f m h H2 ] using eps0_head_pos_rect.
-    * admit.
-    * admit.
-    * rewrite !eps0_mult_right; auto.
+      apply eps0_lt_le_trans with (eps0_mpos (eps0_momega a f) m); auto.
+      apply eps0_lt_le_trans with (2 := eps0_mpos_mono_right_le _ (le_0_n _)).
+      rewrite eps0_mpos_O.
+      now apply eps0_lt_mpos_momega.
+  + destruct f as [ | m | f m h G1 G2 _ _ ] using eps0_head_pos_rect.
+    * now apply eps0_zero_not_gt in Hf.
+    * apply eps0_lt_head_split_inv_right in Hf
+        as [ Hf | (-> & Hf) ]; auto.
+      - now apply eps0_zero_not_gt in Hf.
+      - now apply eps0_zero_not_gt in H1.
+    * apply eps0_lt_head_split_inv in Hf; auto.
+      destruct Hf as [ Hf | Hf ].
+      - apply eps0_lt_le_trans with (a *₀ ω^(S₀ e)).
+        apply IH. 
+      rewrite !eps0_mult_distr.
+      rewrite !eps0_mult_right; auto.
+      destruct Hf as [ Hf | (<- & Hf) ].
+      ++ 
       admit.
 Admitted.
 
@@ -3843,14 +4058,6 @@ Proof.
     apply eps0_omega_mono_lt; auto.
 Qed.
 
-Lemma eps0_lt_omega_inv : ∀ f b, f <ε₀ ω^b → f = 0₀ ∨ ∃ a n, f <ε₀ eps0_exp_S a n ∧ a <ε₀ b.
-Proof.
-  intros [f Hf] [b Hb] H%E0_lt_omega_inv; simpl in H; auto.
-  destruct H as [ -> | ([|n] & a & ? & ? & ? & Ha) ].
-  + left; now apply eps0_eq_iff.
-  + lia.
-  + right; exists (exist _ a Ha), n; auto.
-Qed.
 
 Fact eps0_max u v b : u <ε₀ b → v <ε₀ b → { w | u ≤ε₀ w ∧ v ≤ε₀ w ∧ w <ε₀ b }.
 Proof. intros ? ?; destruct (eps0_le_lt_dec u v); eauto. Qed.
