@@ -3349,8 +3349,17 @@ Proof.
       - now apply eps0_zero_not_gt in H1.
     * apply eps0_lt_head_split_inv in Hf; auto.
       destruct Hf as [ Hf | Hf ].
-      - apply eps0_lt_le_trans with (a *₀ ω^(S₀ e)).
-        apply IH. 
+      - apply eps0_lt_le_trans with (a *₀ ω^⟨e,S n⟩).
+        apply IH.
+        ++ apply eps0_lt_head_split_inv_left; auto.
+        ++ apply eps0_lt_head_split_inv_right; auto.
+        ++ left.
+           destruct (eps0_zero_or_pos h) as [ -> | Hh ].
+           ** rewrite eps0_add_zero_right.
+              admit.
+           ** rewrite eps0_mult_right, eps0_mpos_momega_eq; auto.
+              assert (0₀ <ε₀ a *₀ h).
+            
       rewrite !eps0_mult_distr.
       rewrite !eps0_mult_right; auto.
       destruct Hf as [ Hf | (<- & Hf) ].
