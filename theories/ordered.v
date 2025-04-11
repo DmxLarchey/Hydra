@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Wellfounded Utf8.
+From Coq Require Import Arith Lia List Relations Wellfounded Utf8.
 
 Import ListNotations.
 
@@ -304,6 +304,28 @@ Section ordered_trans.
   Qed.
 
 End ordered_trans.
+
+Definition lmax := fold_right max 0.
+
+Fact lmax_cons x l : lmax (x::l) = max x (lmax l).
+Proof. induction l; simpl; lia. Qed.
+
+Fact lmax_bounded n l : (∀ x : nat, x ∈ l → x ≤ n) → lmax l ≤ n.
+Proof. rewrite <- Forall_forall; induction 1; simpl; lia. Qed.
+
+Fact ordered_from_lmax x l : ordered_from (λ n m, m ≤ n) x l → lmax l ≤ x.
+Proof. induction 1; simpl; lia. Qed.
+
+Fact ordered_lmax l :
+    ordered (λ n m, m ≤ n) l
+  → match l with
+    | []   => True
+    | x::l => lmax (x::l) = x
+    end.
+Proof. induction 1 as [ | ? ? ?%ordered_from_lmax ]; simpl; lia. Qed.
+
+Fact ordered_lmax_cons x l : ordered (λ n m, m ≤ n) (x::l) → lmax (x::l) = x.
+Proof. exact (@ordered_lmax (_::_)). Qed.
 
 Section list_plus.
 
