@@ -38,30 +38,6 @@ Section wlist_add.
       end
     end.
 
-(*
-
-  Fact wlist_cut_spec m y j :
-      Forall (λ x, R y (fst x)) m ∧ wlist_cut m y j = m++[(y,j)]
-    ∨ (∃ i l r, m   = l++[(y,i)]++r ∧ Forall (λ x, R y (fst x)) l ∧ wlist_cut m y j = l++[(y,i+j)])
-    ∨ (∃ x i l r, m = l++[(x,i)]++r ∧ Forall (λ x, R y (fst x)) l ∧ R x y ∧ wlist_cut m y j = l++[(y,j)]).
-  Proof.
-    induction m as [ | (x,i) m IH ]; simpl.
-    + left; simpl; auto.
-    + destruct (R_sdec x y) as [ x y H | y | x y H ].
-      * do 2 right; exists x, i, [], m; simpl; auto.
-      * right; left; exists i, [], m; simpl; auto.
-      * destruct IH 
-          as [ (H1 & ->) 
-           | [ (k & l & r & E & ? & ->) 
-             | (z & k & l & r & E & ? & ? & ->) ] ].
-        - left; auto.
-        - subst m; right; left; exists k, ((x,i)::l), r; simpl; auto.
-        - subst m; do 2 right.
-          exists z, k, ((x,i)::l), r; auto.
-  Qed.
-
-*)
-
   Fact wlist_cut_choice m y : 
       Forall (λ x, R y (fst x)) m
     ∨ (∃ i l r,   m = l++[(y,i)]++r ∧ Forall (λ x, R y (fst x)) l)
@@ -98,7 +74,7 @@ Section wlist_add.
     → wlist_cut (l++r) y j = l++wlist_cut r y j.
   Proof.
     induction 1 as [ | (x,k) m H1 H2 IH2 ]; simpl; auto.
-    destruct sdec_gt_refl with (s := R_sdec x y) as (? & ->); auto.
+    destruct sdec_gt_inv with (s := R_sdec x y); auto.
     f_equal; auto.
   Qed.
 
@@ -111,24 +87,18 @@ Section wlist_add.
   Qed.
 
   Fact wlist_cut_eq i r y j : wlist_cut ((y,i)::r) y j = [(y,i+j)].
-  Proof.
-    simpl.
-    rewrite sdec_eq_refl with (s := R_sdec y y); auto.
-  Qed.
+  Proof. simpl; destruct sdec_eq_inv with (s := R_sdec y y); auto. Qed.
 
   Fact wlist_cut_lt x i r y j : R x y → wlist_cut ((x,i)::r) y j = [(y,j)].
-  Proof.
-    simpl; intro H.
-    destruct sdec_lt_refl with (s := R_sdec x y) as (? & ->); auto.
-  Qed.
+  Proof. simpl; intro; destruct sdec_lt_inv with (s := R_sdec x y); auto. Qed.
 
   Fact wlist_cut_spec2 l y i r j :
       Forall (λ x, R y (fst x)) l
     → wlist_cut (l++[(y,i)]++r) y j = l++[(y,i+j)].
   Proof.
     induction 1 as [ | (x,k) m H1 H2 IH2 ]; simpl; auto.
-    + rewrite sdec_eq_refl with (s := R_sdec y y); auto.
-    + destruct sdec_gt_refl with (s := R_sdec x y) as (? & ->); auto.
+    + destruct sdec_eq_inv with (s := R_sdec y y); auto.
+    + destruct sdec_gt_inv with (s := R_sdec x y); auto.
       simpl in IH2; rewrite IH2; auto.
   Qed.
 
@@ -139,8 +109,8 @@ Section wlist_add.
   Proof.
     intros H1 Hxy; revert H1.
     induction 1 as [ | (u,k) m H1 H2 IH2 ]; simpl; auto.
-    + destruct sdec_lt_refl with (s := R_sdec x y) as (? & ->); auto.
-    + destruct sdec_gt_refl with (s := R_sdec u y) as (? & ->); auto.
+    + destruct sdec_lt_inv with (s := R_sdec x y); auto.
+    + destruct sdec_gt_inv with (s := R_sdec u y); auto.
       simpl in IH2; rewrite IH2; auto.
   Qed.
 
@@ -195,7 +165,9 @@ Section wlist_add.
     | (y,j)::m => wlist_cut l y j ++ m
     end.
 
-  Fact wlist_add_cons_right l y j m : wlist_add l ((y,j)::m) = wlist_cut l y j ++ m.
+  Fact wlist_add_cons_right l y j m :
+      wlist_add l ((y,j)::m)
+    = wlist_cut l y j ++ m.
   Proof. trivial. Qed. 
 
   Fact wlist_add_nil_right l : wlist_add l [] = l.
@@ -204,26 +176,10 @@ Section wlist_add.
   Fact wlist_add_nil_left m : wlist_add [] m = m.
   Proof. destruct m as [ | [] ]; simpl; auto. Qed.
 
-(*
-  Fact wlist_combine_spec_cons l y j m :
-      Forall (fun x => R y (fst x)) l ∧ wlist_combine l ((y,j)::m) = l++[(y,j)]++m
-    ∨ (∃ i a b,   l = a++[(y,i)]++b ∧ Forall (fun x => R y (fst x)) a ∧ wlist_combine l ((y,j)::m) = a++[(y,i+j)]++m)
-    ∨ (∃ x i a b, l = a++[(x,i)]++b ∧ Forall (fun x => R y (fst x)) a ∧ R x y ∧ wlist_combine l ((y,j)::m) = a++[(y,j)]++m).
-  Proof.
-    simpl.
-    destruct (wlist_cut_spec l y j)
-      as [ (H1 & ->) 
-       | [ (k & a & b & E & H1 & ->) 
-         | (z & k & a & b & E & H1 & H2 & ->) ] ]; subst; rewrite <- !app_assoc; auto.
-    + right; left; exists k, a, b; auto. 
-    + do 2 right; exists z, k, a, b; auto.
-  Qed.
-
-*)
-
   Fact wlist_add_gt_list l r y j m :
       Forall (λ x, R y (fst x)) l
-    → wlist_add (l++r) ((y,j)::m) = l++wlist_add r ((y,j)::m).
+    → wlist_add (l++r) ((y,j)::m)
+    = l++wlist_add r ((y,j)::m).
   Proof.
     simpl; intros.
     rewrite wlist_cut_gt_list; auto.
@@ -232,7 +188,8 @@ Section wlist_add.
 
   Fact wlist_add_gt x i r y j m :
       R y x
-    → wlist_add ((x,i)::r) ((y,j)::m) = (x,i)::wlist_add r ((y,j)::m).
+    → wlist_add ((x,i)::r) ((y,j)::m)
+    = (x,i)::wlist_add r ((y,j)::m).
   Proof.
     intros.
     apply wlist_add_gt_list with (l := [_]).
@@ -240,7 +197,8 @@ Section wlist_add.
   Qed.
 
   Fact wlist_add_eq i r y j m :
-      wlist_add ((y,i)::r) ((y,j)::m) = (y,i+j)::m.
+      wlist_add ((y,i)::r) ((y,j)::m)
+   = (y,i+j)::m.
   Proof.
     unfold wlist_add.
     now rewrite wlist_cut_eq.
@@ -248,7 +206,8 @@ Section wlist_add.
 
   Fact wlist_add_lt x i r y j m :
       R x y
-    → wlist_add ((x,i)::r) ((y,j)::m) = (y,j)::m.
+    → wlist_add ((x,i)::r) ((y,j)::m)
+    = (y,j)::m.
   Proof.
     unfold wlist_add; intro.
     now rewrite wlist_cut_lt.
@@ -256,7 +215,8 @@ Section wlist_add.
 
   Fact wlist_add_spec_1 l y j m :
       Forall (λ x, R y (fst x)) l
-    → wlist_add l ((y,j)::m) = l++(y,j)::m.
+    → wlist_add l ((y,j)::m)
+    = l++(y,j)::m.
   Proof.
     intros H.
     rewrite <- (app_nil_r l) at 1.
@@ -265,7 +225,8 @@ Section wlist_add.
 
   Fact wlist_add_spec_2 l y i r j m :
       Forall (λ x, R y (fst x)) l
-    → wlist_add (l++[(y,i)]++r) ((y,j)::m) = l++[(y,i+j)]++m.
+    → wlist_add (l++[(y,i)]++r) ((y,j)::m)
+    = l++[(y,i+j)]++m.
   Proof.
     intros H.
     simpl app at 2.
@@ -275,7 +236,8 @@ Section wlist_add.
   Fact wlist_add_spec_3 l x i r y j m :
       Forall (λ x, R y (fst x)) l
     → R x y
-    → wlist_add (l++[(x,i)]++r) ((y,j)::m) = l++[(y,j)]++m.
+    → wlist_add (l++[(x,i)]++r) ((y,j)::m)
+    = l++[(y,j)]++m.
   Proof.
     intros H1 H2; simpl app at 2.
     rewrite wlist_add_gt_list, wlist_add_lt; auto.

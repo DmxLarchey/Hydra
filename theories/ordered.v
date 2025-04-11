@@ -43,56 +43,75 @@ Proof. unfold transitive; eauto. Qed.
 
 #[local] Hint Resolve transitive_rev : core.
 
-Inductive sdec {X} (R : X → X → Prop) : X → X → Type :=
-  | sdec_lt x y : R x y → sdec R x y
-  | sdec_eq x : sdec R x x
-  | sdec_gt x y : R y x → sdec R x y.
-
 Definition dec (P : Prop) := {P} + {~P}. 
 
-Section sdec_irrefl.
+Section sdec.
 
   Variables (X : Type)
-            (R : X → X → Prop)
-            (R_sdec : ∀ x y, sdec R x y)
-            (R_irrefl : ∀x, ¬ R x x).
+            (R : X → X → Prop).
+
+  Inductive sdec : X → X → Type :=
+    | sdec_lt x y : R x y → sdec x y
+    | sdec_eq x   :         sdec x x
+    | sdec_gt x y : R y x → sdec x y.
+
+  Inductive sdec_lt_inv_t {x y} : sdec x y → Prop := 
+    | sdec_lt_inv_intro h : sdec_lt_inv_t (sdec_lt h).
+
+  Inductive sdec_eq_inv_t {x} : sdec x x → Prop :=
+    | sdec_eq_inv_intro : sdec_eq_inv_t (sdec_eq x).
+
+  Inductive sdec_gt_inv_t {x y} : sdec x y → Prop := 
+    | sdec_gt_inv_intro h : sdec_gt_inv_t (sdec_gt h).
+
+  Hint Constructors sdec_lt_inv_t sdec_eq_inv_t sdec_gt_inv_t : core.
+
+  Fact sdec_inv x y (s : sdec x y) :
+    match s with
+    | sdec_lt _ as s => sdec_lt_inv_t s
+    | sdec_eq _ as s => sdec_eq_inv_t s
+    | sdec_gt _ as s => sdec_gt_inv_t s
+    end.
+  Proof. destruct s; auto. Qed.
+
+  Hypothesis (R_sdec : ∀ x y, sdec x y)
+             (R_irrefl : ∀x, ¬ R x x).
 
   Fact sdec_eq_dec (x y : X) : { x = y } + { x ≠ y }.
   Proof.
     destruct (R_sdec x y); auto; right; intro; subst; eapply R_irrefl; eassumption.
   Qed.
 
-  Fact sdec_uip (x y : X) (h1 h2 : x = y) : h1 = h2. 
+  Fact sdec_uip (x : X) (h : x = x) : h = eq_refl. 
   Proof. apply UIP_dec, sdec_eq_dec. Qed.
 
-  Local Lemma sdec_eq_refl_rec x y (s : sdec R x y) : 
-    ∀e : y = x, @eq_rect _ _ (sdec R x) s _ e = sdec_eq R x.
+  Local Fact sdec_eq_inv_dep {x y} (s : sdec x y) : ∀e, sdec_eq_inv_t (eq_rect y (sdec x) s x e).
   Proof.
     destruct s as [ x y H | | x y H ]; auto.
     1,3: intros <-; destruct (R_irrefl H).
-    now intros e; rewrite (sdec_uip e eq_refl).
+    intros e; now rewrite (sdec_uip e).
   Qed.
 
-  Theorem sdec_eq_refl x (s : sdec R x x) : s = sdec_eq R x.
-  Proof. apply (sdec_eq_refl_rec s eq_refl). Qed.
+  Theorem sdec_eq_inv x (s : sdec x x) : sdec_eq_inv_t s.
+  Proof. exact (sdec_eq_inv_dep s eq_refl). Qed.
 
   Hypothesis (R_trans : transitive R).
 
-  Theorem sdec_lt_refl x y : R x y → ∀s : sdec R x y, { h | s = sdec_lt _ _ _ h }.
+  Theorem sdec_lt_inv x y (s : sdec x y) : R x y → sdec_lt_inv_t s.
   Proof.
-    intros H s; destruct s; eauto.
+    intros H; destruct s; eauto.
     + now apply R_irrefl in H.
     + destruct (@R_irrefl x); eauto.
   Qed.
 
-  Theorem sdec_gt_refl x y : R y x → ∀s : sdec R x y, { h | s = sdec_gt _ _ _ h }.
+  Theorem sdec_gt_inv x y (s : sdec x y) : R y x → sdec_gt_inv_t s.
   Proof.
-    intros H s; destruct s; eauto.
+    intros H; destruct s; eauto.
     + destruct (@R_irrefl x); eauto.
     + now apply R_irrefl in H.
   Qed.
 
-End sdec_irrefl.
+End sdec.
 
 Section ordered.
 
