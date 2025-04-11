@@ -17,23 +17,6 @@ Set Implicit Arguments.
 #[local] Hint Constructors clos_trans clos_refl_trans : core.
 #[local] Hint Resolve Acc_inv Acc_intro in_cons in_eq in_elt in_or_app : core.
 
-(*
-
-Fact list_snoc_rect {X} (P : list X → Type) :
-           P []
-         → (∀ l x, P l → P (l++[x]))
-         → ∀ l, P l.
-Proof.
-  intros H1 H2 l; revert P H1 H2.
-  induction l as [ | x l IHl ]; auto.
-  intros P H1 H2.
-  apply (IHl (fun l => P (x::l))).
-  + apply (H2 []), H1.
-  + intros ? ?; apply (H2 (_::_)).
-Qed.
-
-*)
-
 Section lex_list.
 
   Variables (X : Type) (R : X → X → Prop).
@@ -54,7 +37,7 @@ Section lex_list.
   Hint Resolve lex_list_app_head : core.
 
   Fact lex_list_prefix' p x l : lex_list p (p++x::l).
-  Proof. rewrite (app_nil_end p) at 1; auto. Qed.
+  Proof. rewrite <- (app_nil_r p) at 1; auto. Qed.
 
   Hint Resolve lex_list_prefix' : core.
 
@@ -299,7 +282,6 @@ Section lex_list_sim.
 
 End lex_list_sim. 
 
-
 Fact Acc_lex_list_nil X P (R : X → X → Prop) : Acc (λ l m, P l ∧ lex_list R l m) [].
 Proof. constructor; intros [] (? & []%lex_list_inv). Qed.
 
@@ -348,7 +330,10 @@ Section lex_list_wf.
 
   (* The proof of this lemma uses Acc for lo & the inclusion ordered_lex_list_lo 
      CAN WE PROVIDE A MORE DIRECT PROOF *)
-  Lemma lex_list_Acc_ordered_from x l : Acc R x → ordered_from (ge R) x l → Acc (λ l m, ordered (ge R) l ∧ lex_list R l m) l.
+  Lemma lex_list_Acc_ordered_from x l :
+      Acc R x
+    → ordered_from (ge R) x l
+    → Acc (λ l m, ordered (ge R) l ∧ lex_list R l m) l.
   Proof. 
     intros H1 H2.
     cut (Acc (lo (clos_trans R)) l).
@@ -361,55 +346,15 @@ Section lex_list_wf.
 
   Hint Resolve ordered_lex_list_lo_restr : core.
 
-  (*
-
-  Lemma lex_list_Acc_ordered_from_restr P x l :
-             Acc (λ x y, P x ∧ R x y) x
-           → Forall P l
-           → ordered_from (ge R) x l
-           → Acc (λ l m, (Forall P l ∧ ordered (ge R) l) ∧ lex_list R l m) l.
-  Proof.
-    intros H1 H2 H3.
-    cut (Acc (lo (λ x y, P x ∧ clos_trans R x y)) l).
-    + apply Acc_incl.
-      intros ? ? [[]]; eauto.
-    + apply Acc_lo_iff.
-      intros z Hz.
-      cut (Acc (clos_trans (λ x y, P x ∧ R x y)) z).
-      * apply Acc_incl.
- admit.
-      * apply Acc_clos_trans.
-        revert H1 z Hz. 
-        apply ordered_from_ge_Acc.
-        revert H3 H2.
-        induction 1 as [ x | x y l H1 H2 IH2 ]; auto.
-        intros []%Forall_cons_iff; constructor; eauto; tauto.
-  Admitted.
-
-  *)
-
-  Theorem lex_list_Acc_ordered l : Forall (Acc R) l → ordered (ge R) l → Acc (λ l m, ordered (ge R) l ∧ lex_list R l m) l.
+  Theorem lex_list_Acc_ordered l :
+      Forall (Acc R) l
+    → ordered (ge R) l
+    → Acc (λ l m, ordered (ge R) l ∧ lex_list R l m) l.
   Proof.
     intros H1 H2; revert H2 H1.
     induction 1 as [ | x l H1 ]; intros H2; auto.
     apply lex_list_Acc_ordered_from with x; eauto.
     eapply Forall_forall; eauto.
   Qed.
- 
-  (*
-
-  Theorem lex_list_Acc_ordered_restr P l :
-           Forall P l 
-         → Forall (Acc (λ x y, P x ∧ R x y)) l 
-         → ordered (ge R) l 
-         → Acc (λ l m, (Forall P l ∧ ordered (ge R) l) ∧ lex_list R l m) l.
-  Proof.
-    intros H0 H1 H2; revert H2 H1 H0.
-    induction 1 as [ | x l H1 ]; intros H2 H3; auto.
-    apply lex_list_Acc_ordered_from_restr with x; eauto.
-    eapply Forall_forall; eauto.
-  Qed.
-
-  *)
 
 End lex_list_wf.

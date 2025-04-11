@@ -8,2192 +8,10 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import hydra ordered lex_list wlist.
+From Hydra Require Import utils ordered lex2 lex_list list_order wlist E0.
 
-Import ListNotations hydra_notations.
+Import ListNotations.
 
-Set Implicit Arguments.
-
-Tactic Notation "symm" :=
-  let H := fresh in
-  match goal with
-    |- _ = _ -> _ => intro H; symmetry in H; revert H
-  end.
-
-Arguments clos_trans {_}.
-Arguments clos_refl_trans {_}.
-Arguments transitive {_}.
-
-Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
-
-Notation π₁ := proj1_sig.
-Notation π₂ := proj2_sig.
-
-#[local] Hint Constructors clos_trans : core.
-#[local] Hint Resolve Acc_inv Acc_intro 
-                      in_cons in_eq in_elt in_or_app : core.
-
-Fact lt_irrefl n : ¬ n < n.
-Proof. lia. Qed.
-
-Fact lt_trans a b c : a < b → b < c → a < c.
-Proof. lia. Qed.
-
-Section iter.
-
-  Variable (X : Type).
-
-  Implicit Type (f : X → X).
-
-  Definition iter f :=
-    fix loop n x := 
-      match n with
-      | 0   => x
-      | S n => loop n (f x)
-      end.
-
-  Fact iter_ext f g : (∀x, f x = g x) → ∀ n x, iter f n x = iter g n x.
-  Proof.
-    intros E n.
-    induction n as [ | n IHn ]; intro; simpl; auto. 
-    now rewrite E, IHn.
-  Qed.
-
-End iter.
-
-Arguments iter {_}.
-
-#[local] Hint Resolve clos_trans_rev transitive_rev : core.
-
-Fact rev_rect X (P : list X → Type) :
-      P [] → (∀ l x, P l → P (l++[x])) → ∀l, P l.
-Proof.
-  intros H1 H2 l; revert l P H1 H2.
-  induction l as [ | x l IH ]; intros P H1 H2; auto.
-  apply IH.
-  + apply (H2 []); auto.
-  + intros ? ? ?; now apply (H2 (_::_)).
-Qed.
-
-Fact in_snoc_iff X (l : list X) x y : y ∈ l++[x] ↔ x = y ∨ y ∈ l.
-Proof. rewrite in_app_iff; simpl; tauto. Qed.
-
-Fact snoc_assoc X l (x y : X) : l++[x;y] = (l++[x])++[y].
-Proof. now rewrite <- app_assoc. Qed.
-
-Fact list_split {X} (l₁ l₂ r₁ r₂ : list X) :
-    l₁++r₁ = l₂++r₂
-  → ∃m, l₁++m = l₂ ∧ r₁ = m++r₂
-     ∨  l₁ = l₂++m ∧ m++r₁ = r₂.
-Proof.
-  revert l₂; induction l₁ as [ | x l1 IH ]; intros [ | y l2 ]; simpl.
-  + exists []; auto.
-  + intros ->; eauto.
-  + intros <-; eauto.
-  + injection 1; intros (m & [ [] | [] ])%IH <-; subst; eauto.
-Qed.
-
-Fact list_split_cons {X} (l₁ l₂ r₁ r₂ : list X) x :
-    l₁++r₁ = l₂++[x]++r₂
-  → ∃m, l₁++m = l₂ ∧ r₁ = m++[x]++r₂
-     ∨  l₁ = l₂++[x]++m ∧ m++r₁ = r₂.
-Proof.
-  intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst; eauto.
-  destruct m as [ | y m ]; simpl in H2.
-  + subst; exists []; rewrite !app_nil_r; auto.
-  + inversion H2; subst; exists m; auto.
-Qed. 
-
-Fact list_split_cons2 {X} (l₁ l₂ r₁ r₂ : list X) x y :
-    l₁++[x]++r₁ = l₂++[y]++r₂
-  → l₁ = l₂ ∧ x = y ∧ r₁ = r₂
-  ∨ ∃m, l₁++[x]++m = l₂ ∧ r₁ = m++[y]++r₂
-     ∨  l₁ = l₂++[y]++m ∧ m++[x]++r₁ = r₂.
-Proof.
-  intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst.
-  + destruct m as [ | z m ]; simpl in H2.
-    * inversion H2; subst y r₂.
-      rewrite app_nil_r; auto.
-    * inversion H2; subst z r₁.
-      right; exists m; auto.
-  + destruct m as [ | z m ]; simpl in H2.
-    * inversion H2; subst y r₂.
-      rewrite app_nil_r; auto.
-    * inversion H2; subst z r₂.
-      right; exists m; auto.
-Qed.
-
-Fact list_nil_choose X (l : list X) : {l = []} + {l ≠ []}.
-Proof. destruct l; eauto; now right. Qed.
-
-Fact list_fall_choose X (P Q : X → Prop) l :
-        (∀x, x ∈ l → {P x} + {Q x})
-      → { x | x ∈ l ∧ P x } + { ∀x, x ∈ l → Q x }.
-Proof.
-  induction l as [ | x l IHl ]; intros Hl.
-  + now right.
-  + destruct (Hl x); eauto.
-    destruct IHl as [ (? & []) | ]; eauto.
-    right; intros ? [<- |]; eauto.
-Qed.
-
-Section squash.
-
-  (* Squashing map a (strongly) decidable predicate into
-     an equivalent proof irrelevant one *)
-
-  Variables (P : Prop) (d : {P}+{¬P}).
-
-  Definition squash := if d then True else False.
-
-  Fact squash_iff : squash ↔ P.
-  Proof. unfold squash; destruct d; tauto. Qed.
-
-  Fact squash_pirr : ∀ p1 p2 : squash, p1 = p2.
-  Proof. unfold squash; destruct d; now intros [] []. Qed.
-
-End squash.
-
-Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ~ R x x.
-Proof. induction 1 as [ x _ IH ]; intros H; exact (IH _ H H). Qed.
-
-Section wf_rel_morph.
-
-  Variables (X Y : Type) (R : X → X → Prop) (T : Y → Y → Prop)
-            (f : X → Y → Prop)
-            (f_surj : ∀y, ∃x, f x y)
-            (f_morph : ∀ x₁ x₂ y₁ y₂, f x₁ y₁ → f x₂ y₂ → T y₁ y₂ → R x₁ x₂).
-
-  Theorem Acc_rel_morph x y : f x y → Acc R x → Acc T y.
-  Proof.
-    intros H1 H2; revert H2 y H1.
-    induction 1 as [ x _ IH ]; intros y ?.
-    constructor; intros z ?.
-    destruct (f_surj z); eauto.
-  Qed.
-
-  Hint Resolve Acc_rel_morph : core.
-
-  Corollary wf_rel_morph : well_founded R → well_founded T.
-  Proof. intros ? y; destruct (f_surj y); eauto. Qed.
-
-End wf_rel_morph.
-
-Section lex2.
-
-  Variables (X I : Type) (RX : X → X → Prop) (RI : I → I → Prop).
-
-  Inductive lex2 : X*I → X*I → Prop :=
-    | lex2_left x i y j : RX x y → lex2 (x,i) (y,j)
-    | lex2_right x i j  : RI i j → lex2 (x,i) (x,j).
-
-  Hint Constructors lex2 : core.
-
-  Fact lex2_inv xi yj :
-      lex2 xi yj
-    → match xi, yj with
-      | (x,i), (y,j) => RX x y ∨ x = y ∧ RI i j
-      end.
-  Proof. destruct 1; eauto. Qed.
-
-  Lemma lex2_irrefl xi : lex2 xi xi → RX (fst xi) (fst xi) ∨ RI (snd xi) (snd xi).
-  Proof. revert xi; intros []?%lex2_inv; simpl; tauto. Qed.
-
-  Section lex2_trans.
-
-    Variables (l m p : list (X*I))
-              (RXtrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ p → RX x y → RX y z → RX x z)
-              (RItrans : ∀ x i y j z u, (x,i) ∈ l → (y,j) ∈ m → (z,u) ∈ p → RI i j → RI j u → RI i u).
-
-    Lemma lex2_trans xi yj zk : xi ∈ l → yj ∈ m → zk ∈ p → lex2 xi yj → lex2 yj zk → lex2 xi zk.
-    Proof.
-      revert xi yj zk.
-      intros [] [] [] ? ? ? [ | (<- & ?) ]%lex2_inv [ | (<- & ?) ]%lex2_inv; eauto.
-    Qed.
-
-  End lex2_trans.
-
-  Hint Constructors sdec : core.
-
-  Section lex2_sdec.
-
-    Variables (l m : list (X*I))
-              (RX_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RX x y)
-              (RI_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RI i j).
-
-    Lemma lex2_sdec xi yj : xi ∈ l → yj ∈ m → sdec lex2 xi yj.
-    Proof.
-      revert xi yj; intros (x,i) (y,j) ? ?.
-      destruct (RX_sdec x i y j) as [| x |]; eauto.
-      destruct (RI_sdec x i x j); eauto.
-    Qed.
-
-  End lex2_sdec.
-
-  Section Acc.
-
-    Hypothesis RI_wf : well_founded RI.
-
-    Fact Acc_lex2 x : Acc RX x → ∀i, Acc lex2 (x,i).
-    Proof.
-      induction 1 as [ x _ IHx ].
-      intros i; induction i using (well_founded_induction RI_wf).
-      constructor.
-      intros [] [ | (<- & ?) ]%lex2_inv; eauto.
-    Qed.
-
-  End Acc.
-
-End lex2.
-
-Arguments lex2 {_ _}.
-
-#[local] Hint Constructors lex2 : core.
-
-Reserved Notation "a '+₀' b"  (at level 31, left associativity, format "a  +₀  b" ).
-Reserved Notation "'ω[' l ]"  (at level 1, no associativity, format "ω[ l ]").
-Reserved Notation "⌊ e ⌋₀"    (at level 1, e at level 200, format "⌊ e ⌋₀").
-Reserved Notation "e '<E₀' f" (at level 70, format "e  <E₀  f").
-Reserved Notation "e '≤E₀' f" (at level 70, format "e  ≤E₀  f").
-
-Section E0.
-
-  Unset Elimination Schemes.
-
-  Inductive E0 : Set :=
-    | E0_cons : list (E0*nat) → E0.
-
-  Set Elimination Schemes.
-
-  Notation "ω[ l ]" := (E0_cons l).
-  
-  Fact E0_eq_inv l m : ω[l] = ω[m] → l = m.
-  Proof. now inversion 1. Qed.
-
-  Section E0_rect.
-
-    Let E0_sub e f := match f with ω[l] => ∃n, (e,n) ∈ l end.
-
-    Local Lemma E0_sub_wf : well_founded E0_sub.
-    Proof.
-      refine (fix loop f := _).
-      destruct f as [ l ].
-      constructor; intros e (n & Hn).
-      induction l as [ | y l IHl ].
-      + destruct Hn.
-      + destruct Hn as [ Hn | Hn ]; [ | apply IHl; assumption ].
-        generalize (loop (fst y)). (* be careful here on what loop is applied *)
-        clear loop; now subst.
-    Qed.
-
-    Variables (P : E0 → Type)
-              (HP : ∀l, (∀ e n, (e,n) ∈ l → P e) → P ω[l]).
-
-    Theorem E0_rect e : P e.
-    Proof.
-      apply Fix_F with (2 := E0_sub_wf e).
-      intros [l] Hl.
-      apply HP.
-      intros f n Hfn; apply Hl; simpl; eauto.
-    Defined.
-
-  End E0_rect.
-
-  Definition E0_ind (P : _ → Prop) := E0_rect P.
-  Definition E0_rec (P : _ → Set) := E0_rect P.
-
-  Fixpoint E0_ht e :=
-    match e with
-    | ω[l] => lmax (map (λ x, 1+E0_ht (fst x)) l)
-    end.
-
-  Notation "⌊ e ⌋₀" := (E0_ht e).
-
-  Fact E0_ht_fix l : ⌊ω[l]⌋₀ = lmax (map (λ x, 1+⌊fst x⌋₀) l).
-  Proof. trivial. Qed.
-
-  Fact E0_ht_in e i l : (e,i) ∈ l → ⌊e⌋₀ < ⌊ω[l]⌋₀.
-  Proof.
-    intros ?; rewrite E0_ht_fix.
-    apply lmax_in, in_map_iff.
-    now exists (e,i).
-  Qed.
-
-  Definition E0_fall (P : list (E0*nat) → Prop) : E0 → Prop :=
-    fix loop e :=
-      match e with
-      | ω[l] => P l ∧ fold_right (λ p, and (loop (fst p))) True l
-      end.
-
-  Lemma E0_fall_fix P l : E0_fall P ω[l] ↔ P l ∧ ∀ x i, (x,i) ∈ l → E0_fall P x.
-  Proof.
-    simpl; rewrite fold_right_conj.
-    apply and_iff_compat_l; split.
-    + intros H ? ?; apply (H (_,_)).
-    + intros ? []; eauto.
-  Qed.
-
-  Section E0_fall_rect.
-
-    Variables (P : list (E0*nat) → Prop)
-              (Q : E0 → Type)
-              (HQ : ∀l, P l 
-                      → (∀ e i, (e,i) ∈ l → E0_fall P e)
-                      → (∀ e i, (e,i) ∈ l → Q e)
-                      → Q ω[l]).
-
-    Theorem E0_fall_rect e : E0_fall P e → Q e.
-    Proof. induction e; intros []%E0_fall_fix; eauto. Qed.
-
-  End E0_fall_rect.
-
-  Unset Elimination Schemes.
-
-  Inductive E0_lt : E0 → E0 → Prop :=
-    | E0_lt_intro l m : lex_list (lex2 E0_lt lt) l m → E0_lt ω[l] ω[m].
-
-  Set Elimination Schemes.
-
-  Hint Constructors E0_lt : core.
-
-  Infix "<E₀" := E0_lt.
-
-  (* This inversion principle is enough to reason about <E₀, 
-     proceeding by induction on arguments *)
-  Fact E0_lt_inv l m : ω[l] <E₀ ω[m] ↔ lex_list (lex2 E0_lt lt) l m.
-  Proof. split; auto; now inversion 1. Qed.
-
-  (** We show that <E₀ is a strict order (irreflexive and transitive)
-      and computably total, ie either e <E₀ f or e = f or f <E₀ e *)
-
-  (* irreflexive *)
-  Lemma E0_lt_irrefl e : ¬ e <E₀ e.
-  Proof.
-    induction e as [ l IH ].
-    intros ((?,i) & ? & [ ?%(IH _ i) | ?%lt_irrefl ]%lex2_irrefl)%E0_lt_inv%lex_list_irrefl; auto.
-  Qed.
-
-  Hint Resolve lt_trans lex2_trans : core.
-
-  (* transitive *)
-  Lemma E0_lt_trans : transitive E0_lt.
-  Proof.
-    intros e.
-    induction e as [ l IH ]. 
-    intros [] [] H1%E0_lt_inv H2%E0_lt_inv; constructor.
-    revert H1 H2; apply lex_list_trans; eauto.
-  Qed.
-
-  Hint Resolve E0_lt_trans E0_lt_irrefl : core.
-
-  Corollary E0_lt_trans' e f : clos_trans E0_lt e f → e <E₀ f.
-  Proof. induction 1; eauto. Qed.
-
-  Hint Constructors sdec : core.
-
-  Lemma lt_sdec i j : sdec lt i j.
-  Proof. destruct (lt_eq_lt_dec i j) as [ [ | []] | ]; eauto. Qed.
-
-  Hint Resolve lt_sdec lex2_sdec : core.
-
-  (* computably total *)
-  Lemma E0_lt_sdec e f : sdec E0_lt e f.
-  Proof.
-    revert f; induction e as [l]; intros [m].
-    destruct (@lex_list_sdec _ (lex2 E0_lt lt) l m); eauto.
-  Qed.
-
-  (* Hence decidable *)
-  Corollary E0_lt_dec e f : { e <E₀ f } + { ¬ e <E₀ f }.
-  Proof.
-    destruct (E0_lt_sdec e f) as [ | | e f ]; eauto.
-    right; intro; apply (@E0_lt_irrefl e); eauto.
-  Qed.
-
-  Hint Resolve E0_lt_dec : core.
-
-  (** An "ordinal" of E₀ is in CNF if, recursivelly, it is
-     of the shape ω[(e₁,i₁);...;(eₙ,iₙ)] with
-     0 < i₁,...,iₙ and e₁ >ε₀ ... >ε₀ eₙ *)
-
-  Definition E0_cnf_pred l :=
-      ordered E0_lt⁻¹ (map fst l)
-    ∧ ∀ e i, (e,i) ∈ l → 0 < i.
-
-  Definition E0_cnf := E0_fall E0_cnf_pred.
-
-  Fact E0_cnf_fix l : 
-      E0_cnf ω[l]
-    ↔ ordered E0_lt⁻¹ (map fst l) ∧ ∀ e i, (e,i) ∈ l → 0 < i ∧ E0_cnf e.
-  Proof.
-    unfold E0_cnf.
-    rewrite E0_fall_fix.
-    unfold E0_cnf_pred; firstorder.
-  Qed.
-
-  (* E0_cnf is a strongly decidable predicate *)
-  Theorem E0_cnf_dec e : { E0_cnf e } + { ¬ E0_cnf e }.
-  Proof.
-    induction e as [ l IHl ].
-    destruct (ordered_dec E0_lt⁻¹ (map fst l))
-      as [ H1 | H1 ]; eauto.
-    + destruct list_fall_choose
-        with (P := fun xi => snd xi = 0 \/ ~ E0_cnf (fst xi))
-             (Q := fun xi => 0 < snd xi /\ E0_cnf (fst xi))
-             (l := l)
-      as [ ((x,i) & H2 & H3) | H2 ].
-      * intros (x,[|i]) [ H | H ]%IHl; simpl; try tauto.
-        right; split; auto; lia.
-      * right; rewrite E0_cnf_fix; intros (_ & G).
-        simpl in H3; apply G in H2.
-        destruct H2, H3; subst; tauto || lia.
-      * left; rewrite E0_cnf_fix; split; auto.
-        intros; apply (H2 (_,_)); auto.
-    + right; rewrite E0_cnf_fix; tauto.
-  Qed.
-
-  Unset Elimination Schemes.
-
-  Inductive E0_lpo : E0 → E0 → Prop :=
-    | E0_lpo_intro l m : lo (lex2 E0_lpo lt) l m → E0_lpo ω[l] ω[m].
-
-  Set Elimination Schemes.
-
-  Hint Constructors E0_lpo : core.
-
-  Fact E0_lpo_inv l m : E0_lpo ω[l] ω[m] ↔ lo (lex2 E0_lpo lt) l m.
-  Proof. split; auto; now inversion 1. Qed.
-
-  Hint Resolve lt_wf : core.
-
-  Lemma wf_E0_lpo : well_founded E0_lpo.
-  Proof.
-    intros e.
-    induction e as [ l IH ].
-    assert (Acc (lo (lex2 E0_lpo lt)) l) as Hl.
-    1:{ apply Acc_lo_iff.
-        intros [] ?.
-        apply Acc_lex2; eauto. }
-    revert Hl.
-    apply Acc_rel_morph with (f := fun l e => ω[l] = e); auto.
-    + intros []; eauto.
-    + now intros ? ? ? ? <- <- ?%E0_lpo_inv.
-  Qed.
-
-  Fact E0_lpo_irrefl e : ¬ E0_lpo e e.
-  Proof. apply Acc_irrefl with (1 := wf_E0_lpo _). Qed.
-
-  Fact E0_lpo_trans : transitive E0_lpo.
-  Proof.
-    intros [] [] [] ?%E0_lpo_inv ?%E0_lpo_inv.
-    constructor; econstructor 2; eauto.
-  Qed.
-
-  Hint Resolve E0_lpo_trans : core.
-
-  Fact E0_lpo_trans' e f : clos_trans E0_lpo e f → E0_lpo e f.
-  Proof. induction 1; eauto. Qed.
-
-  Definition E0_le e f := e <E₀ f ∨ e = f.
-
-  Infix "≤E₀" := E0_le.
-
-  Fact E0_le_refl e : e ≤E₀ e.
-  Proof. now right. Qed.
-
-  Fact E0_le_trans : transitive E0_le.
-  Proof. intros ? ? ? [] []; subst; red; eauto. Qed.
-  
-  Fact E0_le_antisym e f : e ≤E₀ f → f ≤E₀ e → e = f.
-  Proof.
-    intros [H1 |]  [H2 |]; auto.
-    edestruct E0_lt_irrefl; eauto.
-  Qed.
-
-  Hint Resolve E0_le_refl E0_le_trans E0_le_antisym : core.
-
-  Fact E0_le_lt_trans e f g : e ≤E₀ f → f <E₀ g → e <E₀ g.
-  Proof. intros [] ?; subst; eauto. Qed.
-
-  Fact E0_lt_le_trans e f g : e <E₀ f → f ≤E₀ g → e <E₀ g.
-  Proof. intros ? []; subst; eauto. Qed.
-  
-  Fact E0_le_lt_dec e f : { e ≤E₀ f } + { f <E₀ e }.
-  Proof. destruct (E0_lt_sdec e f); simpl; auto; now do 2 left. Qed. 
-
-  Definition E0_zero := ω[[]].
-  Notation "0₀" := E0_zero.
-  Definition E0_one := ω[[(0₀, 1)]].
-  Notation "1₀" := E0_one.
-
-  Fact E0_zero_le : ∀e, 0₀ ≤E₀ e.
-  Proof. intros [ [] ]; [ right | left ]; eauto; repeat constructor. Qed.
-
-  Hint Resolve E0_zero_le : core.
-
-  Fact E0_zero_not_gt : ∀e, ¬ e <E₀ 0₀.
-  Proof. intros [ l ] ?%E0_lt_inv%lex_list_inv; now destruct l. Qed.
-  
-  Fact E0_lt_le_dec e f : { e <E₀ f } + { f ≤E₀ e}.
-  Proof. unfold E0_le; destruct (E0_lt_sdec e f); auto. Qed.
-  
-  Fact E0_lt_sdec2 e f a : e <E₀ f → { a <E₀ e } + { a = e } + { e <E₀ a ∧ a <E₀ f } + { a = f } + { f <E₀ a }.
-  Proof.
-    intros H.
-    destruct (E0_lt_sdec a e) as [ | | a e ]; auto.
-    destruct (E0_lt_sdec f a); eauto.
-  Qed. 
-
-  Fact E0_lt_app_head l m k : ω[m] <E₀ ω[k] → ω[l++m] <E₀ ω[l++k].
-  Proof. intros ?%E0_lt_inv; constructor; now apply lex_list_app_head. Qed.
-
-  Fact E0_le_app_head l m k : ω[m] ≤E₀ ω[k] → ω[l++m] ≤E₀ ω[l++k].
-  Proof.
-    intros [ H | H ]; [ left | right ].
-    + now apply E0_lt_app_head.
-    + inversion H; subst; auto.
-  Qed.
-
-  (* We convert E0_cnf into an equivalent proof irrelevant predicate *)
-  Definition cnf e := squash (E0_cnf_dec e).
-  Local Fact cnf_iff e : cnf e ↔ E0_cnf e.
-  Proof. apply squash_iff. Qed.
-
-  Fact cnf_pirr e (h1 h2 : cnf e) : h1 = h2.
-  Proof. apply squash_pirr. Qed.
-
-  Fact cnf_fix l : 
-      cnf ω[l]
-    ↔ ordered E0_lt⁻¹ (map fst l)
-    ∧ ∀ e i, (e,i) ∈ l → 0 < i ∧ cnf e.
-  Proof.
-    rewrite cnf_iff, E0_cnf_fix.
-    apply and_iff_compat_l.
-    split; intros H ? ? []%H; split; auto; apply cnf_iff; auto.
-  Qed.
-
-  (* We convert the recursor *)
-  Fact cnf_rect (P : E0 → Type) :
-     (∀l, ordered E0_lt⁻¹ (map fst l) 
-       → (∀ e i, (e,i) ∈ l → 0 < i)
-       → (∀ e i, (e,i) ∈ l → cnf e)
-       → (∀ e i, (e,i) ∈ l → P e)
-       → P ω[l])
-    → ∀e, cnf e → P e.
-  Proof. 
-    intros HP h H%cnf_iff; revert h H.
-    induction 1 as [ l [] H2 IH ] using E0_fall_rect.
-    apply HP; auto.
-    intros ? i ?.
-    apply cnf_iff, (H2 _ i); auto.
-  Qed.
-
-  Fact cnf_sg e i : cnf e → 0 < i → cnf ω[[(e,i)]].
-  Proof.
-    rewrite cnf_fix; split.
-    + repeat constructor.
-    + intros ? ? [[=]|[]]; subst; eauto.
-  Qed.
-
-  Fact cnf_cons_inv_left e i l : cnf ω[(e,i)::l] → cnf e.
-  Proof. intros (_ & H)%cnf_fix; eapply H; eauto. Qed.
-  
-  Fact cnf_cons_inv_left' e i l : cnf ω[(e,i)::l] → 0 < i.
-  Proof. intros (_ & H)%cnf_fix; eapply H; eauto. Qed.
-  
-  Fact cnf_app_left_inv l m : cnf ω[l++m] → cnf ω[l].
-  Proof.
-    rewrite !cnf_fix, map_app, ordered_app_iff; auto.
-    intros ((? & ? & H) & ?); split; try tauto; eauto.
-  Qed.
-
-  Fact cnf_app_right_inv l m : cnf ω[l++m] → cnf ω[m].
-  Proof.
-    rewrite !cnf_fix, map_app, ordered_app_iff; auto.
-    intros ((? & ? & H) & ?); split; try tauto; eauto.
-  Qed.
-  
-  Fact cnf_cons_inv_right ei l : cnf ω[ei::l] → cnf ω[l].
-  Proof. apply cnf_app_right_inv with (l := [_]). Qed.
-
-  Hint Resolve cnf_sg
-               cnf_cons_inv_left
-               cnf_cons_inv_left'
-               cnf_cons_inv_right
-               cnf_app_left_inv
-               cnf_app_right_inv : core.
-
-  Fact cnf_zero : cnf 0₀.
-  Proof.
-    apply cnf_fix; simpl; split.
-    + constructor.
-    + tauto.
-  Qed.
-
-  Hint Resolve cnf_zero : core.
-
-  Fact cnf_one : cnf E0_one.
-  Proof. apply cnf_sg; auto. Qed.
-
-  Hint Resolve cnf_one : core.
-
-  Fact E0_one_ge e : e ≠ 0₀ → cnf e → 1₀ ≤E₀ e.
-  Proof.
-    destruct e as [[ | (x,i) r ]]; [ easy | intros _ Hr ].
-    destruct (E0_zero_le x) as [ Hx | <- ].
-    + left; constructor; constructor; now left.
-    + destruct i as [ | [ | i ] ].
-      * apply cnf_fix, proj2 in Hr.
-        destruct (Hr E0_zero 0); auto; lia.
-      * apply E0_le_app_head with (l := [_]).
-        destruct r.
-        - now right.
-        - left; constructor; constructor 1.
-      * left; constructor; constructor; right; lia.
-  Qed.
-  
-  Fact E0_lt_one : ∀e, cnf e → e <E₀ 1₀ → e = 0₀.
-  Proof.
-    intros e H1 H2; revert e H2 H1.
-    intros [l] [ | (x,i) ? [ []%E0_zero_not_gt | [_ H] ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right Hl; auto.
-    assert (0 < i); try lia.
-    apply cnf_fix in Hl.
-    eapply Hl; eauto.
-  Qed.
-
-  (** Factor that proof !! *)
-  Local Lemma E0_lt_ht_rec n e f : ⌊e⌋₀ < n → ⌊f⌋₀ < n → cnf e → cnf f → e <E₀ f → ⌊e⌋₀ ≤ ⌊f⌋₀.
-  Proof.
-    revert e f; induction n as [ | n IHn ].
-    + intros; lia.
-    + intros [ l ] [ m ]; rewrite !E0_ht_fix.
-      intros Hl Hm (H1 & H2)%cnf_fix (H3 & H4)%cnf_fix Hlm%E0_lt_inv.
-      assert (∀ e i, (e,i) ∈ l → cnf e) as H2'.
-      1: intros; eapply H2; eauto.
-      assert (∀ e i, (e,i) ∈ m → cnf e) as H4'.
-      1: intros; eapply H4; eauto.
-      assert (∀ e i, (e,i) ∈ l → E0_ht e < n) as G1.
-      1:{ intros e i ?; apply PeanoNat.lt_S_n, Nat.le_lt_trans with (2 := Hl).
-          apply lmax_in, in_map_iff; exists (e,i); eauto. }
-      assert (∀ e i, (e,i) ∈ m → E0_ht e < n) as G2.
-      1:{ intros e i ?; apply PeanoNat.lt_S_n, Nat.le_lt_trans with (2 := Hm).
-          apply lmax_in, in_map_iff; exists (e,i); eauto. }
-      assert (ordered le⁻¹ (map (λ x, 1 + E0_ht (fst x)) l)) as H1'.
-      1:{ revert H1.
-          rewrite <- (map_map fst (λ x, S (E0_ht x))).
-          apply ordered_mono_map with (f := λ x, S (E0_ht x)).
-          intros ? ? ((x,i) & <- & E1)%in_map_iff ((y,j) & <- & E2)%in_map_iff; simpl.
-          intros H; apply le_n_S, IHn; eauto. }
-      assert (ordered le⁻¹ (map (λ x, 1 + E0_ht (fst x)) m)) as H3'.
-      1:{ revert H3.
-          rewrite <- (map_map fst (λ x, S (E0_ht x))).
-          apply ordered_mono_map with (f := λ x, S (E0_ht x)).
-          intros ? ? ((x,i) & <- & E1)%in_map_iff ((y,j) & <- & E2)%in_map_iff; simpl.
-          intros H; apply le_n_S, IHn; eauto. }
-      assert (∀ e i f j, (e,i) ∈ l → (f,j) ∈ m → e <E₀ f → E0_ht e ≤ E0_ht f) as IH.
-      1:{ intros; apply IHn; eauto. }
-      clear IHn Hl Hm H1 H2 H3 H4 H2' H4' G1 G2.
-      induction Hlm as [ | (e,i) (f,j) | ].
-      * simpl; lia.
-      * simpl map; rewrite !ordered_lmax_cons; auto.
-        apply lex2_inv in H as [ H | (? & _) ]; subst; auto.
-        apply le_n_S; eauto.
-      * simpl map; rewrite !ordered_lmax_cons; auto.
-  Qed.
-
-  (** The height is an over approx. of <E₀ *)
-  Theorem E0_lt_ht e f : cnf e → cnf f → e <E₀ f → ⌊e⌋₀ ≤ ⌊f⌋₀.
-  Proof. apply E0_lt_ht_rec with (n := 1+⌊e⌋₀+⌊f⌋₀); lia. Qed.
-
-  Corollary E0_ht_lt e f : cnf e → cnf f → ⌊e⌋₀ < ⌊f⌋₀ → e <E₀ f.
-  Proof.
-    intros H1 H2 H3.
-    destruct (E0_lt_sdec e f) as [ e f H | e | e f H ]; auto.
-    + lia.
-    + apply E0_lt_ht in H; auto; lia.
-  Qed.
-
-  Corollary E0_lt_sub x i l : cnf ω[l] → (x,i) ∈ l → x <E₀ ω[l].
-  Proof.
-    intros H1 H2.
-    apply E0_ht_lt; auto.
-    + apply cnf_fix, proj2 in H1.
-      apply (H1 _ _ H2).
-    + eapply E0_ht_in; eauto.
-  Qed.
-
-  (** Complete this thing that show that the height is easy quick to compute on cnf *)
-  Fact cnf_ht e i l : cnf ω[(e,i)::l] → ⌊ω[(e,i)::l]⌋₀ = 1+⌊e⌋₀.
-  Proof.
-    intros (H1 & H2)%cnf_fix.
-    rewrite E0_ht_fix; simpl map.
-    rewrite ordered_lmax_cons; auto.
-    revert H1.
-    rewrite <- (map_map fst (λ x, S (E0_ht x))).
-    apply ordered_mono_map with (f := λ x, S (E0_ht x)).
-    intros a b ((x,u) & <- & Hx)%in_map_iff ((y,v) & <- & Hy)%in_map_iff ?.
-    apply le_n_S, E0_lt_ht; eauto; simpl.
-    + apply H2 with v; auto.
-    + apply H2 with u; auto.
-  Qed.
-
-  Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo lt).
-  Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
-
-  Hint Resolve lex2_E0_lpo_lt_trans : core.
-
-  Fact lex2_E0_lpo_lt_trans' xi yj : clos_trans (lex2 E0_lpo lt) xi yj → lex2 E0_lpo lt xi yj.
-  Proof. induction 1; eauto. Qed.
-
-  Hint Resolve lex_list_mono : core.
-
-  Lemma cnf_lt_lpo e f : cnf e → cnf f → e <E₀ f → E0_lpo e f.
-  Proof.
-    intros H1 H2; revert e H1 f H2.
-    induction 1 as [ l He1 He2 He3 IH ] using cnf_rect.
-    destruct 1 as [ m Hf1 Hf2 Hf3 _  ] using cnf_rect.
-    intros H%E0_lt_inv.
-    constructor.
-    apply lo_mono with (1 := lex2_E0_lpo_lt_trans').
-    apply ordered_lex_list_lo; eauto.
-    + revert He1.
-      apply ordered_morphism with (f := fun x y => x = fst y).
-      * intros ? ? [] [] ([] & ? & ?)%in_map_iff ([] & ? & ?)%in_map_iff -> ->; right; left; simpl in *; subst; eauto.
-      * clear He2 He3 IH H; induction l; simpl; constructor; auto.
-    + revert H; apply lex_list_mono.
-      intros [] [] ? ? [| (<- & ?)]%lex2_inv; eauto.
-  Qed.
-
-  Hint Resolve cnf_lt_lpo : core.
-
-  (** The fundamental theorem: <E₀ is well-founded on cnf *)
-  Theorem E0_lt_wf : well_founded (λ x y, x <E₀ y ∧ cnf x ∧ cnf y).
-  Proof.
-    generalize wf_E0_lpo.
-    apply wf_rel_morph with (f := eq); eauto.
-    intros ? ? ? ? -> -> (? & ? & ?); eauto.
-  Qed.
-
-  (** The successor via an inductive spec *)
-  Inductive E0_succ_gr : E0 → E0 → Prop :=
-    | E0_succ_gr_0       : E0_succ_gr 0₀ 1₀
-    | E0_succ_gr_1 l i   : E0_succ_gr ω[l++[(0₀,i)]] ω[l++[(0₀,S i)]] 
-    | E0_succ_gr_2 l x i : x ≠ 0₀
-                         → E0_succ_gr ω[l++[(x,i)]] ω[l++[(x,i);(ω[[]],1)]].
-
-  (* Inversion lemma for the graph of E0_succ *)
-  Fact E0_succ_gr_inv e f :
-      E0_succ_gr e f
-    → (e = 0₀ → f = 1₀)
-    ∧ (∀ l i, e = ω[l++[(0₀,i)]] → f = ω[l++[(0₀,S i)]])
-    ∧ (∀ l x i, x ≠ 0₀ → e = ω[l++[(x,i)]] → f = ω[l++[(x,i);(ω[[]],1)]]).
-  Proof.
-    destruct 1 as [ | l i | l x i H ]; (split; [ | split ]); eauto;
-      try now intros [].
-    + now destruct l.
-    + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst i'; auto.
-    + intros l' x i' H (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
-    + now destruct l.
-    + intros ? i' (<- & [=])%E0_eq_inv%app_inj_tail; subst x; now destruct H.
-    + intros m y j G (<- & [=])%E0_eq_inv%app_inj_tail; subst; auto.
-  Qed.
-
-  Corollary E0_succ_gr_fun e f g : E0_succ_gr e f → E0_succ_gr e g → f = g.
-  Proof. intros [] G%E0_succ_gr_inv; symmetry; apply G; auto. Qed.
-
-  Definition E0_succ_pwc (e : E0) : sig (E0_succ_gr e).
-  Proof.
-    destruct e as [l].
-    destruct l as [ | l (x,i) _ ] using rev_rect.
-    + exists ω[(ω[nil],1)::nil]; constructor.
-    + destruct x as [ [ | y m ] ].
-      * exists ω[l++[(ω[[]],S i)]]; constructor.
-      * exists ω[l⊣⊢[(ω[y::m],i);(ω[[]],1)]]; now constructor.
-  Qed.
-
-  Definition E0_succ e := π₁ (E0_succ_pwc e).
-
-  Notation S₀ := E0_succ.
-
-  Fact E0_succ_spec e : E0_succ_gr e (S₀ e).
-  Proof. apply (proj2_sig _). Qed.
-
-  Fact E0_succ_zero : S₀ 0₀ = 1₀.
-  Proof. apply E0_succ_gr_fun with (1 := E0_succ_spec _); constructor. Qed.
-
-  Hint Resolve E0_succ_zero : core.
-
-  Fact E0_succ_cnf e : cnf e → cnf (S₀ e).
-  Proof.
-    generalize (E0_succ e) (E0_succ_spec e).
-    induction 1 as [ | l i | l x i ]; auto; rewrite !cnf_fix;
-    intros [H1 H2]; split; simpl in *; auto.
-    + rewrite map_app in * |- *; auto.
-    + intros ? ? [ [=] | ]%in_snoc_iff; subst; auto.
-      split; auto || lia.
-    + rewrite map_app in * |- *; simpl; auto.
-      apply ordered_comp with (m := [_]); auto.
-      repeat constructor.
-      destruct x as [ [] ]; try easy.
-      repeat constructor.
-    + intros e j; rewrite snoc_assoc. 
-      intros [ [=] | ]%in_snoc_iff; subst; auto.
-  Qed.
-
-  Hint Resolve E0_succ_cnf : core.
-
-  (** The successor is <E₀-greater *)
-  Fact E0_succ_lt e : e <E₀ S₀ e.
-  Proof.
-    generalize (E0_succ e) (E0_succ_spec e).
-    induction 1; constructor.
-    + constructor.
-    + apply lex_list_app_head.
-      constructor 2; right; lia.
-    + apply lex_list_app_head.
-      constructor 3; constructor.
-  Qed.
-
-  Hint Resolve E0_succ_lt : core. 
-
-  (** The ordinal addition via wlist_combine *)
-
-  Opaque wlist_add.
-
-  Definition E0_add e f :=
-    match e, f with
-    | ω[l], ω[m] => ω[wlist_add E0_lt_sdec l m]
-    end.
-
-  Infix "+₀" := E0_add.
-
-  Fact E0_add_cnf : ∀ e f, cnf e → cnf f → cnf (e +₀ f).
-  Proof.
-    intros [] [] (H1 & H2)%cnf_fix (H3 & H4)%cnf_fix; apply cnf_fix.
-    split.
-    + apply wlist_add_ordered; auto.
-    + intros ? ? (? & ? & [[]%H2|[]%H4])%in_wlist_add; auto; split; auto; lia.
-  Qed.
-
-  Fact E0_add_zero_right : ∀e, e +₀ 0₀ = e.
-  Proof. intros []; simpl; auto. Qed.
-
-  Fact E0_add_zero_left e : 0₀ +₀ e = e.
-  Proof. destruct e as [[|[]]]; auto. Qed.
-
-  (** Already wlist_combine is associative !! *)
-  Lemma E0_add_assoc : ∀ u v w, u +₀ v +₀ w =  u +₀ (v +₀ w).
-  Proof.
-    intros [] [] []; unfold E0_add; f_equal.
-    apply wlist_add_assoc; auto.
-  Qed.
-
-  Lemma E0_add_one_right e : cnf e → e +₀ 1₀ = S₀ e.
-  Proof.
-    intros He.
-    apply E0_succ_gr_fun with (2 := E0_succ_spec _).
-    destruct e as [l]; apply cnf_fix in He as [He1 He2].
-    unfold E0_add, E0_one, E0_zero.
-    destruct (wlist_cut_choice E0_lt_sdec l ω[[]])
-        as [ H 
-         | [ (k & a & b & -> & H1)
-           | (z & k & a & b & -> & H1 & H2)
-           ] ].
-    + rewrite wlist_add_spec_1; auto.
-      destruct l as [ | ([[]],j) l _ ] using rev_ind.
-      * constructor.
-      * now apply Forall_app, proj2, Forall_cons_iff, proj1, E0_lt_irrefl in H.
-      * rewrite <- ! app_assoc; simpl; now constructor 3.
-    + rewrite wlist_add_spec_2; auto.
-      destruct b as [ | (y,j) b ]; simpl.
-      * replace (k+1) with (S k) by lia; constructor.
-      * rewrite map_app in He1; simpl in He1.
-        now apply ordered_app_tail, ordered_inv, ordered_from_inv, proj1, E0_zero_not_gt in He1.
-    + now apply E0_zero_not_gt in H2.
-  Qed.
-
-  (** We show  ω[l] +₀ e ≤E₀ ω[m] +₀ e by induction on lex_list _ l m *)
-  Lemma E0_add_mono_left u v e : cnf u → cnf v → cnf e → u ≤E₀ v → u +₀ e ≤E₀ v +₀ e.
-  Proof.
-    intros Hu Hv He [ H | -> ]; [ | now right ].
-    revert u v e Hu Hv He H.
-    intros [l] [m] [[ | (y,j) k]] Hl Hm Hk ?%E0_lt_inv.
-    1: rewrite !E0_add_zero_right; now left; constructor.
-    revert H Hl Hm.
-    induction 1 as [ (x,i) m | (a,u) (b,v) l m [Hab | (<- & Huv)]%lex2_inv | (x,i) l m Hlm IH ] in j |- *; intros Hl Hm; unfold E0_add.
-    + rewrite wlist_add_nil_left.
-      destruct (E0_lt_sdec x y).
-      * rewrite wlist_add_lt; auto.
-      * rewrite wlist_add_eq; auto.
-        left; constructor; constructor 2; right.
-        rewrite cnf_fix in Hm.
-        assert (0 < i); [ | lia ].
-        eapply Hm; eauto.
-      * rewrite wlist_add_gt; auto.
-        left; constructor; constructor 2; now left.
-    + destruct (@E0_lt_sdec2 a b y)
-        as [ [ [ [ | ->] | [] ] | -> ] | ]; auto.
-      * rewrite !wlist_add_gt; eauto.
-        left; constructor; constructor 2; now left.
-      * rewrite wlist_add_eq, wlist_add_gt; auto.
-        left; constructor; constructor 2; now left.
-      * rewrite wlist_add_lt, wlist_add_gt; auto.
-        left; constructor; constructor 2; now left.
-      * rewrite wlist_add_lt, wlist_add_eq; auto.
-        left; constructor; constructor 2; right.
-        assert (0 < v); [ | lia ].
-        apply cnf_fix in Hm.
-        eapply Hm; eauto.
-      * rewrite !wlist_add_lt; eauto.
-    + destruct (E0_lt_sdec a y).
-      * rewrite !wlist_add_lt; auto.
-      * rewrite !wlist_add_eq; auto.
-        left; constructor; constructor 2; right; lia.
-      * rewrite !wlist_add_gt; auto.
-        left; constructor; constructor 2; now right.
-    + destruct (E0_lt_sdec x y).
-      * rewrite !wlist_add_lt; auto.
-      * rewrite !wlist_add_eq; auto.
-      * rewrite !wlist_add_gt; auto.
-        destruct (IH j) as [ ?%E0_lt_inv | ?%E0_eq_inv ]; auto.
-        1,2: eapply cnf_cons_inv_right; eassumption.
-        - left; constructor; now constructor 3.
-        - right; do 2 f_equal; auto.
-  Qed.
-
-  Lemma E0_add_incr : ∀ e f, cnf e → cnf f → 0₀ <E₀ f → e <E₀ e +₀ f.
-  Proof.
-    intros [l] [[| (y,j) m]] He Hf.
-    1: now intros ?%E0_lt_irrefl.
-    intros _.
-    unfold E0_add.
-    destruct (wlist_cut_choice E0_lt_sdec l y)
-        as [ G1 
-         | [ (i & l' & r & E & G1) 
-         |   (x & i & l' & r & E & G1 & G2) ] ]; subst; simpl.
-    + rewrite wlist_add_spec_1; auto.
-      constructor; apply lex_list_prefix'.
-    + rewrite wlist_add_gt_list, wlist_add_eq; auto.
-      constructor; apply lex_list_app_head.
-      constructor 2; right.
-      apply cnf_fix in Hf.
-      assert (0 < j); [ | lia ].
-      eapply Hf; eauto.
-    + rewrite wlist_add_gt_list, wlist_add_lt; auto.
-      constructor; apply lex_list_app_head.
-      constructor 2; now left.
-  Qed.
-
-  Lemma E0_add_mono_right : ∀ e u v, cnf e → cnf u → cnf v → u <E₀ v → e +₀ u <E₀ e +₀ v.
-  Proof.
-    intros [l] [m] [[|(z,h) k]] Hl Hm Hk.
-    1: intros []%E0_zero_not_gt.
-    destruct m as [ | yj m ].
-    1: intros; apply E0_add_incr; eauto.
-    intros [ (y,j) [ Hyz | (<- & Hjh) ]%lex2_inv | Hmk ]%E0_lt_inv%lex_list_inv; constructor.
-    + destruct (wlist_cut_choice E0_lt_sdec l z)
-        as [ G1 
-         | [ (i & l' & r' & E & G1) 
-         |   (x & i & l' & r' & E & G1 & G2) ] ]; subst; simpl app.
-      * rewrite !wlist_add_spec_1; auto.
-        - apply lex_list_app_head; constructor 2; now left.
-        - revert G1; apply Forall_impl; eauto.
-      * rewrite !wlist_add_gt_list, wlist_add_gt, wlist_add_eq; auto.
-        2: revert G1; apply Forall_impl; eauto.
-        apply lex_list_app_head.
-        constructor 2; right.
-        apply cnf_fix, proj2 in Hk.
-        destruct (Hk z h); eauto; lia.
-      * rewrite !wlist_add_gt_list; auto.
-        2: revert G1; apply Forall_impl; eauto.
-        apply lex_list_app_head.
-        rewrite wlist_add_lt with (y := z); auto.
-        destruct (wlist_add_choice E0_lt_sdec)
-          with (x := x) (i := i) (y := y) (j := j) (l := r') (m := m)
-          as (a & b & c & -> & H); auto.
-        constructor 2; left.
-        destruct H as [ (_ & <- & _) | [ (_& <- & _) | (_ & -> & _)] ]; auto.
-    + destruct (wlist_add_common E0_lt_sdec l y) as (l' & i & H).
-      rewrite !H.
-      apply lex_list_app_head.
-      constructor 2; right; lia.
-    + rewrite !wlist_add_cons_right. 
-      now apply lex_list_app_head.
-  Qed.
-
-  Hint Resolve in_map : core.
-
-  Lemma E0_lt_inv_add e f : cnf e → cnf f → e <E₀ f → ∃a, f = e +₀ a ∧ 0₀ <E₀ a ∧ cnf a.
-  Proof.
-    intros He Hf H; revert e f H He Hf.
-    intros [l] [m] [ l' m' | p (x,i) (y,j) l' m' [ H | (<- & H) ]%lex2_inv ]%E0_lt_inv%lex_list_invert He Hf.
-    + exists ω[l'].
-      destruct l' as [ | (y,j) l' ]; try easy; repeat split; eauto.
-      2: repeat constructor.
-      unfold E0_add.
-      rewrite wlist_add_spec_1; auto.
-      apply cnf_fix, proj1 in Hf.
-      rewrite map_app, ordered_app_iff in Hf; auto.
-      apply Forall_forall.
-      intros; eapply Hf; simpl; eauto.
-    + exists ω[(y,j)::m']; repeat split; eauto.
-      2: repeat constructor.
-      simpl; f_equal.
-      rewrite wlist_add_gt_list, wlist_add_lt; auto.
-      apply cnf_fix, proj1 in Hf.
-      rewrite map_app, ordered_app_iff in Hf; auto.
-      apply Forall_forall.
-      intros; eapply Hf; simpl; eauto.
-    + exists ω[(x,j-i)::m']; repeat split; auto.
-      2: repeat constructor.
-      * simpl; f_equal.
-        rewrite wlist_add_gt_list, wlist_add_eq; auto.
-        - simpl; do 3 f_equal; lia.
-        - apply cnf_fix, proj1 in Hf.
-          rewrite map_app, ordered_app_iff in Hf; auto.
-          apply Forall_forall.
-          intros; eapply Hf; simpl; eauto.
-      * rewrite cnf_fix in Hf |- *.
-        rewrite map_app, ordered_app_iff in Hf; auto.
-        split; try tauto.
-        apply proj2 in Hf.
-        intros u v [ [=] | G ]; subst.
-        - split; try lia; eapply Hf; eauto.
-        - eapply Hf; eauto.
-  Qed.
- 
-  Definition E0_is_succ e := ∃f, e = E0_succ f ∧ cnf f.
-  Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f ∧ cnf f.
-
-  Lemma E0_is_succ_iff e :
-    cnf e → E0_is_succ e ↔ ∃ l i, 0 < i ∧ e = ω[l++[(0₀,i)]].
-  Proof.
-    intros He; split.
-    + intros (f & -> & Hf).
-      generalize (E0_succ f) (E0_succ_spec f).
-      induction 1 as [ | l i | l x i ].
-      * exists [], 1; split; auto.
-      * exists l, (S i); split; auto; lia.
-      * exists (l++[(x,i)]), 1; split; auto.
-        now rewrite <- app_assoc.
-    + intros (l & [ | [|i] ] & H1 & ->).
-      * lia.
-      * exists ω[l]; split; eauto.
-        apply E0_succ_gr_fun with (2 := E0_succ_spec _).
-        destruct l as [ | l (x,i) _ ] using rev_rect.
-        1: constructor 1.
-        rewrite <- app_assoc; simpl.
-        constructor 3.
-        intros ->.
-        rewrite <- app_assoc, cnf_fix, map_app in He.
-        simpl in He.
-        apply proj1, ordered_app_tail, 
-              ordered_cons_iff, proj2 in He; auto.
-        apply (@E0_lt_irrefl 0₀), He; auto. 
-      * exists ω[l++[(0₀,S i)]]; split; auto.
-        - apply E0_succ_gr_fun with (2 := E0_succ_spec _).
-          constructor 2.
-        - rewrite cnf_fix, map_app in He |- *.
-          destruct He as [ H2 H3 ]; split; auto.
-          intros ? ? [| [ [=] | []]]%in_app_iff; eauto.
-          subst; split; auto; lia.
-  Qed.
-
-  Lemma E0_is_limit_iff e :
-    cnf e → E0_is_limit e ↔ ∃ l b i, 0 < i ∧ b ≠ 0₀ ∧ e = ω[l++[(b,i)]].
-  Proof.
-    intros He.
-    split.
-    + intros (H1 & H2); destruct e as [ l ].
-      destruct l as [ | l (b,i) _ ] using rev_rect.
-      1: easy.
-      destruct i as [ | i ].
-      1:{ apply cnf_fix, proj2 in He.
-          destruct (He b 0); eauto; lia. }
-      exists l, b, (S i); repeat split; auto.
-      * lia.
-      * intros ->.
-        apply H2, E0_is_succ_iff; auto.
-        exists l, (S i); split; auto; lia.
-    + intros (l & b & i & H1 & H2 & ->).
-      split.
-      1: now destruct l.
-      intros (m & j & H3 & H4)%E0_is_succ_iff; auto.
-      injection H4; clear H4.
-      intros (_ & [=])%app_inj_tail; now subst.
-  Qed.
-
-  Hint Resolve E0_add_cnf : core.
-
-  (** e + l is a limit if l is *)
-  Lemma E0_add_is_limit a e : 
-    cnf a → cnf e → E0_is_limit e → E0_is_limit (a +₀ e).
-  Proof.
-    intros Ha He (m & b & i & Hi & Hb & ->)%E0_is_limit_iff; auto.
-    apply E0_is_limit_iff; eauto.
-    destruct a as [l].
-    unfold E0_add.
-    destruct (wlist_add_last E0_lt_sdec l m b i)
-      as (r & j & ? & ->).
-    exists r, b, j; split; auto; lia.
-  Qed.
-
-  Fact E0_exp_is_limit e i :
-    cnf e → e ≠ 0₀ → 0 < i → E0_is_limit ω[[(e,i)]].
-  Proof.
-    intros H1 H2 H3.
-    apply E0_is_limit_iff; auto.
-    exists [], e, i; auto.
-  Qed.
-
-  Hint Resolve E0_add_is_limit E0_exp_is_limit : core.
-
-  (** a + ω^(e.i) is a limit ordinal *)
-  Fact E0_add_exp_is_limit a e i : 
-    cnf a → cnf e → e ≠ 0₀ → 0 < i → E0_is_limit (a +₀ ω[[(e,i)]]).
-  Proof. eauto. Qed.
- 
-  Fact E0_add_exp e i j : ω[[(e,i)]] +₀ ω[[(e,j)]] = ω[[(e,i+j)]].
-  Proof. simpl; rewrite wlist_add_eq; auto. Qed.
-
-  Definition E0_omega e := ω[[(e,1)]].
-
-  Notation "'ω' '^' e" := (E0_omega e) (at level 1, format "ω ^ e").
-  
-  Fact E0_omega_zero : ω^0₀ = 1₀.
-  Proof. trivial. Qed.
-
-  Fact E0_omega_cnf e : cnf e → cnf ω^e.
-  Proof. intros; apply cnf_sg; auto. Qed.
-
-  Hint Resolve E0_omega_cnf : core.
-
-  Fact E0_lt_omega e : cnf e → e <E₀ ω^e.
-  Proof. intro; apply E0_lt_sub with 1; auto. Qed.
-
-  Fact E0_add_lt_omega a e : cnf a → e ≠ 0₀ → a <E₀ ω^e → a +₀ ω^e = ω^e.
-  Proof.
-    destruct a as [ l ]; intros Ha He H.
-    revert H Ha He.
-    intros [ | (x,i) m [ H | (_ & H) ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right Ha He; unfold E0_add, E0_omega; f_equal.
-    + rewrite wlist_add_lt; eauto.
-    + apply cnf_fix in Ha.
-      assert (0 < i); [ | lia ].
-      eapply Ha; eauto.
-  Qed.
-
-  Lemma E0_add_omega_fun_right a b e f : a +₀ ω^e = b +₀ ω^f → e = f.
-  Proof.
-    revert a b e f.
-    intros [a] [b] e f; unfold E0_omega, E0_add.
-    destruct (wlist_add_last E0_lt_sdec a [] e 1)
-      as (l & i & H1 & H2).
-    destruct (wlist_add_last E0_lt_sdec b [] f 1)
-      as (m & j & H3 & H4).
-    simpl app in H2, H4; rewrite H2, H4.
-    injection 1.
-    intros (_ & [=])%app_inj_tail; now subst.
-  Qed.
-  
-  (* a +₀ ω^e is the limit decomposition of that ordinal
-     - e is unique 
-     - but a is not and we choose the least one *)
-  Definition E0_least_split (a e : E0) :=
-    ∀b, cnf b → a +₀ ω^e = b +₀ ω^e → a ≤E₀ b.
-
-  Fact E0_split_least_uniq a b e f : 
-      cnf a
-    → cnf b
-    → E0_least_split a e
-    → E0_least_split b f
-    → a +₀ ω^e = b +₀ ω^f
-    → a = b ∧ e = f.
-  Proof.
-    intros Ha Hb He Hf E.
-    assert (e = f) as <-.
-    1: now apply E0_add_omega_fun_right in E.
-    split; auto.
-  Qed.
-
-  (** inversion for f < ω^b:
-      - either f is 0 (and b is also 0)
-      - or f is below ω^a.n for some a < b and some n > 0 *)
-  Lemma E0_lt_omega_inv' f b :
-      cnf f
-    → cnf b
-    → f <E₀ ω^b
-    → f = 0₀ ∨ ∃n a, 0 < n ∧ f <E₀ ω[[(a, n)]] ∧ a <E₀ b ∧ cnf a.
-  Proof.
-    intros Hf Hb.
-    destruct f as [l].
-    (* we analyse ω[l] <E₀ ω[(b,1)] *)
-    intros ?%E0_lt_inv%lex_list_sg_inv_right.
-    destruct H as [ | (x,i) ? [ | (? & ?) ]%lex2_inv ].
-    + (* l = [] *)
-      now left.
-    + (* l = (x,_)::... with x <E₀ b *)
-      right.
-      exists (S i), x; repeat split; eauto; try lia.
-      constructor 2; right; auto.
-    + (* i < 1 is absurd *)
-      assert (0 < i); [ | lia ].
-      apply cnf_fix in Hf.
-      eapply Hf; eauto.
-  Qed.
-  
-  Lemma E0_lt_exp a i b j : a <E₀ b -> ω[[(a, i)]] <E₀ ω[[(b, j)]].
-  Proof. constructor; constructor 2; now left. Qed.
-
-  (** any ordinal is either 0, a successor or a limit ordinal *)
-
-  Inductive E0_decomp : E0 → Type :=
-    | E0_decomp_zero : E0_decomp 0₀
-    | E0_decomp_succ e : cnf e → E0_decomp (S₀ e)
-    | E0_decomp_limit g e : e ≠ 0₀ → cnf g → cnf e → E0_least_split g e → E0_decomp (g +₀ ω^e).
-
-  (* Proof that if cnf u then
-     either u is E0_zero                             (limit ordinal)
-      or  u is ω[l++[(E0_zero,i)]])                (successor)
-      or  u is ω[l++[(e,i)]]) with  E0_zero <E₀ e  (limit ordinal) *)
-
-  Lemma E0_decomp_compute e : cnf e → E0_decomp e.
-  Proof.
-    induction 1 as [ m H1 H2 H3 _ ] using cnf_rect.
-    destruct m as [ | m (e,i) _ ] using rev_rect.
-    + constructor 1.
-    + destruct i as [ | i ].
-      1: destruct (@lt_irrefl 0); eauto.
-      destruct e as [[ | yj e ]].
-      * destruct i as [ | i ].
-        - replace ω[m++[(ω[[]],1)]]
-            with (E0_succ ω[m]).
-          ++ constructor.
-             apply cnf_fix; repeat split; eauto.
-             rewrite map_app in H1.
-             now apply ordered_app_head in H1.
-          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
-             destruct m as [ | m (x,i) _ ] using rev_rect.
-             ** constructor.
-             ** rewrite <- app_assoc.
-                constructor.
-                intros ->.
-                rewrite !map_app, <- app_assoc in H1.
-                now apply ordered_app_tail, ordered_inv,
-                      ordered_from_inv, proj1, E0_lt_irrefl in H1.
-        - replace ω[m++[(ω[[]],S (S i))]]
-            with (E0_succ ω[m++[(0₀,S i)]]).
-          ++ constructor 2.
-             apply cnf_fix; split.
-             ** rewrite map_app in H1 |- *; auto.
-             ** intros ? ? [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
-          ++ apply E0_succ_gr_fun with (1 := E0_succ_spec _).
-             constructor 2.
-      * destruct i as [ | i ].
-        - replace ω[m++[(ω[yj::e],1)]]
-            with (E0_add ω[m] ω[[(ω[yj::e],1)]]).
-          ++ constructor 3; easy || eauto.
-             ** apply cnf_fix; repeat split; eauto.
-                rewrite map_app in H1.
-                now apply ordered_app_head in H1.
-             ** intros [k] Hk; unfold E0_omega, E0_add.
-                intros E%E0_eq_inv.
-                rewrite <- (app_nil_r m) in E.
-                rewrite map_app, ordered_app_iff in H1; eauto.
-                rewrite wlist_add_gt_list in E; eauto.
-                2:{ apply Forall_forall.
-                    intros (x,i) Hxi; apply H1; simpl; eauto.
-                    apply in_map_iff; exists (x,i); auto. }
-                rewrite wlist_add_nil_left in E.
-                symmetry in E.
-                apply wlist_add_eq_snoc_inv in E
-                  as (r & -> & _); auto.
-                destruct r.
-                -- rewrite app_nil_r; now right.
-                -- left; constructor.
-                   apply lex_list_prefix'.
-          ++ simpl.
-             rewrite wlist_add_spec_1; auto.
-             rewrite map_app in H1; simpl in H1.
-             apply ordered_snoc_iff, proj2 in H1; auto.
-             apply Forall_forall.
-             now intros (f,i) H; apply H1, in_map.
-        - replace ω[m++[(ω[yj::e], S (S i))]]
-            with (E0_add ω[m++[(ω[yj::e],S i)]] ω[[(ω[yj::e],1)]]).
-          ++ constructor 3; easy || eauto.
-             ** apply cnf_fix; split.
-                -- rewrite map_app in H1 |- *; auto.
-                -- intros f j [|[[=]|[]]]%in_app_iff; split; subst; eauto; lia.
-             ** intros [k] Hk; unfold E0_omega; simpl.
-                intros E%E0_eq_inv.
-                rewrite map_app, ordered_app_iff in H1; eauto.
-                rewrite wlist_add_gt_list, wlist_add_eq in E; eauto.
-                2:{ apply Forall_forall.
-                    intros (y,j) Hxi; apply H1; simpl; eauto.
-                    apply in_map_iff; exists (y,j); auto. }
-                symmetry in E.
-                apply wlist_add_eq_snoc_inv in E
-                  as (r & -> & _ & _ & [ H | (p & r' & ? & ->) ]); auto.
-                1: exfalso; lia.
-                replace p with (S i) by lia.
-                destruct r'; [ now right | ].
-                left; constructor.
-                apply lex_list_app_head.
-                constructor 3; constructor 1.
-          ++ simpl.
-             rewrite <- (app_nil_r (_++[_])), <- app_assoc.
-             rewrite wlist_add_spec_2; auto.
-             ** rewrite app_nil_r; do 4 f_equal; lia.
-             ** rewrite map_app in H1; simpl in H1. 
-                apply ordered_snoc_iff, proj2 in H1; auto.
-                apply Forall_forall.
-                intros [] ?; now apply H1, in_map.
-  Qed.
-
-  Section cnf_add_rect.
-
-    Variables (P : ∀e, cnf e → Type)
-              (HP0 : ∀ h, P 0₀ h)
-              (HP1 : ∀ e he h, P e he → P (S₀ e) h)
-              (HP2 : ∀ g e hg he h, e ≠ 0₀ → E0_least_split g e → P g hg → P e he → P (g +₀ ω^e) h).
-
-    Theorem cnf_add_rect e he : P e he.
-    Proof.
-      induction e as [ e IHe ] in he |- * using (well_founded_induction_type E0_lt_wf).
-      destruct (E0_decomp_compute e he) as [ | e h | g e h hg he' ]; auto.
-      + apply HP1 with h, IHe; auto.
-      + apply HP2 with (hg := hg) (he := he'); auto.
-      * apply IHe; split; auto.
-        rewrite <- (E0_add_zero_right g) at 1.
-        apply E0_add_mono_right; auto.
-        apply E0_le_lt_trans with (2 := E0_lt_omega _ he'); auto.
-      * apply IHe; split; auto.
-        apply E0_le_lt_trans with (g +₀ e).
-        - rewrite <- (E0_add_zero_left e) at 1.
-          apply E0_add_mono_left; auto.
-        - apply E0_add_mono_right, E0_lt_omega; auto.
-    Qed.
-
-  End cnf_add_rect.
-  
-  Fact E0_cnf_lt_omega e n l j : cnf ω[(e,n)::l] → ω[l] <E₀ ω[[(e,j)]].
-  Proof.
-    intros (H1 & H2)%cnf_fix; constructor.
-    destruct l as [ | (x,i) l ].
-    + constructor.
-    + constructor 2; left.
-      simpl in H1.
-      apply ordered_cons_iff in H1; auto.
-      apply H1; auto.
-  Qed.
-  
-  Fact E0_add_head_normal e i l : cnf ω[l] → ω[l] <E₀ ω^e → ω[[(e, i)]] +₀ ω[l] = ω[(e, i)::l].
-  Proof.
-    intros G H%E0_lt_inv; unfold E0_add; f_equal.
-    revert H G.
-    intros [ | (y,j) m [ H | (-> & H2) ]%lex2_inv ]%lex_list_sg_inv_right G; auto.
-    + rewrite wlist_add_gt; auto.
-    + assert (0 < j); [ | lia ].
-      apply cnf_fix in G.
-      eapply G; eauto.
-  Qed.
-
-  Fact E0_add_below_omega e l m :
-      ω[l] <E₀ ω^e
-    → ω[m] <E₀ ω^e
-    → ω[l] +₀ ω[m] <E₀ ω^e.
-  Proof.
-    unfold E0_add.
-    intros [ | (x,i) l' H1 ]%E0_lt_inv%lex_list_sg_inv_right.
-    1: now rewrite wlist_add_nil_left.
-    intros [ | (y,j) m' H2 ]%E0_lt_inv%lex_list_sg_inv_right.
-    1: now rewrite wlist_add_nil_right; constructor; constructor 2.
-    constructor.
-    destruct (E0_lt_sdec x y) as [ x y H | x | x y H ].
-    + rewrite wlist_add_lt; auto.
-      now constructor 2.
-    + rewrite wlist_add_eq; auto.
-      constructor 2.
-      apply lex2_inv in H1 as [ H1 | (-> & H1) ].
-      1: now constructor 1.
-      apply lex2_inv in H2 as [ H2 | (_ & H2) ].
-      1: now apply E0_lt_irrefl in H2.
-      constructor 2; lia.
-    + rewrite wlist_add_gt; auto.
-      now constructor 2.
-  Qed.
-
-  Fact E0_add_head_lt e i f j l m : e <E₀ f → ω[(e,i)::l] +₀ ω[(f,j)::m] = ω[(f,j)::m].
-  Proof. simpl; intro; rewrite wlist_add_lt; auto. Qed.
-
-  Fact E0_add_head_eq e i j l m : ω[(e,i)::l] +₀ ω[(e,j)::m] = ω[(e,i+j)::m].
-  Proof. simpl; rewrite wlist_add_eq; auto. Qed.
-
-  Fact E0_add_head_gt e i f j l m :
-      f <E₀ e
-    → ω[l] <E₀ ω^e
-    → ω[m] <E₀ ω^f
-    → cnf ω[l]
-    → cnf ω[m]
-    → cnf f
-    → 0 < j
-    →  ω[(e,i)::l] +₀ ω[(f,j)::m] = ω[[(e,i)]] +₀ (ω[l] +₀ ω[(f,j)::m])
-     ∧ ω[l] +₀ ω[(f,j)::m] <E₀ ω^e.
-  Proof.
-    intros H1 H2 H3 H4 H5 H6.
-    assert (ω[l] +₀ ω[(f,j)::m] <E₀ ω^e).
-    1:{ apply E0_add_below_omega; auto.
-        constructor; constructor 2; now left. }
-    split; auto.
-    unfold E0_add at 1 3.
-    unfold E0_add in H.
-    rewrite wlist_add_gt; auto.
-    rewrite E0_add_head_normal; auto.
-    fold (ω[l] +₀ ω[(f,j)::m]).
-    apply E0_add_cnf; auto.
-    rewrite <- E0_add_head_normal; auto.
-  Qed.
-
-  Section cnf_head_rect.
-
-    Variables (P : ∀e, cnf e → Type)
-              (HP0 : ∀ h, P 0₀ h)
-              (HP1 : ∀ e he i f hf h, 0 < i → f <E₀ ω^e → P f hf → P e he → P (ω[[(e, i)]] +₀ f) h).
-
-    Theorem cnf_head_rect e he : P e he.
-    Proof.
-      induction e as [ e IHe ] in he |- * using (well_founded_induction_type E0_lt_wf).
-      destruct e as [ [ | (x,i) l ] ].
-      1: apply HP0.
-      generalize he.
-      rewrite <- E0_add_head_normal; eauto.
-      + intro h.
-        assert (h1 : cnf x) by eauto.
-        assert (h2 : cnf ω[l]) by eauto.
-        apply HP1 with (he := h1) (hf := h2); eauto.
-        * constructor.
-          apply cnf_fix, proj1 in he; simpl in he.
-          apply ordered_cons_iff, proj2 in he; auto.
-          destruct l as [ | (y,j) l ].
-          - constructor 1.
-          - constructor 2; left; apply he; simpl; auto.
-        * apply IHe; split; auto.
-          constructor.
-          apply cnf_fix, proj1 in he; simpl in he.
-          apply ordered_cons_iff, proj2 in he; auto.
-          destruct l as [ | (y,j) l ].
-          - constructor 1.
-          - constructor 2; left; apply he; simpl; auto.
-        * apply IHe; split; auto.
-          apply E0_ht_lt; auto.
-          rewrite cnf_ht; auto; lia.
-      + eapply E0_cnf_lt_omega; eauto.
-    Qed.
-    
-  End cnf_head_rect.
-
-End E0.
-
-Opaque E0_add.
-
-(** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
-
-Definition eps0 := { e | cnf e }.
-
-Notation ε₀ := eps0.
-
-Fact eps0_eq_iff (e f : ε₀) : e = f ↔ π₁ e = π₁ f.
-Proof.
-  split; intro H; subst; auto.
-  revert e f H; intros [e He] [f Hf] ?; simpl in *; subst.
-  now rewrite (cnf_pirr _ He Hf).
-Qed.
-
-(** ε₀ is itself equipped with the restriction of the nested lex. order
-    denoted <ε₀ *)
-
-Definition eps0_lt (e f : ε₀) := E0_lt (π₁ e) (π₁ f).
-
-Arguments eps0_lt /.
-
-Notation "e '<ε₀' f" := (eps0_lt e f) (at level 70, format "e  <ε₀  f").
-
-(** The nested lexicographic order <ε₀ is a strict total/decidable order *)
-
-Theorem eps0_lt_irrefl e : ¬ e <ε₀ e.
-Proof. destruct e; apply E0_lt_irrefl. Qed.
-
-Theorem eps0_lt_trans : transitive eps0_lt.
-Proof. intros [] [] []; apply E0_lt_trans. Qed.
-
-#[local] Hint Resolve eps0_lt_trans : core.
-
-#[local] Hint Constructors sdec : core.
-
-Theorem eps0_lt_sdec e f : sdec eps0_lt e f.
-Proof.
-  revert e f; intros (e & He) (f & Hf).
-  destruct (E0_lt_sdec e f) as []; eauto.
-  rewrite (cnf_pirr _ He Hf); auto.
-Qed.
-
-Fact eps0_lt_eq_gt_dec e f : { e <ε₀ f } + { e = f } + { f <ε₀ e }.
-Proof. destruct (eps0_lt_sdec e f); auto. Qed.
-
-Fact eps0_eq_dec (e f : ε₀) : { e = f } + { e ≠ f }.
-Proof.
-  destruct (eps0_lt_sdec e f) as [ e f H | | e f H ]; auto;
-    right; intros <-; revert H; apply eps0_lt_irrefl.
-Qed.
-
-#[local] Hint Resolve cnf_lt_lpo : core.
-
-(* <ε₀ is well-founded *)
-Theorem wf_eps0_lt : well_founded eps0_lt.
-Proof.
-  generalize E0_lt_wf.
-  apply wf_rel_morph with (f := fun x y => x = π₁ y).
-  + intros []; eauto.
-  + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
-Qed.
-
-#[local] Hint Resolve cnf_zero cnf_one : core.
-
-Definition eps0_zero : ε₀.
-Proof. now exists E0_zero. Defined.
-
-Definition eps0_one : ε₀.
-Proof. now exists E0_one. Defined.
-
-Notation "0₀" := eps0_zero.
-Notation "1₀" := eps0_one.
-
-Fact eps0_zero_not_gt : ∀e, ¬ e <ε₀ 0₀.
-Proof. intros []; apply E0_zero_not_gt. Qed.
-
-Definition eps0_le e f := e <ε₀ f ∨ e = f.
-
-Notation "e '≤ε₀' f" := (eps0_le e f) (at level 70, format "e  ≤ε₀  f").
-
-Fact eps0_le_iff e f : e ≤ε₀ f ↔ E0_le (π₁ e) (π₁ f).
-Proof.
-  unfold eps0_le, E0_le; rewrite eps0_eq_iff.  
-  revert e f; intros [ e He ] [ f Hf ]; simpl; tauto.
-Qed.
-
-Fact eps0_zero_least e : 0₀ ≤ε₀ e.
-Proof.
-  apply eps0_le_iff.
-  destruct e as [ [l] He ]; simpl.
-  destruct l; [ right | left ]; auto.
-  constructor; constructor.
-Qed.
-
-Fact eps0_lt_le_weak e f : e <ε₀ f → e ≤ε₀ f.
-Proof. now left. Qed. 
-
-Fact eps0_le_refl e : e ≤ε₀ e.
-Proof. now right. Qed.
-
-Fact eps0_le_antisym e f : e ≤ε₀ f → f ≤ε₀ e → e = f.
-Proof. rewrite !eps0_le_iff, eps0_eq_iff; apply E0_le_antisym. Qed.
-
-Fact eps0_le_trans e f g : e ≤ε₀ f → f ≤ε₀ g → e ≤ε₀ g.
-Proof. rewrite !eps0_le_iff; apply E0_le_trans. Qed.
-
-Fact eps0_lt_le_trans e f g : e <ε₀ f → f ≤ε₀ g → e <ε₀ g.
-Proof. rewrite eps0_le_iff; apply E0_lt_le_trans. Qed.
-
-Fact eps0_le_lt_trans e f g : e ≤ε₀ f → f <ε₀ g → e <ε₀ g.
-Proof. rewrite eps0_le_iff; apply E0_le_lt_trans. Qed.
-
-Hint Resolve eps0_zero_least eps0_lt_le_weak
-             eps0_le_refl eps0_le_antisym
-             eps0_le_trans eps0_le_lt_trans
-             eps0_lt_le_trans : core.
-
-Fact eps0_zero_or_pos e : { e = 0₀ } + { 0₀ <ε₀ e }.
-Proof.
-  destruct e as [ [ [ | x l ] ] Hl ].
-  + left; apply eps0_eq_iff; auto.
-  + right; cbv; repeat constructor.
-Qed.
-
-Fact eps0_le_lt_dec e f : { e ≤ε₀ f } + { f <ε₀ e }.
-Proof. destruct (eps0_lt_sdec e f); auto. Qed.
-
-Fact eps0_le_zero e : e ≤ε₀ 0₀ → e = 0₀.
-Proof. intros []; auto. Qed.
-
-#[local] Hint Resolve E0_succ_cnf : core.
-
-Definition eps0_succ (e : ε₀) : ε₀.
-Proof.
-  destruct e as [ e He ].
-  exists (E0_succ e); apply E0_succ_cnf, He.
-Defined.
-
-Notation "'S₀' e" := (eps0_succ e) (at level 28).
-
-#[local] Hint Resolve E0_succ_zero E0_succ_lt : core.
-
-(** The successor of E0_zero is E0_one *) 
-Fact eps0_succ_zero_is_one : S₀ 0₀ = 1₀.
-Proof. apply eps0_eq_iff; simpl; auto. Qed.
-
-(** The successor is <ε₀-greater *)
-Fact eps0_lt_succ e : e <ε₀ S₀ e.
-Proof. destruct e; simpl; auto. Qed.
-
-Fact eps0_lt_one : ∀e, e <ε₀ 1₀ → e = 0₀.
-Proof. intros []; rewrite eps0_eq_iff; apply E0_lt_one; auto. Qed.
-
-Fact eps0_le_not_succ e : ¬ S₀ e ≤ε₀ e.
-Proof. intros H; apply (@eps0_lt_irrefl e), eps0_lt_le_trans with (2 := H), eps0_lt_succ. Qed.
-
-Fact eps0_zero_not_succ e : 0₀ ≠ S₀ e.
-Proof.
-  intros H.
-  apply (@eps0_lt_irrefl 0₀).
-  rewrite H at 2.
-  apply eps0_le_lt_trans with (2 := eps0_lt_succ _).
-  apply eps0_zero_least.
-Qed.
-
-#[local] Hint Resolve E0_add_cnf : core.
-
-Definition eps0_add : ε₀ → ε₀ → ε₀.
-Proof. intros [e] [f]; exists (E0_add e f); eauto. Defined.
-
-Infix "+₀" := eps0_add.
-
-Fact eps0_add_zero_left : ∀e, 0₀ +₀ e = e.
-Proof. intros []; apply eps0_eq_iff, E0_add_zero_left. Qed.
-
-Fact eps0_add_zero_right : ∀e, e +₀ 0₀ = e.
-Proof. intros []; apply eps0_eq_iff, E0_add_zero_right. Qed.
-
-Fact eps0_add_assoc : ∀ e f g, (e +₀ f) +₀ g = e +₀ (f +₀ g).
-Proof. intros [] [] []; apply eps0_eq_iff; simpl; apply E0_add_assoc. Qed.
-
-Fact eps0_add_one_right : ∀e, e +₀ 1₀ = S₀ e.
-Proof. intros []; apply eps0_eq_iff, E0_add_one_right; auto. Qed.
-
-(** The defining equation for _ + S _ *)
-Fact eps0_add_succ_right e f : e +₀ S₀ f = S₀ (e +₀ f).
-Proof. now rewrite <- eps0_add_one_right, <- eps0_add_assoc, eps0_add_one_right. Qed.
-
-Fact eps0_lt_inv_add : ∀ e f, e <ε₀ f → ∃a, f = e +₀ a ∧ 0₀ <ε₀ a.
-Proof.
-  intros [e] [f] (a & ? & ? & Ha)%E0_lt_inv_add; auto; simpl in *.
-  exists (exist _ a Ha); rewrite eps0_eq_iff; simpl; auto.
-Qed.
-
-Fact eps0_add_mono_left : ∀ e f g, e ≤ε₀ f → e +₀ g ≤ε₀ f +₀ g.
-Proof. intros [] [] []; rewrite !eps0_le_iff; simpl; apply E0_add_mono_left; auto. Qed.
-
-Fact eps0_add_incr : ∀ e f, 0₀ <ε₀ f → e <ε₀ e +₀ f.
-Proof. intros [] []; apply E0_add_incr; auto. Qed.
-
-Fact eps0_add_mono_right : ∀ e f g, f <ε₀ g → e +₀ f <ε₀ e +₀ g.
-Proof. intros [] [] []; simpl; apply E0_add_mono_right; auto. Qed.
-
-Hint Resolve eps0_add_mono_left eps0_add_mono_right : core.
-
-Fact eps0_add_mono e e' f f' : e ≤ε₀ e' → f ≤ε₀ f' → e +₀ f ≤ε₀ e' +₀ f'.
-Proof. intros ? [ | <- ]; eauto. Qed.
-
-Hint Resolve eps0_add_mono : core.
-
-Fact eps0_add_incr_left e f : e ≤ε₀ f +₀ e.
-Proof. rewrite <- (eps0_add_zero_left e) at 1; auto. Qed. 
-
-Fact eps0_add_incr_right e f : e ≤ε₀ e +₀ f.
-Proof. rewrite <- (eps0_add_zero_right e) at 1; auto. Qed.
-
-Hint Resolve eps0_add_incr_left eps0_add_incr_right : core.
-
-Fact eps0_add_lt_cancel e u v : e +₀ u <ε₀ e +₀ v → u <ε₀ v.
-Proof. 
-  intros H.
-  destruct (eps0_lt_sdec u v) as [ u v ? | u | u v G ]; auto.
-  + now apply E0_lt_irrefl in H.
-  + apply eps0_add_mono_right with (e := e) in G.
-    destruct (@eps0_lt_irrefl (e +₀ v)); eauto.
-Qed.
-
-Fact eps0_add_eq_zero e f : e +₀ f = 0₀ → e = 0₀ ∧ f = 0₀.
-Proof.
-  intros H.
-  destruct (eps0_zero_or_pos f) as [ -> | Hf ].
-  + now rewrite eps0_add_zero_right in H.
-  + apply eps0_add_incr with (e := e) in Hf.
-    rewrite H in Hf.
-    now apply eps0_zero_not_gt in Hf.
-Qed.
-
-Lemma eps0_lt_add_inv_add : ∀ e a f, e <ε₀ a +₀ f → e <ε₀ a ∨ ∃g, e = a +₀ g ∧ g <ε₀ f.
-Proof.
-  intros e a f H.
-  destruct (eps0_lt_sdec e a) as [ e a G | e | e a G ]; auto.
-  + right; exists 0₀.
-    rewrite eps0_add_zero_right; split; auto.
-    destruct (eps0_zero_or_pos f) as [ -> | ]; auto.
-    exfalso; revert H; rewrite eps0_add_zero_right; apply eps0_lt_irrefl.
-  + right.
-    apply eps0_lt_inv_add in G as (b & -> & Hb).
-    apply eps0_add_lt_cancel in H; eauto.
-Qed.
-
-Fact eps0_succ_next e f : e <ε₀ f → S₀ e ≤ε₀ f.
-Proof.
-  intros H.
-  destruct (eps0_le_lt_dec (S₀ e) f) as [ | C ]; auto; exfalso.
-  rewrite <- eps0_add_one_right in C; auto.
-  apply eps0_lt_add_inv_add in C as [ C | (g & -> & Hg) ]; eauto.
-  + apply (@eps0_lt_irrefl e); eauto.
-  + apply eps0_lt_one in Hg as ->; auto.
-    revert H; rewrite eps0_add_zero_right; apply E0_lt_irrefl.
-Qed.
-
-Fact eps0_succ_next_inv e f : e <ε₀ S₀ f → e ≤ε₀ f.
-Proof.
-  intros H.
-  destruct (eps0_lt_sdec e f) as [ e f H1 | e | e f H1%eps0_succ_next ].
-  + now left.
-  + now right.
-  + destruct (@eps0_lt_irrefl e).
-    now apply eps0_lt_le_trans with (2 := H1).
-Qed.
-
-Hint Resolve eps0_le_lt_trans eps0_lt_succ eps0_le_not_succ : core.
-
-Fact eps0_succ_mono e f : e <ε₀ f ↔ S₀ e <ε₀ S₀ f.
-Proof.
-  split.
-  + intros H%eps0_succ_next; eauto.
-  + intros H%eps0_succ_next_inv.
-    destruct (eps0_le_lt_dec f e); auto.
-    apply eps0_lt_le_trans with (2 := H); auto.
-Qed.
-
-Fact eps0_succ_inj e f : S₀ e = S₀ f → e = f.
-Proof.
-  intros E.
-  destruct (eps0_lt_sdec e f) as [ e f G | e | e f G ]; auto.
-    all: apply eps0_succ_mono in G; auto; rewrite E in G; destruct (eps0_lt_irrefl G).
-Qed.
-
-(** There is no ordinal between e and (eps0_succ e) *)
-Corollary eps0_no_ordinal_between_n_and_succ e f :
-    ¬ (e <ε₀ f ∧ f <ε₀ eps0_succ e).
-Proof.
-  intros (H1 & H2).
-  destruct eps0_succ_next with (1 := H1) as [ | <- ].
-  + apply (@eps0_lt_irrefl f), eps0_lt_trans with (1 := H2); auto.
-  + revert H2; apply eps0_lt_irrefl.
-Qed.
-
-Fact eps0_add_cancel e u v : e +₀ u = e +₀ v → u = v.
-Proof.
-  intros H.
-  destruct (eps0_lt_sdec u v) as [ u v G | u | u v G ]; auto;
-    apply eps0_add_mono_right with (e := e) in G; rewrite H in G;
-    edestruct eps0_lt_irrefl; eauto.
-Qed.
-
-Fact eps0_add_le_cancel e u v : e +₀ u ≤ε₀ e +₀ v → u ≤ε₀ v.
-Proof. now intros [ ?%eps0_add_lt_cancel | ?%eps0_add_cancel ]; [ left | right ]. Qed.
-
-(* ω^{e.(S n)} *)
-Definition eps0_exp_S : ε₀ → nat → ε₀.
-Proof.
-  intros (e & He) n.
-  exists (E0_cons [(e,1+n)]).
-  apply cnf_sg; auto; lia.
-Defined.
-
-Notation "'ω' '^⟨' e , i '⟩'" := (eps0_exp_S e i) (at level 1, format "ω ^⟨ e , i ⟩").
-
-Fact eps0_lt_exp_S e n : e <ε₀ ω^⟨e,n⟩.
-Proof.
-  destruct e as [e]; unfold eps0_exp_S; cbn.
-  apply E0_lt_sub with (1+n); auto.
-  apply cnf_sg; auto; lia.
-Qed.
-
-Fact eps0_lt_zero_exp_S e n : 0₀ <ε₀ ω^⟨e,n⟩.
-Proof. apply eps0_le_lt_trans with (2 := eps0_lt_exp_S _ _); auto. Qed.
-
-Hint Resolve eps0_lt_zero_exp_S : core.
-
-Fact eps0_zero_neq_exp_S e n : 0₀ ≠ ω^⟨e,n⟩.
-Proof.
-  intros E; apply (@eps0_lt_irrefl 0₀).
-  rewrite E at 2; apply eps0_lt_zero_exp_S.
-Qed.
-
-Fact eps0_exp_S_mono_right : ∀ e n m, n < m → ω^⟨e,n⟩ <ε₀ ω^⟨e,m⟩.
-Proof. intros [] ? ?; simpl; constructor; constructor 2; right; lia. Qed.
-
-Fact eps0_exp_S_mono_left : ∀ e f n m, e <ε₀ f → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
-Proof. intros [] [] ? ?; apply E0_lt_exp. Qed.
-
-Fact eps0_exp_S_mono e f n m : e ≤ε₀ f → n ≤ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
-Proof.
-  intros [ H1 | <- ] H2.
-  + now left; apply eps0_exp_S_mono_left.
-  + destruct H2; auto.
-    left; apply eps0_exp_S_mono_right; lia.
-Qed.
-
-Fact eps0_exp_S_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n < m.
-Proof.
-  intros H.
-  destruct (eps0_lt_sdec e f) as [ | e | e f H1 ]; auto.
-  + destruct (lt_sdec n m) as [ | n | n m H2 ]; auto.
-    * contradict H; apply eps0_lt_irrefl.
-    * destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
-      apply eps0_lt_trans with (1 := H).
-      now apply eps0_exp_S_mono_right.
-  + destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
-    apply eps0_lt_trans with (1 := H).
-    now apply eps0_exp_S_mono_left.
-Qed.
-
-Fact eps0_add_exp_S e i j : ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i+j+1⟩.
-Proof.
-  destruct e as (e & He); apply eps0_eq_iff; unfold eps0_add, eps0_exp_S, proj1_sig.
-  rewrite E0_add_exp; do 3 f_equal; lia.
-Qed.
-
-Fact eps0_zero_neq_exp_S_add e n f: 0₀ ≠ ω^⟨e,n⟩ +₀ f.
-Proof.
-  intros H.
-  apply (@eps0_lt_irrefl 0₀).
-  rewrite H at 2.
-  apply eps0_lt_le_trans with (1 := eps0_lt_zero_exp_S e n).
-  rewrite <- (eps0_add_zero_right ω^⟨e,n⟩) at 1.
-  apply eps0_add_mono; auto.
-Qed.
-
-(* ω^e *)
-Definition eps0_omega (e : ε₀) := ω^⟨e,0⟩.
-
-Notation "'ω' '^' e" := (eps0_omega e) (at level 1, format "ω ^ e").
-
-Fact eps0_omega_zero : ω^0₀ = 1₀.
-Proof. apply eps0_eq_iff; trivial. Qed.
-
-Fact eps0_lt_omega e : e <ε₀ ω^e.
-Proof. apply eps0_lt_exp_S. Qed.
-
-Hint Resolve eps0_lt_omega : core.
-
-Fact eps0_omega_mono_lt : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
-Proof. intros [] [] ?; constructor; constructor 2; left; auto. Qed.
-
-Fact eps0_omega_mono_le e f : e ≤ε₀ f → ω^e ≤ε₀ ω^f.
-Proof. intros [ | <- ]; auto; left; now apply eps0_omega_mono_lt. Qed.
-
-Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
-Proof.
-  intros E.
-  destruct (eps0_lt_sdec e f) as [ e f H | | e f H ]; auto;
-    apply eps0_omega_mono_lt in H; rewrite E in H; now apply eps0_lt_irrefl in H.
-Qed.
-
-Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
-Proof.
-  rewrite <- eps0_omega_zero.
-  now intros <-%eps0_omega_inj.
-Qed. 
-
-Fact eps0_zero_lt_omega e : 0₀ <ε₀ ω^e.
-Proof. apply eps0_lt_zero_exp_S. Qed.
-
-Hint Resolve eps0_zero_lt_omega : core.
-
-Fact eps0_zero_neq_omega e : 0₀ ≠ ω^e.
-Proof. 
-  intros H.
-  apply (@eps0_lt_irrefl 0₀).
-  rewrite H at 2.
-  apply eps0_zero_lt_omega.
-Qed.
-
-Fact eps0_add_below_omega e f g : e <ε₀ ω^g → f <ε₀ ω^g → e +₀ f <ε₀ ω^g.
-Proof. revert e f g; intros [[] ] [[] ] []; apply E0_add_below_omega. Qed.
-
-Fact eps0_add_lt_omega : ∀ a e, e ≠ 0₀ → a <ε₀ ω^e → a +₀ ω^e = ω^e.
-Proof.
-  intros [a Ha] [e He] He' H.
-  apply eps0_eq_iff; simpl in H |- *.
-  revert H; apply E0_add_lt_omega; auto.
-  contradict He'; subst; now apply eps0_eq_iff.
-Qed.
-
-Lemma eps0_add_omega_fun_right : ∀ a b e f, a +₀ ω^e = b +₀ ω^f → e = f.
-Proof.
-  intros [] [] [] []; rewrite !eps0_eq_iff; simpl.
-  apply E0_add_omega_fun_right.
-Qed.
-
-Fact eps0_lt_head_split_inv e₁ i₁ f₁ e₂ i₂ f₂ :
-    f₁ <ε₀ ω^e₁
-  → f₂ <ε₀ ω^e₂
-  → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
-  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ f₁ <ε₀ f₂).
-Proof.
-  rewrite !eps0_eq_iff.
-  revert e₁ i₁ f₁ e₂ i₂ f₂.
-  intros (e & He) i ([l] & Hl) (f & Hf) j ([m] & Hm) H1 H2; simpl in *.
-  rewrite !E0_add_head_normal in *; auto.
-  split; intros H3.
-  + apply E0_lt_inv, lex_list_cons_inv in H3
-      as [ [ | (<- & ?)]%lex2_inv | ([=] & ?)  ]; auto.
-    * right; split; auto; left; lia.
-    * subst; do 2 (right; split; auto).
-      now constructor.
-  + constructor.
-    destruct H3 as [ | (<- & [ | (<- & ?%E0_lt_inv) ]) ].
-    * constructor 2; now left.
-    * constructor 2; right; lia.
-    * now constructor 3.
-Qed.
-
-Fact eps0_lt_head_split_inv_left e₁ i₁ e₂ i₂ f₂ :
-    f₂ <ε₀ ω^e₂
-  → ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
-  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ 0₀ <ε₀ f₂).
-Proof.
-  intro.
-  rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩), eps0_lt_head_split_inv; auto.
-  firstorder.
-Qed.
-
-Fact eps0_lt_head_split_inv_right e₁ i₁ f₁ e₂ i₂ :
-    f₁ <ε₀ ω^e₁
-  → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
-  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
-Proof.
-  intro.
-  rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩), eps0_lt_head_split_inv; auto.
-  apply or_iff_compat_l, and_iff_compat_l.
-  split; auto.
-  intros [ | (_ & ?%eps0_zero_not_gt) ]; now auto.
-Qed.
-
-Fact eps0_lt_head_split_inv_both e₁ i₁ e₂ i₂ :
-    ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩
-  ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
-Proof.
-  rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩).
-  apply eps0_lt_head_split_inv_right; auto.
-Qed.
-
-Hint Resolve eps0_add_incr eps0_add_incr_right : core.
-
-Fact eps0_lt_zero_head_split e i f : 0₀ <ε₀ ω^⟨e,i⟩ +₀ f.
-Proof. apply eps0_lt_le_trans with ω^⟨e,i⟩; auto. Qed.
-
-Hint Resolve eps0_lt_zero_head_split : core.
-
-Fact eps0_not_head_split_lt_zero e i f : ¬ ω^⟨e,i⟩ +₀ f <ε₀ 0₀.
-Proof. apply eps0_zero_not_gt. Qed.
-
-Fact eps0_not_eps_S_lt_zero e i : ¬ ω^⟨e,i⟩ <ε₀ 0₀.
-Proof. apply eps0_zero_not_gt. Qed.
-
-Fact eps0_head_split_uniq e₁ i₁ f₁ e₂ i₂ f₂ :
-    ω^⟨e₁,i₁⟩ +₀ f₁ = ω^⟨e₂,i₂⟩ +₀ f₂
-  → f₁ <ε₀ ω^e₁
-  → f₂ <ε₀ ω^e₂
-  → e₁ = e₂ ∧ i₁ = i₂ ∧ f₁ = f₂.
-Proof.
-  revert e₁ i₁ f₁ e₂ i₂ f₂.
-  intros (e & He) i ([l] & Hl) (f & Hf) j ([m] & Hm)
-         E%eps0_eq_iff H1 H2.
-  rewrite !eps0_eq_iff; simpl in *.
-  rewrite !E0_add_head_normal in E; auto.
-  now inversion E.
-Qed.
-
-Fact eps0_head_split_uniq' e₁ i₁ e₂ i₂ f₂ :
-    ω^⟨e₁,i₁⟩ = ω^⟨e₂,i₂⟩ +₀ f₂
-  → f₂ <ε₀ ω^e₂
-  → e₁ = e₂ ∧ i₁ = i₂ ∧ f₂ = 0₀.
-Proof.
-  rewrite <- (eps0_add_zero_right ω^⟨e₁,i₁⟩).
-  intros H1 H2; revert H1.
-  intros (-> & -> & <-)%eps0_head_split_uniq; auto.
-Qed.
-
-Fact eps0_eps_S_uniq e₁ i₁ e₂ i₂ :
-    ω^⟨e₁,i₁⟩ = ω^⟨e₂,i₂⟩
-  → e₁ = e₂ ∧ i₁ = i₂.
-Proof.
-   rewrite <- (eps0_add_zero_right ω^⟨_,i₁⟩),
-           <- (eps0_add_zero_right ω^⟨_,i₂⟩).
-   intros (-> & -> & _)%eps0_head_split_uniq; auto.
-Qed.
-
-Fact eps0_zero_neq_head_split e i f : 0₀ ≠ ω^⟨e,i⟩ +₀ f.
-Proof.
-  intros E.
-  apply (@eps0_lt_irrefl 0₀).
-  rewrite E at 2.
-  apply eps0_lt_le_trans with (1 := eps0_lt_zero_exp_S e i).
-  rewrite <- (eps0_add_zero_right ω^⟨_,i⟩) at 1.
-  apply eps0_add_mono; auto.
-Qed.
-
-Fact eps0_add_head_lt e₁ i₁ f₁ e₂ i₂ f₂ :
-    e₁ <ε₀ e₂
-  → f₁ <ε₀ ω^e₁
-  → f₂ <ε₀ ω^e₂
-  → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
-Proof.
-  revert e₁ i₁ f₁ e₂ i₂ f₂.
-  intros (e1 & He1) i ([l] & Hf1) (e2 & He2) j ([m] & Hf2) H1 H2 H3.
-  apply eps0_eq_iff; simpl in *.
-  rewrite !E0_add_head_normal; auto.
-  rewrite E0_add_head_lt; auto.
-Qed.
-
-Fact eps0_add_head_lt' e₁ i₁ e₂ i₂ f₂ :
-    e₁ <ε₀ e₂
-  → f₂ <ε₀ ω^e₂
-  → ω^⟨e₁,i₁⟩ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
-Proof.
-  intros H1 H2.
-  rewrite <- (eps0_add_zero_right ω^⟨e₁,i₁⟩).
-  apply eps0_add_head_lt; auto.
-Qed.
-
-Fact eps0_add_head_lt'' e₁ i₁ e₂ i₂ :
-    e₁ <ε₀ e₂
-  → ω^⟨e₁,i₁⟩ +₀ ω^⟨e₂,i₂⟩ = ω^⟨e₂,i₂⟩.
-Proof.
-  intros H.
-  rewrite <- (eps0_add_zero_right ω^⟨_,i₂⟩).
-  apply eps0_add_head_lt'; auto.
-Qed.
-
-Fact eps0_add_head_eq e i₁ f₁ i₂ f₂ :
-    f₁ <ε₀ ω^e
-  → f₂ <ε₀ ω^e
-  → (ω^⟨e,i₁⟩ +₀ f₁) +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁+i₂+1⟩ +₀ f₂.
-Proof.
-  revert e i₁ f₁ i₂ f₂.
-  intros (e & He) i ([l] & Hf1) j ([m] & Hf2) H1 H2.
-  apply eps0_eq_iff; simpl in *.
-  rewrite !E0_add_head_normal; auto.
-  rewrite E0_add_head_eq; auto.
-  do 3 f_equal; lia.
-Qed.
-
-Fact eps0_add_head_eq' e i₁ i₂ f₂ :
-    f₂ <ε₀ ω^e
-  → ω^⟨e,i₁⟩ +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁+i₂+1⟩ +₀ f₂.
-Proof.
-  intros.
-  rewrite <- (eps0_add_zero_right ω^⟨e,i₁⟩).
-  rewrite eps0_add_head_eq; auto.
-Qed.
-
-Fact eps0_add_head_gt e₁ i₁ f₁ e₂ i₂ f₂ :
-    e₂ <ε₀ e₁
-  → f₁ <ε₀ ω^e₁
-  → f₂ <ε₀ ω^e₂
-  → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₁,i₁⟩ +₀ (f₁ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂))
-   ∧ f₁ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) <ε₀ ω^e₁.
-Proof.
-  revert e₁ i₁ f₁ e₂ i₂ f₂.
-  intros (e1 & He1) i ([l] & Hf1) (e2 & He2) j ([m] & Hf2) H1 H2 H3.
-  rewrite eps0_eq_iff; simpl in *.
-  rewrite !E0_add_head_normal; auto.
-  apply E0_add_head_gt; auto; lia.
-Qed.
-
-Local Fact eps0_pirr (P : ε₀ → Type) e f h1 h2 : e = f → P (exist _ e h1) → P (exist _ f h2).
-Proof. intros <-; now rewrite (cnf_pirr _ h1 h2). Qed.
-
-Section eps0_head_rect.
-
-  Variables (P : ε₀ → Type)
-            (HP0 : P 0₀)
-            (HP1 : ∀ e i f, f <ε₀ ω^e → P e → P f → P (ω^⟨e,i⟩ +₀ f)).
-
-  Theorem eps0_head_rect : ∀e, P e.
-  Proof.
-    intros (e & he); revert e he.
-    apply cnf_head_rect.
-    + intros; revert HP0; apply eps0_pirr with (1 := eq_refl).
-    + intros e he i f hf h hi H Hf He.
-      refine (@eps0_pirr P _ _ _ _ _ (@HP1 _ (pred i) _ _ He Hf)).
-      * do 4 f_equal; lia.
-      * simpl; trivial.
-  Qed.
-
-End eps0_head_rect.
-
-Lemma eps0_lt_exp_S_inv a e n :
-    a <ε₀ ω^⟨e,n⟩
-  → (a = 0₀)
-  + { i : _ & { b | a = ω^⟨e,i⟩ +₀ b ∧ i < n ∧ b <ε₀ ω^e } }
-  + { f : _ & { i | a <ε₀ ω^⟨f,i⟩ ∧ f <ε₀ e } }.
-Proof.
-  destruct a as [ | g i h H _ _ ] using eps0_head_rect.
-  + now do 2 left.
-  + intros H1.
-    destruct n as [ | n ].
-    * right.
-      exists g, (S i).
-      apply eps0_lt_head_split_inv_right in H1
-        as [ H1 | (_ & ?) ]; lia || auto.
-      split; auto.
-      apply eps0_lt_head_split_inv_right; auto.
-    * apply eps0_lt_head_split_inv_right in H1; auto.
-      destruct (eps0_le_lt_dec e g) as [ C | C ].
-      - left; right; exists i, h.
-        destruct H1 as [ H1 | (-> & H1) ]; eauto.
-        destruct (@eps0_lt_irrefl e); eauto.
-      - right; exists g, (S i); split; auto.
-        apply eps0_lt_head_split_inv_right; auto.
-Qed.
-
-(** inversion for _ <ε₀ ω^_ *)
-Lemma eps0_lt_omega_inv a e : a <ε₀ ω^e → (a = 0₀) + { f : ε₀ & { n | a <ε₀ ω^⟨f,n⟩ ∧ f <ε₀ e } }.
-Proof. intros [[ -> | (i & ? & ? & ? & _) ] | ]%eps0_lt_exp_S_inv; auto; lia. Qed.
-
-(** inversion for _ < ω^(_+1) *)
-Lemma eps0_lt_omega_succ_inv f e : f <ε₀ ω^(S₀ e) → { n | f <ε₀ ω^⟨e,n⟩ }.
-Proof.
-  intros [ -> | (a & n & H1 & H2%eps0_succ_next_inv) ]%eps0_lt_omega_inv.
-  + exists 0; auto.
-  + exists n; apply eps0_lt_le_trans with (1 := H1), eps0_exp_S_mono; auto.
-Qed.
-
-Section eps0_head_pos_rect.
-
-  Variables (P : ε₀ → Type)
-            (HP0 : P 0₀)
-            (HP1 : ∀i, P ω^⟨0₀,i⟩) 
-            (HP2 : ∀ e i f, 0₀ <ε₀ e → f <ε₀ ω^e → P e → P f → P (ω^⟨e,i⟩ +₀ f)).
-
-  Theorem eps0_head_pos_rect : ∀e, P e.
-  Proof.
-    induction e as [ | e n f H ] using eps0_head_rect; trivial.
-    destruct (eps0_zero_or_pos e) as [ -> | G ].
-    + assert (f = 0₀) as ->.
-      1:{ rewrite eps0_omega_zero in H.
-          now apply eps0_lt_one in H. }
-      rewrite eps0_add_zero_right; trivial.
-    + now apply HP2.
-  Qed.
-
-End eps0_head_pos_rect.
-     
 
 (* LAWS:
 
@@ -2206,6 +24,17 @@ End eps0_head_pos_rect.
    α(β + γ) = αβ + αγ
    (ω^γ.a + β).n = ω^γ.(an) + β
    (ω^γ.a + β).ω^α = ω^(γ+α)
+
+  a^0 = 1
+     a^(S n) = a^n.a
+     a^(ω^e+f) = a^(ω^e).a^f
+
+     a^(ω^e) = ?
+      0^_ = 0
+      n^(ω^e) = 
+      (ω^a+b)^(ω^e) = ?
+      (ω^a)^(ω^e) = ω^(a.ω^e)
+
    
    
    θ.n
@@ -2226,169 +55,903 @@ End eps0_head_pos_rect.
    
    *)
 
-(** θ.(1+n) *)
-Inductive eps0_mpos_gr n : ε₀ → ε₀ → Prop :=
-  | eps0_mpos_gr_0 : eps0_mpos_gr n 0₀ 0₀
-  | eps0_mpos_gr_1 α i β : β <ε₀ ω^α → eps0_mpos_gr n (ω^⟨α,i⟩ +₀ β) (ω^⟨α,i*n+i+n⟩ +₀ β).
+Set Implicit Arguments.
 
-Fact eps0_mpos_fun n e1 f1 e2 f2 : eps0_mpos_gr n e1 f1 → eps0_mpos_gr n e2 f2 → e1 = e2 → f1 = f2.
+#[local] Notation π₁ := proj1_sig.
+#[local] Notation π₂ := proj2_sig.
+
+#[global] Reserved Notation "e '<ε₀' f" (at level 70, format "e  <ε₀  f").
+#[global] Reserved Notation "e '≤ε₀' f" (at level 70, format "e  ≤ε₀  f").
+
+#[local] Hint Constructors clos_trans : core.
+#[local] Hint Resolve Acc_inv Acc_intro 
+                      in_cons in_eq in_elt in_or_app : core.
+#[local] Hint Resolve clos_trans_rev transitive_rev : core.
+#[local] Hint Constructors lex2 : core.
+
+(** ε₀ is the sub-type of E0 composed of trees in nested lexigraphic order *)
+
+Definition eps0 := { e | cnf e }.
+
+#[local] Notation ε₀ := eps0.
+
+Fact eps0_eq_iff (e f : ε₀) : e = f ↔ π₁ e = π₁ f.
 Proof.
-  do 2 destruct 1; auto.
-  + now intros ?%eps0_zero_neq_exp_S_add.
-  + symm; now intros ?%eps0_zero_neq_exp_S_add.
-  + intros (? & [])%eps0_head_split_uniq; subst; auto.
+  split; intro H; subst; auto.
+  revert e f H; intros [e He] [f Hf] ?; simpl in *; subst.
+  now rewrite (cnf_pirr _ He Hf).
 Qed.
 
-Definition eps0_mpos_pwc e n : sig (eps0_mpos_gr n e).
-Proof.
-  destruct e as [ | e i f H ] using eps0_head_rect.
-  + exists 0₀; constructor.
-  + exists (ω^⟨e,i*n+i+n⟩ +₀ f); now constructor.
-Qed.
+Local Fact eps0_pirr (P : ε₀ → Type) e f h1 h2 : e = f → P (exist _ e h1) → P (exist _ f h2).
+Proof. intros <-; now rewrite (cnf_pirr _ h1 h2). Qed.
 
-Definition eps0_mpos e n := proj1_sig (eps0_mpos_pwc e n).
+Section eps0_order.
 
-Fact eps0_mpos_spec e n : eps0_mpos_gr n e (eps0_mpos e n).
-Proof. apply (proj2_sig _). Qed.
+  (** ε₀ is itself equipped with the restriction 
+      of the nested lex. order denoted <ε₀ *)
 
-Fact eps0_mpos_fix_0 n : eps0_mpos 0₀ n = 0₀.
-Proof. apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); constructor. Qed.
+  Definition eps0_lt (e f : ε₀) := E0_lt (π₁ e) (π₁ f).
 
-Fact eps0_mpos_fix_1 n α i β : β <ε₀ ω^α → eps0_mpos (ω^⟨α,i⟩ +₀ β) n = ω^⟨α,i*n+i+n⟩ +₀ β.
-Proof. intros; apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); now constructor. Qed.
+  Arguments eps0_lt /.
 
-Fact eps0_mpos_exp_S n α i : eps0_mpos ω^⟨α,i⟩ n = ω^⟨α,i*n+i+n⟩.
-Proof. 
-  rewrite <- (eps0_add_zero_right ω^⟨_,i⟩), eps0_mpos_fix_1; auto.
-  now rewrite eps0_add_zero_right.
-Qed.
+  Infix "<ε₀" := eps0_lt.
 
-Fact eps0_mpos_O e : eps0_mpos e 0 = e.
-Proof.
-  destruct e as [ | e i f H ] using eps0_head_rect.
-  + now rewrite eps0_mpos_fix_0.
-  + rewrite eps0_mpos_fix_1; auto.
-    do 2 f_equal; lia.
-Qed.
+  (** The nested lexicographic order <ε₀ is a strict total/decidable order *)
 
-(*
-Fact eps0_mpos_eps_S_add n α i β : eps0_mpos (ω^⟨α,i⟩ +₀ β) n = ω^⟨α,i*n+i+n⟩ +₀ β.
-Proof.
-  destruct β as [ | e j f H _ _ ] using eps0_head_rect.
-  + rewrite eps0_mpos_fix_1; auto.
-  + destruct (eps0_lt_sdec α e).
-    * rewrite !eps0_add_head_lt'; auto.
-      rewrite eps0_mpos_fix_1; auto.
-*)
+  Fact eps0_lt_irrefl e : ¬ e <ε₀ e.
+  Proof. destruct e; apply E0_lt_irrefl. Qed.
 
-Fact eps0_mpos_omega_add n α β : β <ε₀ ω^α → eps0_mpos (ω^α +₀ β) n = ω^⟨α,n⟩ +₀ β.
-Proof.
-  intros; unfold eps0_omega.
-  rewrite eps0_mpos_fix_1; auto.
-Qed.
+  Fact eps0_lt_trans : transitive eps0_lt.
+  Proof. intros [] [] []; apply E0_lt_trans. Qed.
 
-Fact eps0_mpos_omega n α : eps0_mpos ω^α n = ω^⟨α,n⟩.
-Proof.
-  rewrite <- (eps0_add_zero_right ω^α), eps0_mpos_omega_add; auto.
-  now rewrite eps0_add_zero_right.
-Qed.
+  Hint Resolve eps0_lt_trans : core.
+  Hint Constructors sdec : core.
 
-Fact eps0_mpos_plus e i j : eps0_mpos e i +₀ eps0_mpos e j = eps0_mpos e (i+j+1).
-Proof.
-  destruct e using eps0_head_rect.
-  + now rewrite !eps0_mpos_fix_0, eps0_add_zero_left.
-  + rewrite !eps0_mpos_fix_1; auto.
+  Fact eps0_lt_sdec e f : sdec eps0_lt e f.
+  Proof.
+    revert e f; intros (e & He) (f & Hf).
+    destruct (E0_lt_sdec e f) as []; eauto.
+    rewrite (cnf_pirr _ He Hf); auto.
+  Qed.
+
+  Fact eps0_lt_eq_gt_dec e f : { e <ε₀ f } + { e = f } + { f <ε₀ e }.
+  Proof. destruct (eps0_lt_sdec e f); auto. Qed.
+
+  Fact eps0_eq_dec (e f : ε₀) : { e = f } + { e ≠ f }.
+  Proof. apply sdec_eq_dec with (1 := eps0_lt_sdec), eps0_lt_irrefl. Qed.
+
+  Hint Resolve cnf_lt_lpo : core.
+
+  (* <ε₀ is well-founded *)
+  Fact wf_eps0_lt : well_founded eps0_lt.
+  Proof.
+    generalize E0_lt_wf.
+    apply wf_rel_morph with (f := fun x y => x = π₁ y).
+    + intros []; eauto.
+    + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
+  Qed.
+
+  Hint Resolve cnf_zero cnf_one : core.
+
+  Definition eps0_zero : ε₀.
+  Proof. now exists E0_zero. Defined.
+
+  Definition eps0_one : ε₀.
+  Proof. now exists E0_one. Defined.
+
+  Notation "0₀" := eps0_zero.
+  Notation "1₀" := eps0_one.
+
+  Fact eps0_zero_not_gt : ∀e, ¬ e <ε₀ 0₀.
+  Proof. intros []; apply E0_zero_not_gt. Qed.
+
+  Definition eps0_le e f := e <ε₀ f ∨ e = f.
+
+  Infix "≤ε₀" := eps0_le.
+
+  Fact eps0_le_iff e f : e ≤ε₀ f ↔ E0_le (π₁ e) (π₁ f).
+  Proof.
+    unfold eps0_le, E0_le; rewrite eps0_eq_iff.  
+    revert e f; intros [ e He ] [ f Hf ]; simpl; tauto.
+  Qed.
+
+  Fact eps0_zero_least e : 0₀ ≤ε₀ e.
+  Proof.
+    apply eps0_le_iff.
+    destruct e as [ [l] He ]; simpl.
+    destruct l; [ right | left ]; auto.
+    constructor; constructor.
+  Qed.
+
+  Fact eps0_lt_le_weak e f : e <ε₀ f → e ≤ε₀ f.
+  Proof. now left. Qed. 
+
+  Fact eps0_le_refl e : e ≤ε₀ e.
+  Proof. now right. Qed.
+
+  Fact eps0_le_antisym e f : e ≤ε₀ f → f ≤ε₀ e → e = f.
+  Proof. rewrite !eps0_le_iff, eps0_eq_iff; apply E0_le_antisym. Qed.
+
+  Fact eps0_le_trans e f g : e ≤ε₀ f → f ≤ε₀ g → e ≤ε₀ g.
+  Proof. rewrite !eps0_le_iff; apply E0_le_trans. Qed.
+
+  Fact eps0_lt_le_trans e f g : e <ε₀ f → f ≤ε₀ g → e <ε₀ g.
+  Proof. rewrite eps0_le_iff; apply E0_lt_le_trans. Qed.
+
+  Fact eps0_le_lt_trans e f g : e ≤ε₀ f → f <ε₀ g → e <ε₀ g.
+  Proof. rewrite eps0_le_iff; apply E0_le_lt_trans. Qed.
+
+  Hint Resolve eps0_zero_least eps0_lt_le_weak
+             eps0_le_refl eps0_le_antisym
+             eps0_le_trans eps0_le_lt_trans
+             eps0_lt_le_trans : core.
+
+  Fact eps0_zero_or_pos e : { e = 0₀ } + { 0₀ <ε₀ e }.
+  Proof.
+    destruct e as [ [ [ | x l ] ] Hl ].
+    + left; apply eps0_eq_iff; auto.
+    + right; cbv; repeat constructor.
+  Qed.
+
+  Fact eps0_le_lt_dec e f : { e ≤ε₀ f } + { f <ε₀ e }.
+  Proof. destruct (eps0_lt_sdec e f); auto. Qed.
+
+  Fact eps0_le_zero e : e ≤ε₀ 0₀ → e = 0₀.
+  Proof. intros []; auto. Qed.
+
+  Hint Resolve E0_succ_cnf : core.
+
+  Definition eps0_succ (e : ε₀) : ε₀.
+  Proof.
+    destruct e as [ e He ].
+    exists (E0_succ e); apply E0_succ_cnf, He.
+  Defined.
+
+  Notation S₀ := eps0_succ.
+
+  Hint Resolve E0_succ_zero E0_succ_lt : core.
+
+  (** The successor of E0_zero is E0_one *) 
+  Fact eps0_succ_zero_is_one : S₀ 0₀ = 1₀.
+  Proof. apply eps0_eq_iff; simpl; auto. Qed.
+
+  (** The successor is <ε₀-greater *)
+  Fact eps0_lt_succ e : e <ε₀ S₀ e.
+  Proof. destruct e; simpl; auto. Qed.
+
+  Fact eps0_lt_one : ∀e, e <ε₀ 1₀ → e = 0₀.
+  Proof. intros []; rewrite eps0_eq_iff; apply E0_lt_one; auto. Qed.
+
+  Fact eps0_le_not_succ e : ¬ S₀ e ≤ε₀ e.
+  Proof. intros H; apply (@eps0_lt_irrefl e), eps0_lt_le_trans with (2 := H), eps0_lt_succ. Qed.
+
+  Fact eps0_zero_not_succ e : 0₀ ≠ S₀ e.
+  Proof.
+    intros H.
+    apply (@eps0_lt_irrefl 0₀).
+    rewrite H at 2.
+    apply eps0_le_lt_trans with (2 := eps0_lt_succ _).
+    apply eps0_zero_least.
+  Qed.
+
+End eps0_order.
+
+Arguments eps0_lt /.
+
+#[local] Hint Resolve eps0_zero_least eps0_lt_le_weak
+             eps0_le_refl eps0_le_antisym
+             eps0_lt_trans eps0_le_trans 
+             eps0_le_lt_trans
+             eps0_lt_le_trans : core.
+
+Infix "<ε₀" := eps0_lt.
+Infix "≤ε₀" := eps0_le.
+Notation "0₀" := eps0_zero.
+Notation "1₀" := eps0_one.
+Notation S₀ := eps0_succ.
+
+Section eps0_add.
+
+  Hint Resolve E0_add_cnf : core.
+
+  Definition eps0_add : ε₀ → ε₀ → ε₀.
+  Proof. intros [e] [f]; exists (E0_add e f); eauto. Defined.
+
+  Infix "+₀" := eps0_add.
+
+  Fact eps0_add_zero_left : ∀e, 0₀ +₀ e = e.
+  Proof. intros []; apply eps0_eq_iff, E0_add_zero_left. Qed.
+
+  Fact eps0_add_zero_right : ∀e, e +₀ 0₀ = e.
+  Proof. intros []; apply eps0_eq_iff, E0_add_zero_right. Qed.
+
+  Fact eps0_add_assoc : ∀ e f g, (e +₀ f) +₀ g = e +₀ (f +₀ g).
+  Proof. intros [] [] []; apply eps0_eq_iff; simpl; apply E0_add_assoc. Qed.
+
+  Fact eps0_add_one_right : ∀e, e +₀ 1₀ = S₀ e.
+  Proof. intros []; apply eps0_eq_iff, E0_add_one_right; auto. Qed.
+
+  (** The defining equation for _ + S _ *)
+  Fact eps0_add_succ_right e f : e +₀ S₀ f = S₀ (e +₀ f).
+  Proof. now rewrite <- eps0_add_one_right, <- eps0_add_assoc, eps0_add_one_right. Qed.
+
+  Fact eps0_lt_inv_add : ∀ e f, e <ε₀ f → ∃a, f = e +₀ a ∧ 0₀ <ε₀ a.
+  Proof.
+    intros [e] [f] (a & ? & ? & Ha)%E0_lt_inv_add; auto; simpl in *.
+    exists (exist _ a Ha); rewrite eps0_eq_iff; simpl; auto.
+  Qed.
+
+  Fact eps0_add_mono_left : ∀ e f g, e ≤ε₀ f → e +₀ g ≤ε₀ f +₀ g.
+  Proof. intros [] [] []; rewrite !eps0_le_iff; simpl; apply E0_add_mono_left; auto. Qed.
+
+  Fact eps0_add_incr : ∀ e f, 0₀ <ε₀ f → e <ε₀ e +₀ f.
+  Proof. intros [] []; apply E0_add_incr; auto. Qed.
+
+  Fact eps0_add_mono_right : ∀ e f g, f <ε₀ g → e +₀ f <ε₀ e +₀ g.
+  Proof. intros [] [] []; simpl; apply E0_add_mono_right; auto. Qed.
+
+  Hint Resolve eps0_add_mono_left eps0_add_mono_right : core.
+
+  Fact eps0_add_mono e e' f f' : e ≤ε₀ e' → f ≤ε₀ f' → e +₀ f ≤ε₀ e' +₀ f'.
+  Proof. intros ? [ | <- ]; eauto. Qed.
+
+  Hint Resolve eps0_add_mono : core.
+
+  Fact eps0_add_incr_left e f : e ≤ε₀ f +₀ e.
+  Proof. rewrite <- (eps0_add_zero_left e) at 1; auto. Qed.
+
+  Fact eps0_add_incr_right e f : e ≤ε₀ e +₀ f.
+  Proof. rewrite <- (eps0_add_zero_right e) at 1; auto. Qed.
+
+  Hint Resolve eps0_add_incr_left eps0_add_incr_right : core.
+
+  Fact eps0_add_lt_cancel e u v : e +₀ u <ε₀ e +₀ v → u <ε₀ v.
+  Proof. 
+    intros H.
+    destruct (eps0_lt_sdec u v) as [ u v ? | u | u v G ]; auto.
+    + now apply E0_lt_irrefl in H.
+    + apply eps0_add_mono_right with (e := e) in G.
+      destruct (@eps0_lt_irrefl (e +₀ v)); eauto.
+  Qed.
+
+  Fact eps0_add_eq_zero e f : e +₀ f = 0₀ → e = 0₀ ∧ f = 0₀.
+  Proof.
+    intros H.
+    destruct (eps0_zero_or_pos f) as [ -> | Hf ].
+    + now rewrite eps0_add_zero_right in H.
+    + apply eps0_add_incr with (e := e) in Hf.
+      rewrite H in Hf.
+      now apply eps0_zero_not_gt in Hf.
+  Qed.
+
+  Lemma eps0_lt_add_inv_add e a f : e <ε₀ a +₀ f → e <ε₀ a ∨ ∃g, e = a +₀ g ∧ g <ε₀ f.
+  Proof.
+    intros H.
+    destruct (eps0_lt_sdec e a) as [ e a G | e | e a G ]; auto.
+    + right; exists 0₀.
+      rewrite eps0_add_zero_right; split; auto.
+      destruct (eps0_zero_or_pos f) as [ -> | ]; auto.
+      exfalso; revert H; rewrite eps0_add_zero_right; apply eps0_lt_irrefl.
+    + right.
+      apply eps0_lt_inv_add in G as (b & -> & Hb).
+      apply eps0_add_lt_cancel in H; eauto.
+  Qed.
+
+  Fact eps0_succ_next e f : e <ε₀ f → S₀ e ≤ε₀ f.
+  Proof.
+    intros H.
+    destruct (eps0_le_lt_dec (S₀ e) f) as [ | C ]; auto; exfalso.
+    rewrite <- eps0_add_one_right in C; auto.
+    apply eps0_lt_add_inv_add in C as [ C | (g & -> & Hg) ]; eauto.
+    + apply (@eps0_lt_irrefl e); eauto.
+    + apply eps0_lt_one in Hg as ->; auto.
+      revert H; rewrite eps0_add_zero_right; apply E0_lt_irrefl.
+  Qed.
+
+  Fact eps0_succ_next_inv e f : e <ε₀ S₀ f → e ≤ε₀ f.
+  Proof.
+    intros H.
+    destruct (eps0_lt_sdec e f) as [ e f H1 | e | e f H1%eps0_succ_next ].
+    + now left.
+    + now right.
+    + destruct (@eps0_lt_irrefl e).
+      now apply eps0_lt_le_trans with (2 := H1).
+  Qed.
+
+  Hint Resolve eps0_le_lt_trans eps0_lt_succ eps0_le_not_succ : core.
+
+  Fact eps0_succ_mono e f : e <ε₀ f ↔ S₀ e <ε₀ S₀ f.
+  Proof.
+    split.
+    + intros H%eps0_succ_next; eauto.
+    + intros H%eps0_succ_next_inv.
+      destruct (eps0_le_lt_dec f e); auto.
+      apply eps0_lt_le_trans with (2 := H); auto.
+  Qed.
+
+  Fact eps0_succ_inj e f : S₀ e = S₀ f → e = f.
+  Proof.
+    intros E.
+    destruct (eps0_lt_sdec e f) as [ e f G | e | e f G ]; auto.
+    all: apply eps0_succ_mono in G; auto; rewrite E in G; destruct (eps0_lt_irrefl G).
+  Qed.
+
+  (** There is no ordinal between e and (eps0_succ e) *)
+  Corollary eps0_no_ordinal_between_n_and_succ e f :
+      ¬ (e <ε₀ f ∧ f <ε₀ eps0_succ e).
+  Proof.
+    intros (H1 & H2).
+    destruct eps0_succ_next with (1 := H1) as [ | <- ].
+    + apply (@eps0_lt_irrefl f), eps0_lt_trans with (1 := H2); auto.
+    + revert H2; apply eps0_lt_irrefl.
+  Qed.
+
+  Fact eps0_add_cancel e u v : e +₀ u = e +₀ v → u = v.
+  Proof.
+    intros H.
+    destruct (eps0_lt_sdec u v) as [ u v G | u | u v G ]; auto;
+      apply eps0_add_mono_right with (e := e) in G; rewrite H in G;
+      edestruct eps0_lt_irrefl; eauto.
+  Qed.
+
+  Fact eps0_add_le_cancel e u v : e +₀ u ≤ε₀ e +₀ v → u ≤ε₀ v.
+  Proof. now intros [ ?%eps0_add_lt_cancel | ?%eps0_add_cancel ]; [ left | right ]. Qed.
+
+End eps0_add.
+
+Infix "+₀" := eps0_add.
+
+#[local] Hint Resolve eps0_le_lt_trans
+                      eps0_lt_succ
+                      eps0_le_not_succ : core.
+
+#[local] Hint Resolve eps0_add_incr
+                      eps0_add_incr_left
+                      eps0_add_incr_right : core.
+
+#[local] Hint Resolve eps0_add_mono_left
+                      eps0_add_mono_right
+                      eps0_add_mono : core.
+
+Section eps0_omega.
+
+  (* ω^{e.(S n)} *)
+  Definition eps0_exp_S : ε₀ → nat → ε₀.
+  Proof.
+    intros (e & He) n.
+    exists (E0_cons [(e,1+n)]).
+    apply cnf_sg; auto; lia.
+  Defined.
+
+  (* Beware that this is for ωᵉ.(1+i) and NOT ωᵉ.i *)
+  Notation "ω^⟨ e , i ⟩" := (eps0_exp_S e i).
+
+  Fact eps0_lt_exp_S e n : e <ε₀ ω^⟨e,n⟩.
+  Proof.
+    destruct e as [e]; unfold eps0_exp_S; cbn.
+    apply E0_lt_sub with (1+n); auto.
+    apply cnf_sg; auto; lia.
+  Qed.
+
+  Fact eps0_lt_zero_exp_S e n : 0₀ <ε₀ ω^⟨e,n⟩.
+  Proof. apply eps0_le_lt_trans with (2 := eps0_lt_exp_S _ _); auto. Qed.
+
+  Hint Resolve eps0_lt_zero_exp_S : core.
+
+  Fact eps0_zero_neq_exp_S e n : 0₀ ≠ ω^⟨e,n⟩.
+  Proof.
+    intros E; apply (@eps0_lt_irrefl 0₀).
+    rewrite E at 2; apply eps0_lt_zero_exp_S.
+  Qed.
+
+  Fact eps0_exp_S_mono_right : ∀ e n m, n < m → ω^⟨e,n⟩ <ε₀ ω^⟨e,m⟩.
+  Proof. intros [] ? ?; simpl; constructor; constructor 2; right; lia. Qed.
+
+  Fact eps0_exp_S_mono_left : ∀ e f n m, e <ε₀ f → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
+  Proof. intros [] [] ? ?; apply E0_lt_exp. Qed.
+
+  Fact eps0_exp_S_mono e f n m : e ≤ε₀ f → n ≤ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
+  Proof.
+    intros [ | <- ] H2.
+    + now left; apply eps0_exp_S_mono_left.
+    + destruct H2; auto.
+      left; apply eps0_exp_S_mono_right; lia.
+  Qed.
+
+  Fact eps0_exp_S_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n < m.
+  Proof.
+    intros H.
+    destruct (eps0_lt_sdec e f) as [ | e | e f H1 ]; auto.
+    + destruct (lt_sdec n m) as [ | n | n m H2 ]; auto.
+      * contradict H; apply eps0_lt_irrefl.
+      * destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
+        apply eps0_lt_trans with (1 := H).
+        now apply eps0_exp_S_mono_right.
+    + destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
+      apply eps0_lt_trans with (1 := H).
+      now apply eps0_exp_S_mono_left.
+  Qed.
+
+  Fact eps0_add_exp_S e i j : ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i+j+1⟩.
+  Proof.
+    destruct e as (e & He); apply eps0_eq_iff; unfold eps0_add, eps0_exp_S, proj1_sig.
+    rewrite E0_add_exp; do 3 f_equal; lia.
+  Qed.
+
+  Fact eps0_zero_neq_exp_S_add e n f: 0₀ ≠ ω^⟨e,n⟩ +₀ f.
+  Proof.
+    intros H.
+    apply (@eps0_lt_irrefl 0₀).
+    rewrite H at 2.
+    apply eps0_lt_le_trans with (1 := eps0_lt_zero_exp_S e n).
+    rewrite <- (eps0_add_zero_right ω^⟨e,n⟩) at 1.
+    apply eps0_add_mono; auto.
+  Qed.
+
+  (* ωᵉ = ωᵉ.(1+0) *)
+  Definition eps0_omega (e : ε₀) := ω^⟨e,0⟩.
+  Notation "ω^ e" := (eps0_omega e).
+
+  Fact eps0_omega_zero : ω^0₀ = 1₀.
+  Proof. apply eps0_eq_iff; trivial. Qed.
+
+  Fact eps0_lt_omega e : e <ε₀ ω^e.
+  Proof. apply eps0_lt_exp_S. Qed.
+
+  Hint Resolve eps0_lt_omega : core.
+
+  Fact eps0_omega_mono_lt : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
+  Proof. intros [] [] ?; constructor; constructor 2; left; auto. Qed.
+
+  Fact eps0_omega_mono_le e f : e ≤ε₀ f → ω^e ≤ε₀ ω^f.
+  Proof. intros [ | <- ]; auto; left; now apply eps0_omega_mono_lt. Qed.
+
+  Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
+  Proof.
+    intros E.
+    destruct (eps0_lt_sdec e f) as [ e f H | | e f H ]; auto;
+      apply eps0_omega_mono_lt in H; rewrite E in H; now apply eps0_lt_irrefl in H.
+  Qed.
+
+  Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
+  Proof.
+    rewrite <- eps0_omega_zero.
+    now intros <-%eps0_omega_inj.
+  Qed.
+
+  Fact eps0_zero_lt_omega e : 0₀ <ε₀ ω^e.
+  Proof. apply eps0_lt_zero_exp_S. Qed.
+
+  Hint Resolve eps0_zero_lt_omega : core.
+
+  Fact eps0_zero_neq_omega e : 0₀ ≠ ω^e.
+  Proof. 
+    intros H.
+    apply (@eps0_lt_irrefl 0₀).
+    rewrite H at 2.
+    apply eps0_zero_lt_omega.
+  Qed.
+
+  Fact eps0_add_below_omega e f g : e <ε₀ ω^g → f <ε₀ ω^g → e +₀ f <ε₀ ω^g.
+  Proof. revert e f g; intros [[] ] [[] ] []; apply E0_add_below_omega. Qed.
+
+  Fact eps0_lt_head_split_inv e₁ i₁ f₁ e₂ i₂ f₂ :
+      f₁ <ε₀ ω^e₁
+    → f₂ <ε₀ ω^e₂
+    → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ f₁ <ε₀ f₂).
+  Proof.
+    rewrite !eps0_eq_iff.
+    revert e₁ i₁ f₁ e₂ i₂ f₂.
+    intros (e & He) i ([l] & Hl) (f & Hf) j ([m] & Hm) H1 H2; simpl in *.
+    rewrite !E0_add_head_normal in *; auto.
+    split; intros H3.
+    + apply E0_lt_inv, lex_list_cons_inv in H3
+        as [ [ | (<- & ?)]%lex2_inv | ([=] & ?)  ]; auto.
+      * right; split; auto; left; lia.
+      * subst; do 2 (right; split; auto).
+        now constructor.
+    + constructor.
+      destruct H3 as [ | (<- & [ | (<- & ?%E0_lt_inv) ]) ].
+      * constructor 2; now left.
+      * constructor 2; right; lia.
+      * now constructor 3.
+  Qed.
+
+  Fact eps0_lt_head_split_inv_left e₁ i₁ e₂ i₂ f₂ :
+      f₂ <ε₀ ω^e₂
+    → ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ 0₀ <ε₀ f₂).
+  Proof.
+    intro.
+    rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩), eps0_lt_head_split_inv; auto.
+    firstorder.
+  Qed.
+
+  Fact eps0_lt_head_split_inv_right e₁ i₁ f₁ e₂ i₂ :
+      f₁ <ε₀ ω^e₁
+    → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+  Proof.
+    intro.
+    rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩), eps0_lt_head_split_inv; auto.
+    apply or_iff_compat_l, and_iff_compat_l.
+    split; auto.
+    intros [ | (_ & ?%eps0_zero_not_gt) ]; now auto.
+  Qed.
+
+  Fact eps0_lt_head_split_inv_both e₁ i₁ e₂ i₂ :
+      ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+  Proof.
+    rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩).
+    apply eps0_lt_head_split_inv_right; auto.
+  Qed.
+
+  Fact eps0_lt_zero_head e i f : 0₀ <ε₀ ω^⟨e,i⟩ +₀ f.
+  Proof. apply eps0_lt_le_trans with ω^⟨e,i⟩; auto. Qed.
+
+  Hint Resolve eps0_lt_zero_head : core.
+
+  Fact eps0_not_head_split_lt_zero e i f : ¬ ω^⟨e,i⟩ +₀ f <ε₀ 0₀.
+  Proof. apply eps0_zero_not_gt. Qed.
+
+  Fact eps0_not_eps_S_lt_zero e i : ¬ ω^⟨e,i⟩ <ε₀ 0₀.
+  Proof. apply eps0_zero_not_gt. Qed.
+
+  Fact eps0_head_split_uniq e₁ i₁ f₁ e₂ i₂ f₂ :
+      ω^⟨e₁,i₁⟩ +₀ f₁ = ω^⟨e₂,i₂⟩ +₀ f₂
+    → f₁ <ε₀ ω^e₁
+    → f₂ <ε₀ ω^e₂
+    → e₁ = e₂ ∧ i₁ = i₂ ∧ f₁ = f₂.
+  Proof.
+    revert e₁ i₁ f₁ e₂ i₂ f₂.
+    intros (e & He) i ([l] & Hl) (f & Hf) j ([m] & Hm)
+           E%eps0_eq_iff H1 H2.
+    rewrite !eps0_eq_iff; simpl in *.
+    rewrite !E0_add_head_normal in E; auto.
+    now inversion E.
+  Qed.
+
+  Fact eps0_head_split_uniq' e₁ i₁ e₂ i₂ f₂ :
+      ω^⟨e₁,i₁⟩ = ω^⟨e₂,i₂⟩ +₀ f₂
+    → f₂ <ε₀ ω^e₂
+    → e₁ = e₂ ∧ i₁ = i₂ ∧ f₂ = 0₀.
+  Proof.
+    rewrite <- (eps0_add_zero_right ω^⟨e₁,i₁⟩).
+    intros H1 H2; revert H1.
+    intros (-> & -> & <-)%eps0_head_split_uniq; auto.
+  Qed.
+
+  Fact eps0_eps_S_uniq e₁ i₁ e₂ i₂ :
+    ω^⟨e₁,i₁⟩ = ω^⟨e₂,i₂⟩ → e₁ = e₂ ∧ i₁ = i₂.
+  Proof.
+     rewrite <- (eps0_add_zero_right ω^⟨_,i₁⟩),
+             <- (eps0_add_zero_right ω^⟨_,i₂⟩).
+     intros (-> & -> & _)%eps0_head_split_uniq; auto.
+  Qed.
+
+  Fact eps0_zero_neq_head e i f : 0₀ ≠ ω^⟨e,i⟩ +₀ f.
+  Proof.
+    intros E.
+    apply (@eps0_lt_irrefl 0₀).
+    rewrite E at 2.
+    apply eps0_lt_le_trans with (1 := eps0_lt_zero_exp_S e i).
+    rewrite <- (eps0_add_zero_right ω^⟨_,i⟩) at 1.
+    apply eps0_add_mono; auto.
+  Qed.
+
+  Fact eps0_add_head_lt e₁ i₁ f₁ e₂ i₂ f₂ :
+      e₁ <ε₀ e₂
+    → f₁ <ε₀ ω^e₁
+    → f₂ <ε₀ ω^e₂
+    → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
+  Proof.
+    revert e₁ i₁ f₁ e₂ i₂ f₂.
+    intros (e1 & He1) i ([l] & Hf1) (e2 & He2) j ([m] & Hf2) H1 H2 H3.
+    apply eps0_eq_iff; simpl in *.
+    rewrite !E0_add_head_normal; auto.
+    rewrite E0_add_head_lt; auto.
+  Qed.
+
+  Fact eps0_add_head_lt' e₁ i₁ e₂ i₂ f₂ :
+      e₁ <ε₀ e₂
+    → f₂ <ε₀ ω^e₂
+    → ω^⟨e₁,i₁⟩ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
+  Proof.
+    intros H1 H2.
+    rewrite <- (eps0_add_zero_right ω^⟨e₁,i₁⟩).
+    apply eps0_add_head_lt; auto.
+  Qed.
+
+  Fact eps0_add_head_lt'' e₁ i₁ e₂ i₂ :
+      e₁ <ε₀ e₂ → ω^⟨e₁,i₁⟩ +₀ ω^⟨e₂,i₂⟩ = ω^⟨e₂,i₂⟩.
+  Proof.
+    intros H.
+    rewrite <- (eps0_add_zero_right ω^⟨_,i₂⟩).
+    apply eps0_add_head_lt'; auto.
+  Qed.
+
+  Fact eps0_add_head_eq e i₁ f₁ i₂ f₂ :
+      f₁ <ε₀ ω^e
+    → f₂ <ε₀ ω^e
+    → (ω^⟨e,i₁⟩ +₀ f₁) +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁+i₂+1⟩ +₀ f₂.
+  Proof.
+    revert e i₁ f₁ i₂ f₂.
+    intros (e & He) i ([l] & Hf1) j ([m] & Hf2) H1 H2.
+    apply eps0_eq_iff; simpl in *.
+    rewrite !E0_add_head_normal; auto.
+    rewrite E0_add_head_eq; auto.
+    do 3 f_equal; lia.
+  Qed.
+
+  Fact eps0_add_head_eq' e i₁ i₂ f₂ :
+      f₂ <ε₀ ω^e
+    → ω^⟨e,i₁⟩ +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁+i₂+1⟩ +₀ f₂.
+  Proof.
+    intros.
+    rewrite <- (eps0_add_zero_right ω^⟨e,i₁⟩).
     rewrite eps0_add_head_eq; auto.
-    do 2 f_equal; ring.
-Qed.
+  Qed.
 
-Fact eps0_mpos_mult e i j : eps0_mpos (eps0_mpos e i) j = eps0_mpos e (i*j+i+j).
-Proof.
-  destruct e using eps0_head_rect.
-  + now rewrite !eps0_mpos_fix_0.
-  + rewrite !eps0_mpos_fix_1; auto.
-    do 2 f_equal; ring.
-Qed.
+  Fact eps0_add_head_gt e₁ i₁ f₁ e₂ i₂ f₂ :
+      e₂ <ε₀ e₁
+    → f₁ <ε₀ ω^e₁
+    → f₂ <ε₀ ω^e₂
+    → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₁,i₁⟩ +₀ (f₁ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂))
+     ∧ f₁ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) <ε₀ ω^e₁.
+  Proof.
+    revert e₁ i₁ f₁ e₂ i₂ f₂.
+    intros (e1 & He1) i ([l] & Hf1) (e2 & He2) j ([m] & Hf2) H1 H2 H3.
+    rewrite eps0_eq_iff; simpl in *.
+    rewrite !E0_add_head_normal; auto.
+    apply E0_add_head_gt; auto; lia.
+  Qed.
 
-Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
-Proof.
-  intros Hab Hmn.
-  destruct a as [ | e i f H1 _ _ ] using eps0_head_rect;
-    destruct b as [ | g j h H2 _ _ ] using eps0_head_rect.
-  + now apply eps0_lt_irrefl in Hab.
-  + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
-  + now apply eps0_not_head_split_lt_zero in Hab.
-  + apply eps0_lt_head_split_inv in Hab; auto.
-    rewrite !eps0_mpos_fix_1; auto.
-    apply eps0_lt_head_split_inv; auto.
-    destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
-    * right; split; auto; left.
-      assert (i*m <= j*n); [ | lia ].
-      apply Nat.mul_le_mono; lia.
-    * destruct (eq_nat_dec m n) as [ -> | ? ]; auto.
+  Section eps0_head_rect.
+
+    Variables (P : ε₀ → Type)
+              (HP0 : P 0₀)
+              (HP1 : ∀ e i f, f <ε₀ ω^e → P e → P f → P (ω^⟨e,i⟩ +₀ f)).
+
+    Theorem eps0_head_rect : ∀e, P e.
+    Proof.
+      intros (e & he); revert e he.
+      apply cnf_head_rect.
+      + intros; revert HP0; apply eps0_pirr with (1 := eq_refl).
+      + intros e he i f hf h hi H Hf He.
+        refine (@eps0_pirr P _ _ _ _ _ (@HP1 _ (pred i) _ _ He Hf)).
+        * do 4 f_equal; lia.
+        * simpl; trivial.
+    Qed.
+
+  End eps0_head_rect.
+
+  Lemma eps0_lt_exp_S_inv a e n :
+      a <ε₀ ω^⟨e,n⟩
+    → (a = 0₀)
+    + { i : _ & { b | a = ω^⟨e,i⟩ +₀ b ∧ i < n ∧ b <ε₀ ω^e } }
+    + { f : _ & { i | a <ε₀ ω^⟨f,i⟩ ∧ f <ε₀ e } }.
+  Proof.
+    destruct a as [ | g i h H _ _ ] using eps0_head_rect.
+    + now do 2 left.
+    + intros H1.
+      destruct n as [ | n ].
+      * right.
+        exists g, (S i).
+        apply eps0_lt_head_split_inv_right in H1
+          as [ H1 | (_ & ?) ]; lia || auto.
+        split; auto.
+        apply eps0_lt_head_split_inv_right; auto.
+      * apply eps0_lt_head_split_inv_right in H1; auto.
+        destruct (eps0_le_lt_dec e g) as [ C | C ].
+        - left; right; exists i, h.
+          destruct H1 as [ H1 | (-> & H1) ]; eauto.
+          destruct (@eps0_lt_irrefl e); eauto.
+        - right; exists g, (S i); split; auto.
+          apply eps0_lt_head_split_inv_right; auto.
+  Qed.
+
+  (** inversion for _ <ε₀ ω^_ *)
+  Lemma eps0_lt_omega_inv a e : a <ε₀ ω^e → (a = 0₀) + { f : ε₀ & { n | a <ε₀ ω^⟨f,n⟩ ∧ f <ε₀ e } }.
+  Proof. intros [[ -> | (i & ? & ? & ? & _) ] | ]%eps0_lt_exp_S_inv; auto; lia. Qed.
+
+  (** inversion for _ < ω^(_+1) *)
+  Lemma eps0_lt_omega_succ_inv f e : f <ε₀ ω^(S₀ e) → { n | f <ε₀ ω^⟨e,n⟩ }.
+  Proof.
+    intros [ -> | (a & n & H1 & H2%eps0_succ_next_inv) ]%eps0_lt_omega_inv.
+    + exists 0; auto.
+    + exists n; apply eps0_lt_le_trans with (1 := H1), eps0_exp_S_mono; auto.
+  Qed.
+
+  Section eps0_head_pos_rect.
+
+    Variables (P : ε₀ → Type)
+              (HP0 : P 0₀)
+              (HP1 : ∀i, P ω^⟨0₀,i⟩) 
+              (HP2 : ∀ e i f, 0₀ <ε₀ e → f <ε₀ ω^e → P e → P f → P (ω^⟨e,i⟩ +₀ f)).
+
+    Theorem eps0_head_pos_rect : ∀e, P e.
+    Proof.
+      induction e as [ | e n f H ] using eps0_head_rect; trivial.
+      destruct (eps0_zero_or_pos e) as [ -> | G ].
+      + assert (f = 0₀) as ->.
+        1:{ rewrite eps0_omega_zero in H.
+            now apply eps0_lt_one in H. }
+        rewrite eps0_add_zero_right; trivial.
+      + now apply HP2.
+    Qed.
+
+  End eps0_head_pos_rect.
+
+End eps0_omega.
+
+Hint Resolve eps0_lt_omega 
+             eps0_lt_zero_exp_S
+             eps0_zero_lt_omega 
+             eps0_lt_zero_head : core.
+
+#[local] Notation "ω^⟨ e , i ⟩" := (eps0_exp_S e i).
+#[local] Notation "ω^ e" := (eps0_omega e).
+
+Section eps0_mpos.
+
+  (** pos := nat viewed as 1, 2, ... and not 0, 1, ... *)
+
+  (** The operation (θ : ε₀) (n : pos) => θ.(1+n) *)
+  Inductive eps0_mpos_gr n : ε₀ → ε₀ → Prop :=
+    | eps0_mpos_gr_0 : eps0_mpos_gr n 0₀ 0₀
+    | eps0_mpos_gr_1 α i β : β <ε₀ ω^α → eps0_mpos_gr n (ω^⟨α,i⟩ +₀ β) (ω^⟨α,i*n+i+n⟩ +₀ β).
+
+  Fact eps0_mpos_fun n e1 f1 e2 f2 : eps0_mpos_gr n e1 f1 → eps0_mpos_gr n e2 f2 → e1 = e2 → f1 = f2.
+  Proof.
+    do 2 destruct 1; auto.
+    + now intros ?%eps0_zero_neq_exp_S_add.
+    + symm; now intros ?%eps0_zero_neq_exp_S_add.
+    + intros (? & [])%eps0_head_split_uniq; subst; auto.
+  Qed.
+
+  Definition eps0_mpos_pwc e n : sig (eps0_mpos_gr n e).
+  Proof.
+    destruct e as [ | e i f H ] using eps0_head_rect.
+    + exists 0₀; constructor.
+    + exists (ω^⟨e,i*n+i+n⟩ +₀ f); now constructor.
+  Qed.
+
+  Definition eps0_mpos e n := π₁ (eps0_mpos_pwc e n).
+
+  Fact eps0_mpos_spec e n : eps0_mpos_gr n e (eps0_mpos e n).
+  Proof. apply (proj2_sig _). Qed.
+
+  Fact eps0_mpos_fix_0 n : eps0_mpos 0₀ n = 0₀.
+  Proof. apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); constructor. Qed.
+
+  Fact eps0_mpos_fix_1 n α i β : β <ε₀ ω^α → eps0_mpos (ω^⟨α,i⟩ +₀ β) n = ω^⟨α,i*n+i+n⟩ +₀ β.
+  Proof. intros; apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); now constructor. Qed.
+
+  Fact eps0_mpos_exp_S n α i : eps0_mpos ω^⟨α,i⟩ n = ω^⟨α,i*n+i+n⟩.
+  Proof. 
+    rewrite <- (eps0_add_zero_right ω^⟨_,i⟩), eps0_mpos_fix_1; auto.
+    now rewrite eps0_add_zero_right.
+  Qed.
+
+  Fact eps0_mpos_O e : eps0_mpos e 0 = e.
+  Proof.
+    destruct e using eps0_head_rect.
+    + now rewrite eps0_mpos_fix_0.
+    + rewrite eps0_mpos_fix_1; auto.
+      do 2 f_equal; lia.
+  Qed.
+
+  Fact eps0_mpos_omega_add n α β : β <ε₀ ω^α → eps0_mpos (ω^α +₀ β) n = ω^⟨α,n⟩ +₀ β.
+  Proof.
+    intros; unfold eps0_omega.
+    rewrite eps0_mpos_fix_1; auto.
+  Qed.
+
+  Fact eps0_mpos_omega n α : eps0_mpos ω^α n = ω^⟨α,n⟩.
+  Proof.
+    rewrite <- (eps0_add_zero_right ω^α), eps0_mpos_omega_add; auto.
+    now rewrite eps0_add_zero_right.
+  Qed.
+
+  Fact eps0_mpos_plus e i j : eps0_mpos e i +₀ eps0_mpos e j = eps0_mpos e (i+j+1).
+  Proof.
+    destruct e using eps0_head_rect.
+    + now rewrite !eps0_mpos_fix_0, eps0_add_zero_left.
+    + rewrite !eps0_mpos_fix_1; auto.
+      rewrite eps0_add_head_eq; auto.
+      do 2 f_equal; ring.
+  Qed.
+
+  Fact eps0_mpos_mult e i j : eps0_mpos (eps0_mpos e i) j = eps0_mpos e (i*j+i+j).
+  Proof.
+    destruct e using eps0_head_rect.
+    + now rewrite !eps0_mpos_fix_0.
+    + rewrite !eps0_mpos_fix_1; auto.
+      do 2 f_equal; ring.
+  Qed.
+
+  Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
+  Proof.
+    intros Hab Hmn.
+    destruct a as [ | e i f H1 _ _ ] using eps0_head_rect;
+      destruct b as [ | g j h H2 _ _ ] using eps0_head_rect.
+    + now apply eps0_lt_irrefl in Hab.
+    + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
+    + now apply eps0_not_head_split_lt_zero in Hab.
+    + apply eps0_lt_head_split_inv in Hab; auto.
+      rewrite !eps0_mpos_fix_1; auto.
+      apply eps0_lt_head_split_inv; auto.
+      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+      * right; split; auto; left.
+        assert (i*m <= j*n); [ | lia ].
+        apply Nat.mul_le_mono; lia.
+      * destruct (eq_nat_dec m n) as [ -> | ? ]; auto.
+        right; split; auto; left.
+        assert (i*m <= i*n); [ | lia ].
+        apply Nat.mul_le_mono; lia.
+  Qed.
+
+  Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
+  Proof.
+    intros H.
+    apply eps0_mpos_mono_left with (n := n) (m := n) in H; auto.
+    now rewrite eps0_mpos_fix_0 in H.
+  Qed.
+
+  Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+
+  Fact eps0_mpos_mono_right a n m : 0₀ <ε₀ a → n < m → eps0_mpos a n <ε₀ eps0_mpos a m.
+  Proof.
+    intros H1 H2.
+    destruct a as [ | e i f H _ _ ] using eps0_head_rect.
+    + now apply eps0_lt_irrefl in H1.
+    + rewrite !eps0_mpos_fix_1; auto.
+      apply eps0_lt_head_split_inv; auto.
       right; split; auto; left.
-      assert (i*m <= i*n); [ | lia ].
-      apply Nat.mul_le_mono; lia.
-Qed.
+      assert (i*n <= i*m); [ | lia ].
+      apply Nat.mul_le_mono_l; lia.
+  Qed.
 
-Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
-Proof.
-  intros H.
-  apply eps0_mpos_mono_left with (n := n) (m := n) in H; auto.
-  now rewrite eps0_mpos_fix_0 in H.
-Qed.
+  Fact eps0_mpos_mono_right_le a n m : n ≤ m → eps0_mpos a n ≤ε₀ eps0_mpos a m.
+  Proof.
+    destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
+    destruct (eps0_zero_or_pos a) as [ -> | ].
+    + rewrite !eps0_mpos_fix_0; auto.
+    + left; apply eps0_mpos_mono_right; auto; lia.
+  Qed.
 
-Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+  Fact eps0_mpos_mono a b m n : a ≤ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
+  Proof.
+    intros [ H1 | -> ].
+    + left; now apply eps0_mpos_mono_left.
+    + apply eps0_mpos_mono_right_le.
+  Qed.
 
-Fact eps0_mpos_mono_right a n m : 0₀ <ε₀ a → n < m → eps0_mpos a n <ε₀ eps0_mpos a m.
-Proof.
-  intros H1 H2.
-  destruct a as [ | e i f H _ _ ] using eps0_head_rect.
-  + now apply eps0_lt_irrefl in H1.
-  + rewrite !eps0_mpos_fix_1; auto.
-    apply eps0_lt_head_split_inv; auto.
-    right; split; auto; left.
-    assert (i*n <= i*m); [ | lia ].
-    apply Nat.mul_le_mono_l; lia.
-Qed.
+  Fact eps0_mpos_below_omega a n e : a <ε₀ ω^e → eps0_mpos a n <ε₀ ω^e.
+  Proof.
+    intros [ -> | (f & i & H1 & H2) ] %eps0_lt_omega_inv.
+    + rewrite eps0_mpos_fix_0; auto.
+    + apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
+      apply eps0_lt_trans with (1 := H1).
+      rewrite eps0_mpos_exp_S.
+      apply eps0_lt_head_split_inv_both; auto.
+  Qed.
 
-Fact eps0_mpos_mono_right_le a n m : n ≤ m → eps0_mpos a n ≤ε₀ eps0_mpos a m.
-Proof.
-  destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
-  destruct (eps0_zero_or_pos a) as [ -> | ].
-  + rewrite !eps0_mpos_fix_0; auto.
-  + left; apply eps0_mpos_mono_right; auto; lia.
-Qed.
+  Fact eps0_mpos_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_mpos a n <ε₀ ω^(S₀ e).
+  Proof.
+    intros H.
+    apply eps0_mpos_below_omega,
+          eps0_lt_trans with (1 := H),
+          eps0_exp_S_mono_left; auto.
+  Qed.
 
-Fact eps0_mpos_mono a b m n : a ≤ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
-Proof.
-  intros [ H1 | -> ].
-  + left; now apply eps0_mpos_mono_left.
-  + apply eps0_mpos_mono_right_le.
-Qed.
+End eps0_mpos.
 
-Fact eps0_mpos_below_omega a n e : a <ε₀ ω^e → eps0_mpos a n <ε₀ ω^e.
-Proof.
-  intros [ -> | (f & i & H1 & H2) ] %eps0_lt_omega_inv.
-  + rewrite eps0_mpos_fix_0; auto.
-  + apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
-    apply eps0_lt_trans with (1 := H1).
-    rewrite eps0_mpos_exp_S.
-    apply eps0_lt_head_split_inv_both; auto.
-Qed.
+#[local] Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
 
-Fact eps0_mpos_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_mpos a n <ε₀ ω^(S₀ e).
-Proof.
-  intros H.
-  apply eps0_mpos_below_omega,
-        eps0_lt_trans with (1 := H),
-        eps0_exp_S_mono_left; auto.
-Qed.
-
-(** θ.ω^α
-
-    0.ω^α = 0
-    (ω^⟨γ,_⟩ + _).ω^α = ω^⟨γ+α⟩ *)
+(** now the operation (θ α : ε₀) => θ.ω^α *)
 Inductive eps0_momega_gr α : ε₀ → ε₀ → Prop :=
   | eps0_momega_gr_0 : eps0_momega_gr α 0₀ 0₀
   | eps0_momega_gr_1 γ n β : β <ε₀ ω^γ → eps0_momega_gr α (ω^⟨γ,n⟩ +₀ β) ω^(γ+₀α).
@@ -2531,7 +1094,7 @@ Proof.
     apply eps0_le_lt_trans with (e +₀ b); auto.
 Qed.
 
-(* γ._ *)
+(* now the operation (γ α : ε₀) => γ.α *)
 Inductive eps0_mult_gr γ : ε₀ → ε₀ → Prop :=
   | eps0_mult_gr_0         : eps0_mult_gr γ 0₀ 0₀ 
   | eps0_mult_gr_1 n       : eps0_mult_gr γ ω^⟨0₀,n⟩ (eps0_mpos γ n)
@@ -2551,7 +1114,7 @@ Proof.
   + now intros (_ & ->)%eps0_eps_S_uniq.
   + intros (<- & -> & ->)%eps0_head_split_uniq'; auto.
     contradict H2; apply eps0_lt_irrefl.
-  + symm; now intros ?%eps0_zero_neq_head_split.
+  + symm; now intros ?%eps0_zero_neq_head.
   + symm; intros (<- & -> & ->)%eps0_head_split_uniq'; auto.
     contradict H1; apply eps0_lt_irrefl.
   + intros (<- & <- & <-)%eps0_head_split_uniq; auto.
@@ -2569,7 +1132,7 @@ Qed.
 
 Definition eps0_mult e f := proj1_sig (eps0_mult_pwc e f).
 
-Notation "e '*₀' f" := (eps0_mult e f) (at level 30).
+Infix "*₀" := eps0_mult.
 
 Fact eps0_mult_spec e f : eps0_mult_gr e f (e *₀ f).
 Proof. apply (proj2_sig _). Qed.
@@ -2756,6 +1319,7 @@ Proof.
   + rewrite eps0_mult_exp_S; auto.
 Qed.
 
+(** From ω^e.n.ω^f = ω^(e+f) *)
 Fact eps0_mult_below_omega a b e n f : 
     a <ε₀ ω^⟨e,n⟩
   → b <ε₀ ω^f
@@ -2893,16 +1457,7 @@ Check eps0_omega_succ.
 Section eps0_exponentiation.
 
   (** Define exponentiation in CNF 
-     a^0 = 1
-     a^(S n) = a^n.a
-     a^(ω^e+f) = a^(ω^e).a^f
-
-     a^(ω^e) = ?
-      0^_ = 0
-      n^(ω^e) = 
-      (ω^a+b)^(ω^e) = ?
-      (ω^a)^(ω^e) = ω^(a.ω^e)
-
+   
       The formula here: 
 
          https://proofwiki.org/wiki/Ordinal_Exponentiation_via_Cantor_Normal_Form/Limit_Exponents
@@ -2918,8 +1473,8 @@ Section eps0_exponentiation.
     eps0_expo_gr α e1 f1 → eps0_expo_gr α e2 f2 → e1 = e2 → f1 = f2.
   Proof.
     intros [] []; auto.
-    + now intros ?%eps0_zero_neq_head_split.
-    + symm; now intros ?%eps0_zero_neq_head_split.
+    + now intros ?%eps0_zero_neq_head.
+    + symm; now intros ?%eps0_zero_neq_head.
     + intros (<- & <- & <-)%eps0_head_split_uniq; auto.
   Qed. 
 
@@ -2961,6 +1516,20 @@ Section eps0_exponentiation.
 End eps0_exponentiation.
 
 (** For the fundemental sequence *)
+
+Fact eps0_add_lt_omega : ∀ a e, e ≠ 0₀ → a <ε₀ ω^e → a +₀ ω^e = ω^e.
+Proof.
+  intros [a Ha] [e He] He' H.
+  apply eps0_eq_iff; simpl in H |- *.
+  revert H; apply E0_add_lt_omega; auto.
+  contradict He'; subst; now apply eps0_eq_iff.
+Qed.
+
+Lemma eps0_add_omega_fun_right : ∀ a b e f, a +₀ ω^e = b +₀ ω^f → e = f.
+Proof.
+  intros [] [] [] []; rewrite !eps0_eq_iff; simpl.
+  apply E0_add_omega_fun_right.
+Qed.
 
 (* a +₀ ω^e is the limit decomposition of that ordinal
  - e is unique 

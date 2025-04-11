@@ -375,6 +375,23 @@ End ordered_trans.
 
 Definition lmax := fold_right max 0.
 
+Lemma lmax_locate m :  m = [] ∨ ∃ l r, m = l++[lmax m]++r.
+Proof.
+  induction m as [ | x m [ -> | (l & r & E) ] ]; eauto; simpl; right.
+  + exists [], []; simpl; f_equal; now rewrite Nat.max_0_r.
+  + destruct (Nat.le_gt_cases x (lmax m)).
+    * rewrite max_r; auto.
+      exists (x::l), r; simpl; f_equal; auto.
+    * rewrite max_l; [|now apply Nat.lt_le_incl].
+      now exists [], m. 
+Qed.
+
+Fact lmax_in x l : x ∈ l → x ≤ lmax l.
+Proof.
+  induction l as [ | y l IHl ]; simpl; try tauto. 
+  intros [ | ?%IHl ]; subst; simpl; tauto || lia.
+Qed.
+
 Fact lmax_cons x l : lmax (x::l) = max x (lmax l).
 Proof. induction l; simpl; lia. Qed.
 

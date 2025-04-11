@@ -198,6 +198,15 @@ Proof.
     right; intros ? [<- |]; eauto.
 Qed.
 
+Fact fold_right_conj X (P : X → Prop) l :
+         fold_right (λ x, and (P x)) True l ↔ ∀x, x ∈ l → P x.
+Proof.
+  rewrite <- Forall_forall.
+  induction l; simpl.
+  + split; constructor.
+  + now rewrite Forall_cons_iff, IHl.
+Qed.
+
 (** Squashing a decidable predidate into an equivalent
     one that has unique proofs *)
 

@@ -6,6 +6,8 @@ hydra.v
 Hydra.v
 ordered.v
 lex_list.v
+lex2.v
 wlist.v
+E0.v
 eps0.v
 epsilon0.v
