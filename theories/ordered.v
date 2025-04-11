@@ -8,40 +8,15 @@
 (**************************************************************)
 
 From Coq Require Import Arith Lia List Relations Wellfounded Eqdep_dec Utf8.
+From Hydra Require Import utils.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 
-#[local] Infix "∈" := In (at level 70, no associativity).
-#[local] Arguments clos_trans {_}.
-
 #[local] Hint Constructors clos_trans : core.
-#[local] Hint Resolve Acc_inv Acc_intro in_cons in_eq in_elt in_or_app : core.
-
-#[global] Notation ge R := (λ x y, x = y ∨ R y x).
-
-#[global] Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
-
-Arguments clos_trans {_}.
-Arguments clos_refl_trans {_}.
-Arguments transitive {_}.
-
-#[local] Hint Constructors clos_trans : core.
-#[local] Hint Resolve in_cons in_eq in_elt in_or_app : core.
-
-Fact clos_trans_rev X R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
-Proof. induction 1; eauto. Qed.
-
-#[local] Hint Resolve clos_trans_rev : core.
-
-Fact clos_trans_rev_iff X R x y : @clos_trans X R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
-Proof. split; auto. Qed.
-
-Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
-Proof. unfold transitive; eauto. Qed.
-
-#[local] Hint Resolve transitive_rev : core.
+#[local] Hint Resolve in_cons in_eq in_elt in_or_app 
+                      clos_trans_rev transitive_rev : core.
 
 Definition dec (P : Prop) := {P} + {~P}. 
 
@@ -82,18 +57,22 @@ Section sdec.
     destruct (R_sdec x y); auto; right; intro; subst; eapply R_irrefl; eassumption.
   Qed.
 
-  Fact sdec_uip (x : X) (h : x = x) : h = eq_refl. 
+  Fact sdec_uip (x : X) (h : x = x) : eq_refl = h. 
   Proof. apply UIP_dec, sdec_eq_dec. Qed.
 
-  Local Fact sdec_eq_inv_dep {x y} (s : sdec x y) : ∀e, sdec_eq_inv_t (eq_rect y (sdec x) s x e).
-  Proof.
-    destruct s as [ x y H | | x y H ]; auto.
-    1,3: intros <-; destruct (R_irrefl H).
-    intros e; now rewrite (sdec_uip e).
-  Qed.
+  Section sdec_eq_inv.
 
-  Theorem sdec_eq_inv x (s : sdec x x) : sdec_eq_inv_t s.
-  Proof. exact (sdec_eq_inv_dep s eq_refl). Qed.
+    Let sdec_eq_inv_dep x y (s : sdec x y) : ∀e, sdec_eq_inv_t (eq_rect y (sdec x) s x e).
+    Proof.
+      destruct s as [ ? ? H | | ? ? H ].
+      1,3: intros <-; destruct (R_irrefl H).
+      intros e; destruct (sdec_uip e); constructor.
+    Defined.
+
+    Theorem sdec_eq_inv x (s : sdec x x) : sdec_eq_inv_t s.
+    Proof. exact (sdec_eq_inv_dep s eq_refl). Qed.
+
+  End sdec_eq_inv.
 
   Hypothesis (R_trans : transitive R).
 
@@ -112,6 +91,10 @@ Section sdec.
   Qed.
 
 End sdec.
+
+Check sdec_lt_inv.
+Check sdec_eq_inv.
+Check sdec_gt_inv.
 
 Section ordered.
 
@@ -261,6 +244,8 @@ Section ordered.
   Qed.
 
 End ordered.
+
+#[local] Hint Resolve Acc_inv Acc_intro : core.
 
 Fact ordered_from_ge_Acc X R (x : X) l : ordered_from (ge R) x l → Acc R x → ∀y, y ∈ l → Acc R y.
 Proof. induction 1 as [ | ? ? ? [ <- | ] ]; intros ? ? []; subst; eauto. Qed.

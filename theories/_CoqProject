@@ -1,5 +1,7 @@
 -R . Hydra
 
+utils.v
+list_order.v
 hydra.v
 Hydra.v
 ordered.v

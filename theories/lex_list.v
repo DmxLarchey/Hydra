@@ -8,47 +8,16 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Wellfounded Utf8 Arith Lia.
-From Hydra Require Import hydra ordered.
+From Hydra Require Import utils list_order ordered.
 
 Import ListNotations.
 
 Set Implicit Arguments.
 
-#[local] Infix "∈" := In (at level 70, no associativity).
-#[local] Arguments clos_trans {_}.
-#[local] Arguments clos_refl_trans {_}.
-#[local] Arguments transitive {_}.
-
 #[local] Hint Constructors clos_trans clos_refl_trans : core.
 #[local] Hint Resolve Acc_inv Acc_intro in_cons in_eq in_elt in_or_app : core.
 
-Section clos_trans.
-
-  Variables (X : Type).
-
-  Implicit Type (R T : X → X → Prop).
-
-  Hint Constructors clos_refl_trans : core.
-
-  Fact clos_t_rt R x y z :
-       clos_trans R x y → clos_refl_trans R y z → clos_trans R x z.
-  Proof. induction 2; eauto. Qed.
-
-  Fact clos_trans_ge R : transitive R → ∀ x y, clos_trans (ge R) x y → ge R x y.
-  Proof. 
-    intros HR; red in HR.
-    induction 1 as [ ? ? [] | ? ? ? _ [] _ [] ]; subst; eauto.
-  Qed.
-
-  Fact clos_t_ge_rt R x y : clos_trans (ge R) x y → clos_refl_trans R y x.
-  Proof. induction 1 as [ ? ? [ <- | ] | ]; eauto. Qed.
-
-  Fact clos_trans_mono R T : 
-          (∀ x y, R x y → T x y)
-        → (∀ l m, clos_trans R l m → clos_trans T l m).
-  Proof. induction 2; eauto. Qed.
-
-End clos_trans.
+(*
 
 Fact list_snoc_rect {X} (P : list X → Type) :
            P []
@@ -63,15 +32,7 @@ Proof.
   + intros ? ?; apply (H2 (_::_)).
 Qed.
 
-Inductive list_snoc_inv_shape X : list X → Type :=
-  | in_list_snoc_inv_shape l x : list_snoc_inv_shape (l++[x]).
-
-Fact list_snoc_inv X (l : list X) : l ≠ [] → list_snoc_inv_shape l.
-Proof.
-  destruct l as [ | l x ] using list_snoc_rect.
-  + now intros [].
-  + intros; constructor.
-Qed.
+*)
 
 Section lex_list.
 
@@ -203,10 +164,10 @@ Section lex_list.
   Local Lemma lex_list_snoc_inv_rec l m' : lex_list l m' → ∀ m y, m' = m++[y] → lex_list_snoc_inv_shape y l m.
   Proof.
     intros [ ? m [k x]%list_snoc_inv | ]%lex_list_invert.
-    + intros ? ?; rewrite <- app_ass; intros [ <- <- ]%app_inj_tail; constructor.
-    + destruct m as [ | m z _ ] using list_snoc_rect.
-      * intros ? ?; rewrite <- app_nil_end; intros [ <- <- ]%app_inj_tail; now constructor.
-      * intros ? ?; rewrite <- !app_ass; intros [ <- <- ]%app_inj_tail; rewrite !app_ass; now constructor.
+    + intros ? ?; rewrite app_assoc; intros [ <- <- ]%app_inj_tail; constructor.
+    + destruct m as [ | m z _ ] using rev_rect.
+      * intros ? ?; rewrite app_nil_r; intros [ <- <- ]%app_inj_tail; now constructor.
+      * intros ? ?; rewrite !app_assoc; intros [ <- <- ]%app_inj_tail; rewrite <- !app_assoc; now constructor.
   Qed.
 
   Lemma lex_list_snoc_inv l y m : lex_list l (m++[y]) → lex_list_snoc_inv_shape y l m.

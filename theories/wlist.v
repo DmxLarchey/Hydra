@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Utf8.
-From Hydra Require Import ordered lex_list.
+From Hydra Require Import utils ordered lex_list.
 
 Import ListNotations.
 
