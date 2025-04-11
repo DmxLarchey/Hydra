@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Eqdep_dec Lia Utf8.
+From Coq Require Import List Relations Arith Lia Utf8.
 From Hydra Require Import ordered lex_list.
 
 Import ListNotations.
@@ -15,70 +15,8 @@ Import ListNotations.
 Set Implicit Arguments.
 
 #[local] Infix "∈" := In (at level 70, no associativity).
-
-Arguments clos_trans {_}.
-Arguments clos_refl_trans {_}.
-Arguments transitive {_}.
-
-#[local] Hint Constructors clos_trans : core.
-#[local] Hint Resolve in_cons in_eq in_elt in_or_app : core.
-
-Fact clos_trans_rev X R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
-Proof. induction 1; eauto. Qed.
-
-#[local] Hint Resolve clos_trans_rev : core.
-
-Fact clos_trans_rev_iff X R x y : @clos_trans X R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
-Proof. split; auto. Qed.
-
-Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
-Proof. unfold transitive; eauto. Qed.
-
 #[local] Hint Resolve transitive_rev : core.
-
-Section sdec_irrefl.
-
-  Variables (X : Type)
-            (R : X → X → Prop)
-            (R_sdec : ∀ x y, sdec R x y)
-            (R_irrefl : ∀x, ¬ R x x).
-
-  Fact sdec_eq_dec (x y : X) : { x = y } + { x ≠ y }.
-  Proof.
-    destruct (R_sdec x y); auto; right; intro; subst; eapply R_irrefl; eassumption.
-  Qed.
-
-  Fact sdec_uip (x y : X) (h1 h2 : x = y) : h1 = h2. 
-  Proof. apply UIP_dec, sdec_eq_dec. Qed.
-
-  Local Lemma sdec_eq_refl_rec x y (s : sdec R x y) : 
-    ∀e : y = x, @eq_rect _ _ (sdec R x) s _ e = sdec_eq R x.
-  Proof.
-    destruct s as [ x y H | | x y H ]; auto.
-    1,3: intros <-; destruct (R_irrefl H).
-    now intros e; rewrite (sdec_uip e eq_refl).
-  Qed.
-
-  Theorem sdec_eq_refl x (s : sdec R x x) : s = sdec_eq R x.
-  Proof. apply (sdec_eq_refl_rec s eq_refl). Qed.
-
-  Hypothesis (R_trans : transitive R).
-
-  Theorem sdec_lt_refl x y : R x y → ∀s : sdec R x y, { h | s = sdec_lt _ _ _ h }.
-  Proof.
-    intros H s; destruct s; eauto.
-    + now apply R_irrefl in H.
-    + destruct (@R_irrefl x); eauto.
-  Qed.
-
-  Theorem sdec_gt_refl x y : R y x → ∀s : sdec R x y, { h | s = sdec_gt _ _ _ h }.
-  Proof.
-    intros H s; destruct s; eauto.
-    + destruct (@R_irrefl x); eauto.
-    + now apply R_irrefl in H.
-  Qed.
-
-End sdec_irrefl.
+#[local] Hint Resolve in_cons in_eq in_elt in_or_app : core.
 
 Section wlist_add.
 
@@ -256,6 +194,9 @@ Section wlist_add.
     | []       => l
     | (y,j)::m => wlist_cut l y j ++ m
     end.
+
+  Fact wlist_add_cons_right l y j m : wlist_add l ((y,j)::m) = wlist_cut l y j ++ m.
+  Proof. trivial. Qed. 
 
   Fact wlist_add_nil_right l : wlist_add l [] = l.
   Proof. trivial. Qed.

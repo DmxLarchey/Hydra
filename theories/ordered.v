@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import Arith Lia List Relations Wellfounded Utf8.
+From Coq Require Import Arith Lia List Relations Wellfounded Eqdep_dec Utf8.
 
 Import ListNotations.
 
@@ -23,12 +23,76 @@ Set Implicit Arguments.
 
 #[global] Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
 
+Arguments clos_trans {_}.
+Arguments clos_refl_trans {_}.
+Arguments transitive {_}.
+
+#[local] Hint Constructors clos_trans : core.
+#[local] Hint Resolve in_cons in_eq in_elt in_or_app : core.
+
+Fact clos_trans_rev X R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
+Proof. induction 1; eauto. Qed.
+
+#[local] Hint Resolve clos_trans_rev : core.
+
+Fact clos_trans_rev_iff X R x y : @clos_trans X R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
+Proof. split; auto. Qed.
+
+Fact transitive_rev X R : @transitive X R → transitive R⁻¹.
+Proof. unfold transitive; eauto. Qed.
+
+#[local] Hint Resolve transitive_rev : core.
+
 Inductive sdec {X} (R : X → X → Prop) : X → X → Type :=
   | sdec_lt x y : R x y → sdec R x y
   | sdec_eq x : sdec R x x
   | sdec_gt x y : R y x → sdec R x y.
 
 Definition dec (P : Prop) := {P} + {~P}. 
+
+Section sdec_irrefl.
+
+  Variables (X : Type)
+            (R : X → X → Prop)
+            (R_sdec : ∀ x y, sdec R x y)
+            (R_irrefl : ∀x, ¬ R x x).
+
+  Fact sdec_eq_dec (x y : X) : { x = y } + { x ≠ y }.
+  Proof.
+    destruct (R_sdec x y); auto; right; intro; subst; eapply R_irrefl; eassumption.
+  Qed.
+
+  Fact sdec_uip (x y : X) (h1 h2 : x = y) : h1 = h2. 
+  Proof. apply UIP_dec, sdec_eq_dec. Qed.
+
+  Local Lemma sdec_eq_refl_rec x y (s : sdec R x y) : 
+    ∀e : y = x, @eq_rect _ _ (sdec R x) s _ e = sdec_eq R x.
+  Proof.
+    destruct s as [ x y H | | x y H ]; auto.
+    1,3: intros <-; destruct (R_irrefl H).
+    now intros e; rewrite (sdec_uip e eq_refl).
+  Qed.
+
+  Theorem sdec_eq_refl x (s : sdec R x x) : s = sdec_eq R x.
+  Proof. apply (sdec_eq_refl_rec s eq_refl). Qed.
+
+  Hypothesis (R_trans : transitive R).
+
+  Theorem sdec_lt_refl x y : R x y → ∀s : sdec R x y, { h | s = sdec_lt _ _ _ h }.
+  Proof.
+    intros H s; destruct s; eauto.
+    + now apply R_irrefl in H.
+    + destruct (@R_irrefl x); eauto.
+  Qed.
+
+  Theorem sdec_gt_refl x y : R y x → ∀s : sdec R x y, { h | s = sdec_gt _ _ _ h }.
+  Proof.
+    intros H s; destruct s; eauto.
+    + destruct (@R_irrefl x); eauto.
+    + now apply R_irrefl in H.
+  Qed.
+
+End sdec_irrefl.
 
 Section ordered.
 
@@ -83,11 +147,11 @@ Section ordered.
   Fact ordered_from_comp R x l y m : ordered_from R x (l++[y]) → ordered_from R y m → ordered_from R x (l++[y]++m).
   Proof. induction l in x |- *; simpl; intros []%ordered_from_inv; eauto. Qed.
 
-  Fact ordered_from_trans R x y l : transitive _ R → ordered_from R x l → R y x → ordered_from R y l.
+  Fact ordered_from_trans R x y l : transitive R → ordered_from R x l → R y x → ordered_from R y l.
   Proof. induction 2 in y |- *; eauto. Qed.
 
   Fact ordered_from_app_middle R l x m : 
-       transitive _ R
+       transitive R
      → ordered R l 
      → (∀y, y ∈ l → R y x ∨ y = x)
      → ordered_from R x m
@@ -268,7 +332,7 @@ End ordered_morphism.
 
 Section ordered_trans.
 
-  Variables (X : Type) (R : X → X → Prop) (HR : transitive _ R).
+  Variables (X : Type) (R : X → X → Prop) (HR : transitive R).
 
   Local Fact transitive_clos_trans x y : clos_trans R x y → R x y.
   Proof. induction 1; eauto. Qed.
