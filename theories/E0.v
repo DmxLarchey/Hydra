@@ -602,6 +602,12 @@ Section E0.
   Fact E0_succ_zero : S₀ 0₀ = 1₀.
   Proof. apply E0_succ_gr_fun with (1 := E0_succ_spec _); constructor. Qed.
 
+  Fact E0_succ_pos n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,S n⟩.
+  Proof.
+    apply E0_succ_gr_fun with (1 := E0_succ_spec _).
+    constructor 2 with (l := []).
+  Qed.
+
   Hint Resolve E0_succ_zero : core.
 
   Fact E0_succ_cnf e : cnf e → cnf (S₀ e).
@@ -917,6 +923,23 @@ Section E0.
     destruct (wlist_add_last E0_lt_sdec l m b i)
       as (r & j & ? & ->).
     exists r, b, j; split; auto; lia.
+  Qed.
+
+  Lemma E0_add_is_limit_inv a e : 
+    cnf a → cnf e → E0_is_limit (a +₀ e) → e = 0₀ ∨ E0_is_limit e.
+  Proof.
+    intros Ha He (m & b & i & Hi & Hb & E)%E0_is_limit_iff; auto.
+    destruct a as [l]; destruct e as [k].
+    destruct k as [|k (c,j) _] using rev_rect; auto; right.
+    unfold E0_add in E; apply E0_eq_inv in E.
+    destruct (wlist_add_last E0_lt_sdec l k c j)
+      as (r & p & Hp & H).
+    rewrite H in E.
+    apply app_inj_tail in E as (<- & [=]); subst p c.
+    apply E0_is_limit_iff; auto.
+    exists k, b, j; split; auto.
+    apply cnf_app_right_inv, cnf_fix in He.
+    eapply He; eauto.
   Qed.
 
   Fact E0_exp_is_limit e i :

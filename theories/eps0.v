@@ -234,6 +234,9 @@ Section eps0_order.
     apply eps0_zero_least.
   Qed.
 
+  Fact eps0_lt_not_le e f : e <ε₀ f → ¬ f ≤ε₀ e.
+  Proof. intros ? ?; apply (@eps0_lt_irrefl e); eauto. Qed.
+
 End eps0_order.
 
 Arguments eps0_lt /.
@@ -425,6 +428,9 @@ Section eps0_omega.
 
   (* Beware that this is for ωᵉ.(1+i) and NOT ωᵉ.i *)
   Notation "ω^⟨ e , i ⟩" := (eps0_exp_S e i).
+
+  Fact eps0_succ_exp_S n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,S n⟩.
+  Proof. apply eps0_eq_iff; simpl; apply E0_succ_pos. Qed.
 
   Fact eps0_lt_exp_S e n : e <ε₀ ω^⟨e,n⟩.
   Proof.
@@ -1616,7 +1622,6 @@ Qed.
 
 Definition eps0_is_limit e := e ≠ 0₀ ∧ ¬ eps0_is_succ e.
 
-(** Notice that the converse MAY NOT HOLD *)
 Fact eps0_is_limit_iff e : eps0_is_limit e ↔ E0_is_limit (π₁ e).
 Proof.
   split; intros (H1 & H2); split.
@@ -1631,6 +1636,18 @@ Fact eps0_add_is_limit a e : eps0_is_limit e → eps0_is_limit (a +₀ e).
 Proof.
   rewrite !eps0_is_limit_iff.
   destruct a; destruct e; apply E0_add_is_limit; auto.
+Qed.
+
+Fact eps0_add_is_limit_inv a e :
+    eps0_is_limit (a +₀ e)
+  → e = 0₀ ∧ eps0_is_limit a ∨ eps0_is_limit e.
+Proof.
+  rewrite !eps0_is_limit_iff.
+  revert a e; intros (a & Ha) (e & He); simpl; intros H.
+  destruct E0_add_is_limit_inv with (3 := H)
+    as [ -> | ]; auto.
+  left; rewrite eps0_eq_iff; split; auto.
+  now rewrite E0_add_zero_right in H.
 Qed.
 
 Fact eps0_is_limit_exp_S e n : e ≠ 0₀ → eps0_is_limit ω^⟨e,n⟩.
@@ -1821,7 +1838,7 @@ Proof.
         apply eps0_add_mono_right.
         apply eps0_lt_trans with (1 := Ha).
         now apply eps0_exp_S_mono_left.
-Qed.  
+Qed.
 
 (** The fundemental sequence is lesser than its limit *)
 Theorem eps0_fseq_lt e l n : @eps0_fseq e l n <ε₀ e.
@@ -1932,6 +1949,96 @@ Proof.
       exists (eps0_fseq l n); split; auto.
       apply eps0_fseq_lt.
 Qed.
+
+(** a.0 = 0
+    a.(w^e.n+b) = (a.w^e).n + a.b
+
+    a.w^0. *)
+
+Check eps0_mpos_fix_1.
+
+(** mpos does not respects limits 
+    (w.2).2 = w.4
+    but ordinals below w.2 are below some w.1+n
+    and (w.1+n).2 = w.2+n < w.3 hence
+    lub {v.2 | v < w.2 } = w.3 < w.4 *)
+
+(** does eps0_momega e f = e.w^f respect limits *)
+
+(** e*0 = e
+    e*n = eps0_mpos e n but n is not limit
+    e*(w^f.n+b) = (e.w^f).n + e*b
+
+    if b is not zero then b is limit
+    and we can approach b from below 
+    and continuity applies recursively to e*b.
+
+    otherwise if b is zero
+   
+    e.w^⟨f,n⟩ with 0 < f
+    how can we approach w^⟨f,n⟩ ?
+    if n = 0
+
+
+    (ω^⟨a,i⟩ +₀ b) *₀ ω^⟨f,n⟩ = ω^⟨a+₀f,n⟩
+
+     (ω^⟨a,i⟩ +₀ b) *₀ (ω^⟨f,n⟩ +₀ g)
+       = ω^⟨a+₀f,n⟩ +₀ (ω^⟨a,i⟩ +₀ b) *₀ g
+
+
+    Check forall n, exists m > n,
+         fseq (a*e) m = a*(fseq e m) 
+
+    Let u < a*e
+    then exists n, u < fseq (a*e) n < a*e
+    then exists m > n, u < a*fseq e m < e*e
+
+ .
+
+    w.w.1 = w² *)
+
+Fact eps0_mult_exp_S_is_limit a e n :
+    0₀ <ε₀ a → 0₀ <ε₀ e → eps0_is_limit (a *₀ ω^⟨e,n⟩).
+Proof.
+  intros Ha He.
+  destruct a as [ | b i c H1 H2 ] using eps0_head_rect.
+  + contradict Ha; apply eps0_lt_irrefl.
+  + rewrite eps0_mult_head_exp_S; auto.
+    apply eps0_is_limit_exp_S.
+    intros (-> & ->)%eps0_add_eq_zero.
+    revert He; apply eps0_lt_irrefl.
+Qed.
+
+(* Of course, if a is 0 then a*e = 0 is not a limit ordinal
+   is the sense we use for the fundemental sequence *)
+Fact eps0_mult_is_limit a e :
+    0₀ <ε₀ a → eps0_is_limit e → eps0_is_limit (a *₀ e).
+Proof.
+  intros Ha.
+  induction e as [ | | e n f He Hf IHe IHf ] using eps0_head_pos_rect.
+  + now rewrite eps0_mult_zero_right.
+  + intros [H1 H2].
+    destruct H2.
+    destruct i.
+    * exists 0₀; now rewrite eps0_succ_zero_is_one, <- eps0_omega_zero.
+    * exists ω^⟨0₀,i⟩; now rewrite eps0_succ_exp_S.
+  + intros [ (-> & H) | H ]%eps0_add_is_limit_inv.
+    * rewrite eps0_add_zero_right; apply eps0_mult_exp_S_is_limit; auto.
+    * rewrite eps0_mult_distr.
+      apply eps0_add_is_limit; auto.
+Qed.
+
+(* We need to show a strong property of the fundemental sequence wrt. mult 
+   maybe even identity ? *)
+Theorem eps0_fseq_mult a e (le : eps0_is_limit e) (lae : eps0_is_limit (a*₀e)) :
+   ∀n, ∃m, n ≤ m ∧ eps0_fseq lae m = a*₀eps0_fseq le m.
+Proof.
+  (* tail induction on e is what we want to do here to be able to use
+     fixpoint equations for fseq, that we need to show anyway !! *)
+Admitted.
+  
+
+
 
 Definition is_lub {X} (R : X → X → Prop) (P : X → Prop) u := ∀v, (∀x, P x → R x v) ↔ R u v.
 
