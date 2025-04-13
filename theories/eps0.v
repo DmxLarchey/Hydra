@@ -1339,13 +1339,16 @@ Section eps0_mult.
   Fact eps0_mult_exp_S_omega e i f : 0₀ <ε₀ f → ω^⟨e,i⟩ *₀ ω^f = ω^(e+₀f).
   Proof. intro; apply eps0_mult_exp_S; auto. Qed.
 
-  Fact eps0_mult_omega e f : ω^e *₀ ω^f = ω^(e+₀f).
+  Fact eps0_mult_omega_exp_S e f n: ω^e *₀ ω^⟨f,n⟩ = ω^⟨e+₀f,n⟩.
   Proof.
     unfold eps0_omega.
     destruct (eps0_zero_or_pos f) as [ -> | ].
     + now rewrite eps0_mult_exp_S_pos, eps0_add_zero_right.
     + rewrite eps0_mult_exp_S; auto.
   Qed.
+
+  Fact eps0_mult_omega e f : ω^e *₀ ω^f = ω^(e+₀f).
+  Proof. apply eps0_mult_omega_exp_S. Qed.
 
   (** From ω^e.n.ω^f = ω^(e+f) *)
   Fact eps0_mult_below_omega a b e n f : 
@@ -1620,6 +1623,15 @@ Proof.
     apply eps0_eq_iff; now rewrite H1.
 Qed.
 
+Fact eps0_is_succ_exp_S n : eps0_is_succ ω^⟨0₀,n⟩.
+Proof.
+  destruct n as [ | n ].
+  + exists 0₀. rewrite eps0_succ_zero_is_one; apply eps0_omega_zero.
+  + exists ω^⟨0₀,n⟩; now rewrite eps0_succ_exp_S.
+Qed.
+
+Hint Resolve eps0_is_succ_exp_S : core.
+
 Definition eps0_is_limit e := e ≠ 0₀ ∧ ¬ eps0_is_succ e.
 
 Fact eps0_is_limit_iff e : eps0_is_limit e ↔ E0_is_limit (π₁ e).
@@ -1738,7 +1750,7 @@ Qed.
 
 Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
   | eps0_fseq_gr_0 g b   : eps0_least_split g (S₀ b)
-                         → eps0_fseq_gr (g +₀ ω^(S₀ b)) (λ n, g +₀ eps0_exp_S b n)
+                         → eps0_fseq_gr (g +₀ ω^(S₀ b)) (λ n, g +₀ ω^⟨b,n⟩)
   | eps0_fseq_gr_1 g b r : eps0_is_limit b
                          → eps0_least_split g b
                          → eps0_fseq_gr b r
@@ -1766,23 +1778,37 @@ Hint Resolve eps0_is_limit_exp_S eps0_is_limit_omega
 Lemma eps0_fseq_gr_fun e r r' : eps0_fseq_gr e r → eps0_fseq_gr e r' → ∀n, r n = r' n.
 Proof. intros H1 H2; now apply (eps0_fseq_gr_fun_rec H1 H2). Qed.
 
+Section eps0_fseq_rect.
+
+  Variables (P : forall e, eps0_is_limit e → Type)
+            (HP0 : ∀ g e l, eps0_least_split g (S₀ e) → @P (g +₀ ω^(S₀ e)) l)
+            (HP1 : ∀ g e l l', eps0_least_split g e → @P e l → @P (g +₀ ω^e) l').
+
+  Theorem eps0_fseq_rect e (l : eps0_is_limit e) : P l.
+  Proof.
+    revert l.
+    destruct e as [ | e | g e H1 H2 _ _ ]
+      using eps0_tail_rect.
+    + now intros [ [] _ ].
+    + intros [ _ [] ]; eauto.
+    + induction e as [ | e | h e H3 H4 _ IH ]
+        in H1, g, H2 |- *
+        using eps0_tail_rect; intros l.
+      * now destruct H1.
+      * now apply HP0.
+      * assert (eps0_is_limit (h+₀ ω^(e))) as l' by auto.
+        apply HP1 with l'; auto.
+  Qed.
+
+End eps0_fseq_rect.
+
 (** By WF induction, we build the fundemental sequence of a limit
     ordinal, packed with conformity (pwc) as spec'd with eps0_fseq_gr *)
 Theorem eps0_fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
 Proof.
-  destruct e as [ | e | g e H1 H2 _ _ ]
-    using eps0_tail_rect.
-  + now intros [ [] _ ].
-  + intros [ _ [] ]; eauto.
-  + intros _.
-    induction e as [ | e | h e H3 H4 _ IH ]
-      in H1, g, H2 |- *
-      using eps0_tail_rect.
-    * now destruct H1.
-    * exists (λ n, g +₀ eps0_exp_S e n); now constructor.
-    * destruct (IH h) as (lam & Hlam); auto.
-      exists (λ n, g +₀ ω^(lam n)).
-      constructor; auto.
+  induction 1 as [ g e l H | g e l l' H (lam & Hlam) ] using eps0_fseq_rect.
+  + exists (λ n, g +₀ eps0_exp_S e n); now constructor.
+  + exists (λ n, g +₀ ω^(lam n)); constructor; auto.
 Qed.
 
 Definition eps0_fseq {e} (l : eps0_is_limit e) := π₁ (@eps0_fseq_pwc e l).
@@ -1790,16 +1816,38 @@ Definition eps0_fseq {e} (l : eps0_is_limit e) := π₁ (@eps0_fseq_pwc e l).
 Fact eps0_fseq_spec e l : eps0_fseq_gr e (@eps0_fseq e l).
 Proof. apply (proj2_sig _). Qed.
 
+Fact eps0_fseq_pirr e (l l' : eps0_is_limit e) n :
+    eps0_fseq l n = eps0_fseq l' n.
+Proof. revert n; apply eps0_fseq_gr_fun with e; apply eps0_fseq_spec. Qed.
+
+Fact eps0_fseq_fix_0 g e (l : eps0_is_limit (g +₀ ω^(S₀ e))) n :
+    eps0_least_split g (S₀ e)
+  → eps0_fseq l n = g +₀ ω^⟨e,n⟩.
+Proof.
+  intro.
+  revert n; apply eps0_fseq_gr_fun with (1 := eps0_fseq_spec _).
+  constructor; auto.
+Qed.
+
+Fact eps0_fseq_fix_1 g e (l : eps0_is_limit (g +₀ ω^e))
+                         (l' : eps0_is_limit e) n :
+    eps0_least_split g e
+  → eps0_fseq l n = g +₀ ω^(eps0_fseq l' n).
+Proof.
+  intros H.
+  revert n; apply eps0_fseq_gr_fun with (1 := eps0_fseq_spec _).
+  constructor; auto.
+  apply eps0_fseq_spec.
+Qed.
+
 (** The fundemental sequence is monotonic *)
 Fact eps0_fseq_mono e l : ∀ n m, n < m → @eps0_fseq e l n <ε₀ eps0_fseq l m.
 Proof.
-  generalize (eps0_fseq l) (eps0_fseq_spec l); clear l.
-  induction 1; intros.
-  + apply eps0_add_mono_right; auto.
-    destruct b; simpl.
-    constructor; constructor 2; right; lia.
-  + apply eps0_add_mono_right; auto.
-    apply eps0_omega_mono_lt; auto.
+  induction l using eps0_fseq_rect; intros n m Hnm.
+  + rewrite !eps0_fseq_fix_0; auto.
+    apply eps0_add_mono_right, eps0_exp_S_mono_right; auto.
+  + rewrite !eps0_fseq_fix_1 with (l' := l1); auto.
+    apply eps0_add_mono_right, eps0_omega_mono_lt; auto.
 Qed.
 
 Fact eps0_max u v b : u <ε₀ b → v <ε₀ b → { w | u ≤ε₀ w ∧ v ≤ε₀ w ∧ w <ε₀ b }.
@@ -2018,18 +2066,127 @@ Proof.
   induction e as [ | | e n f He Hf IHe IHf ] using eps0_head_pos_rect.
   + now rewrite eps0_mult_zero_right.
   + intros [H1 H2].
-    destruct H2.
-    destruct i.
-    * exists 0₀; now rewrite eps0_succ_zero_is_one, <- eps0_omega_zero.
-    * exists ω^⟨0₀,i⟩; now rewrite eps0_succ_exp_S.
+    destruct H2; auto.
   + intros [ (-> & H) | H ]%eps0_add_is_limit_inv.
     * rewrite eps0_add_zero_right; apply eps0_mult_exp_S_is_limit; auto.
     * rewrite eps0_mult_distr.
       apply eps0_add_is_limit; auto.
 Qed.
 
+Fact eps0_mult_head_limit a i b e :
+      b <ε₀ ω^a
+    → eps0_is_limit e
+    → (ω^⟨a,i⟩ +₀ b) *₀ e = ω^a *₀ e.
+Proof.
+  intros Hab.
+  induction e as [ | e n f H _ IHf ] using eps0_head_rect.
+  + now intros [ [] _ ].
+  + intros He.
+    unfold eps0_omega.
+    assert (e ≠ 0₀) as He'.
+    1:{ intros ->.
+        rewrite eps0_omega_zero in H.
+        apply eps0_lt_one in H as ->.
+        rewrite eps0_add_zero_right in He.
+        apply (proj2 He); auto. }
+    assert (0₀ <ε₀ e) as He''.
+    1:{ now destruct (eps0_zero_or_pos e) as [ -> | ]. }
+    apply eps0_add_is_limit_inv in He as [ (-> & _) | Hf ].
+    * rewrite !eps0_add_zero_right, eps0_mult_head_exp_S, eps0_mult_exp_S; auto.
+    * rewrite eps0_mult_head, IHf, eps0_mult_exp_S_head; auto.
+Qed.
+
+
+Check eps0_least_split_find.
+
 (* We need to show a strong property of the fundemental sequence wrt. mult 
-   maybe even identity ? *)
+   maybe even identity ? 
+
+   Since (ω^⟨a,i⟩ +₀ b) *₀ e = ω^a *₀ e when e is a limit ordinal,
+
+   we just need to show that lim ω^a *₀ fseq e n = ω^a *₀ e
+
+   e = w^i₁.n1 + ... + w^iₓ.nₓ  i1 > ... > ix > 0
+   
+
+   w^a.e = w^(a+i₁).n1 + ... + w^(a+iₓ).nₓ
+
+*)
+
+(* g + w^e is a least split if g is minimal for this value 
+   meaning g is either 
+       of the form _ + w^e 
+       or the form _ + w^f with f > e
+       or 0 *)
+
+Fact eps0_least_split_iff g e :
+    eps0_least_split g e
+  <-> g = 0₀ \/ exists a f, e ≤ε₀ f /\ g = a +₀ ω^f.
+Proof.
+Admitted.
+
+Fact eps0_least_split_add a g e :
+    g ≠ 0₀
+ -> eps0_least_split g e 
+ -> eps0_least_split (a +₀ g) e.
+Proof.
+  rewrite !eps0_least_split_iff.
+  intros Hg [ -> | (b & f & H & ->) ].
+  + easy.
+  + right.
+    exists (a+₀b), f; split; auto.
+    now rewrite eps0_add_assoc.
+Qed.
+
+(** fseq (a+e) n <= a+fseq e n < a + e 
+    is enough to show that a+fseq e n ~~> a+e *)
+
+Theorem eps0_fseq_add a e (le : eps0_is_limit e) (lae : eps0_is_limit (a+₀e)) :
+   ∀n, eps0_fseq lae n = a +₀ eps0_fseq le n.
+Proof.
+  revert lae.
+  induction le as [ g e le H | g e le l' H IH ]using eps0_fseq_rect.
+  + rewrite <- eps0_add_assoc.
+    intros lae n.
+    rewrite !eps0_fseq_fix_0, eps0_add_assoc; auto.
+    apply eps0_least_split_add; auto.
+    admit.
+  + rewrite <- eps0_add_assoc.
+    intros lae n.
+    rewrite !eps0_fseq_fix_1 with (l' := le), eps0_add_assoc; auto.
+    apply eps0_least_split_add; auto.
+    admit.
+Admitted.
+
+(** fseq (a*e) n <= a*fseq e n < a*e 
+    is enough to show that a*fseq e n ~~> a*e *)
+
+Theorem eps0_fseq_mult a e (le : eps0_is_limit e) (lae : eps0_is_limit (ω^a*₀e)) :
+   ∀n, eps0_fseq lae n = ω^a *₀ eps0_fseq le n.
+Proof.
+  revert lae.
+  induction le as [ g e le H | g e le l' H IH ]using eps0_fseq_rect.
+  + rewrite eps0_mult_distr, eps0_mult_omega, eps0_add_succ_right.
+    intros lae n.
+    rewrite !eps0_fseq_fix_0, eps0_mult_distr, eps0_mult_omega_exp_S; auto.
+    admit.
+  + rewrite eps0_mult_distr, eps0_mult_omega.
+    intros lae n.
+    rewrite eps0_fseq_fix_1 with (l' := le); auto.
+    assert (l'' : eps0_is_limit (a+₀e)) by auto.
+    rewrite eps0_fseq_fix_1 with (l' := l''); auto.
+    * rewrite eps0_mult_distr; f_equal.
+      rewrite eps0_mult_omega.
+      f_equal.
+      apply eps0_fseq_add.
+    *
+    unfold eps0_omega; rewrite eps0_mult_exp_S; auto.
+    
+    rewrite eps0_fseq_fix_1.
+    
+
+
+Check eps0_mult_exp_S_head.
 Theorem eps0_fseq_mult a e (le : eps0_is_limit e) (lae : eps0_is_limit (a*₀e)) :
    ∀n, ∃m, n ≤ m ∧ eps0_fseq lae m = a*₀eps0_fseq le m.
 Proof.
