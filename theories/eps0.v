@@ -2150,18 +2150,26 @@ Section upper_bound.
   
 End upper_bound.
 
+Theorem eps0_lub_simpler P e :
+    ub eps0_le P e
+  → (∀ u : ε₀, u <ε₀ e → ∃ v : ε₀, P v ∧ u <ε₀ v)
+  → lub eps0_le P e. 
+Proof.
+  intros H1 H2; split; auto.
+  intros v Hv.
+  destruct (eps0_le_lt_dec e v) as [ | (w & ? & Hw)%H2 ]; auto.
+  destruct (@eps0_lt_irrefl v).
+  apply eps0_lt_le_trans with (1 := Hw), Hv; auto.
+Qed.
+
 (* for a limit ordinal e, it is the ≤ε₀-lub of its fundemental sequence *) 
 Theorem eps0_fseq_lub e l : lub eps0_le (λ x, ∃n, x = @eps0_fseq e l n) e.
 Proof.
-  split.
+  apply eps0_lub_simpler.
   + intros x (n & ->); left; apply eps0_fseq_lt.
   + intros u Hu.
-    destruct (eps0_lt_sdec u e) as [ x e H | | ].
-    2,3: red; auto.
-    apply eps0_lt_fseq_inv with (l := l) in H as (n & Hn); auto.
-    exfalso.
-    apply (@eps0_lt_irrefl x).
-    apply eps0_lt_le_trans with (1 := Hn); eauto.
+    apply eps0_lt_fseq_inv with (l := l) in Hu as (n & Hn); auto.
+    exists (eps0_fseq l n); eauto.
 Qed.
 
 (* A limit ordinal is the ≤ε₀-lub of <ε₀-smaller ordinals.
@@ -2169,13 +2177,11 @@ Qed.
    the case for successor ordinals *)
 Theorem eps0_is_limit_lub e : eps0_is_limit e → lub eps0_le (λ x, x <ε₀ e) e.
 Proof.
-  intros l; split.
+  intros l; apply eps0_lub_simpler.
   + now left.
   + intros v Hv.
-    destruct (eps0_le_lt_dec e v) as [ | C ]; auto; exfalso.
-    apply eps0_lt_fseq_inv with (l := l) in C as (n & Hn).
-    apply (@eps0_lt_irrefl v).
-    apply eps0_lt_le_trans with (1 := Hn), Hv.
+    apply eps0_lt_fseq_inv with (l := l) in Hv as (n & Hn).
+    exists (eps0_fseq l n); split; auto.
     apply eps0_fseq_lt.
 Qed.
 
@@ -2193,23 +2199,13 @@ Theorem eps0_add_lub a e :
     eps0_is_limit e
   → lub eps0_le (λ x, ∃u, x = a +₀ u ∧ u <ε₀ e) (a +₀ e).
 Proof.
-  intros l.
-  split.
-  + intros ? (u & -> & Hu).
-    left; now apply eps0_add_mono_right.
-  + intros v Hv.
-    red in Hv.
-    destruct (eps0_le_lt_dec (a +₀ e) v) as [ |H1]; auto; exfalso.
-    apply eps0_lt_add_inv_add in H1 as [ H1 | (g & -> & Hg) ].
-    * apply (@eps0_lt_irrefl v).
-      apply eps0_lt_le_trans with (1 := H1), Hv.
-      exists 0₀; split.
-      - now rewrite eps0_add_zero_right.
-      - destruct (eps0_zero_or_pos e) as [ C%l | ]; now auto.
+  intros l; apply eps0_lub_simpler.
+  + intros ? (? & -> & ?); auto.
+  + intros v [ H1 | (g & -> & Hg) ]%eps0_lt_add_inv_add.
+    * exists a; split; auto.
+      exists 0₀; rewrite eps0_add_zero_right; auto.
     * apply eps0_lt_fseq_inv with (l := l) in Hg as (n & Hn).
-      destruct (@eps0_lt_irrefl g).
-      apply eps0_lt_le_trans with (1 := Hn).
-      apply eps0_add_le_cancel with a, Hv.
+      exists (a+₀eps0_fseq l n); split; auto.
       exists (eps0_fseq l n); split; auto.
       apply eps0_fseq_lt.
 Qed.
@@ -2456,43 +2452,41 @@ Proof.
     apply eps0_exp_S_mono; auto; lia.
 Qed.
 
+Hint Resolve eps0_fseq_lt : core.
+Hint Resolve eps0_mult_mono : core.
+
+(** Maybe we can factor out these two proofs !! *)
+
 Corollary eps0_add_limit a e :
     eps0_is_limit e
   → lub eps0_le (λ x, ∃u, x = a +₀ u ∧ u <ε₀ e) (a +₀ e).
 Proof.
-  intros l; split.
+  intros l; apply eps0_lub_simpler.
   + intros ? (? & -> & ?); auto.
   + intros v Hv.
     generalize (eps0_add_is_limit a l); intros l'.
-    destruct (eps0_le_lt_dec (a +₀ e) v) as [ | C ]; auto.
-    destruct (@eps0_lt_irrefl v).
-    apply eps0_lt_fseq_inv with (l := l') in C as (n & Hn).
-    apply eps0_lt_le_trans with (1 := Hn),
-          eps0_le_trans with (1 := eps0_fseq_add _ l l' _),
-          Hv.
-    exists (eps0_fseq l n); split; auto.
-    apply eps0_fseq_lt.
+    apply eps0_lt_fseq_inv with (l := l') in Hv.
+    destruct Hv as (n & Hn).
+    exists (a+₀eps0_fseq l n); split.
+    * exists (eps0_fseq l n); auto.
+    * apply eps0_lt_le_trans with (2 := eps0_fseq_add _ l l' _); auto.
 Qed.
 
 Corollary eps0_mult_limit a e :
     eps0_is_limit e
   → lub eps0_le (λ x, ∃u, x = a *₀ u ∧ u <ε₀ e) (a *₀ e).
 Proof.
-  intros l; split.
-  + intros u (v & -> & Hv). 
-    apply eps0_mult_mono; auto.
+  intros l; apply eps0_lub_simpler.
+  + intros ? (? & -> & ?); auto.
   + intros v Hv.
     destruct (eps0_zero_or_pos a) as [ -> | Ha ].
-    1: rewrite eps0_mult_zero_left; auto.
+    1: rewrite eps0_mult_zero_left in Hv; now apply eps0_zero_not_gt in Hv.
     generalize (eps0_mult_is_limit Ha l); intros l'.
-    destruct (eps0_le_lt_dec (a *₀ e) v) as [ | C ]; auto.
-    destruct (@eps0_lt_irrefl v).
-    apply eps0_lt_fseq_inv with (l := l') in C as (n & Hn).
-    apply eps0_lt_le_trans with (1 := Hn),
-          eps0_le_trans with (1 := eps0_fseq_mult _ l l' _),
-          Hv.
-    exists (eps0_fseq l n); split; auto.
-    apply eps0_fseq_lt.
+    apply eps0_lt_fseq_inv with (l := l') in Hv.
+    destruct Hv as (n & Hn).
+    exists (a*₀eps0_fseq l n); split.
+    * exists (eps0_fseq l n); auto.
+    * apply eps0_lt_le_trans with (2 := eps0_fseq_mult _ l l' _); auto.
 Qed.
 
 Check eps0_add_zero_right.
