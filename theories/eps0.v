@@ -195,6 +195,9 @@ Section eps0_order.
 
   Fact eps0_le_lt_dec e f : { e ≤ε₀ f } + { f <ε₀ e }.
   Proof. destruct (eps0_lt_sdec e f); auto. Qed.
+  
+  Fact eps0_le_not_lt e f : e ≤ε₀ f → ~ f <ε₀ e.
+  Proof. intros ? ?; apply (@eps0_lt_irrefl e); eauto. Qed.
 
   Fact eps0_le_zero e : e ≤ε₀ 0₀ → e = 0₀.
   Proof. intros []; auto. Qed.
@@ -316,6 +319,9 @@ Section eps0_add.
     + apply eps0_add_mono_right with (e := e) in G.
       destruct (@eps0_lt_irrefl (e +₀ v)); eauto.
   Qed.
+  
+  Fact eps0_incr_not_lt e f : ~ e +₀ f <ε₀ e.
+  Proof. apply eps0_le_not_lt; auto. Qed.
 
   Fact eps0_add_eq_zero e f : e +₀ f = 0₀ → e = 0₀ ∧ f = 0₀.
   Proof.
@@ -769,7 +775,36 @@ Section eps0_omega.
     + exists 0; auto.
     + exists n; apply eps0_lt_le_trans with (1 := H1), eps0_exp_S_mono; auto.
   Qed.
-
+  
+  Hint Resolve eps0_exp_S_mono_left eps0_exp_S_mono : core.
+  
+  Fact eps0_add_exp_S_omega_le e n m : n < m → ω^⟨e,n⟩ +₀ ω^e ≤ε₀ ω^⟨e,m⟩.
+  Proof.
+    intro H; unfold eps0_omega.
+    rewrite eps0_add_exp_S.
+    apply eps0_exp_S_mono; auto; lia.
+  Qed.
+  
+  Lemma eps0_add_below_exp_S b c e n : b <ε₀ ω^⟨e,n⟩ → c <ε₀ ω^e → b+₀c <ε₀ ω^⟨e,n⟩.
+  Proof.
+    intros [ [ -> | (u & i & -> & []) ] | (u & i & []) ]%eps0_lt_exp_S_inv [ -> | (v & j & H2 & H3) ]%eps0_lt_omega_inv.
+    + rewrite eps0_add_zero_left; auto.
+    + rewrite eps0_add_zero_left; apply eps0_lt_trans with (1 := H2); auto.
+    + rewrite eps0_add_zero_right.
+      apply eps0_lt_le_trans with (2 := eps0_add_exp_S_omega_le _ H); auto.
+    + rewrite eps0_add_assoc.
+      apply eps0_lt_le_trans with (2 := eps0_add_exp_S_omega_le _ H); auto.
+      apply eps0_add_mono_right, eps0_add_below_omega; auto.
+      now apply eps0_lt_trans with (1 := H2), eps0_exp_S_mono_left.
+    + rewrite eps0_add_zero_right.
+      now apply eps0_lt_trans with (1 := H), eps0_exp_S_mono_left.
+    + apply eps0_lt_le_trans with ω^e.
+      * apply eps0_add_below_omega; auto.
+        - now apply eps0_lt_trans with (1 := H), eps0_exp_S_mono_left.
+        - now apply eps0_lt_trans with (1 := H2), eps0_exp_S_mono_left.
+      * apply eps0_exp_S_mono; auto; lia.
+  Qed.
+  
   Section eps0_head_pos_rect.
 
     Variables (P : ε₀ → Type)
@@ -1807,7 +1842,7 @@ End eps0_fseq_rect.
 Theorem eps0_fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
 Proof.
   induction 1 as [ g e l H | g e l l' H (lam & Hlam) ] using eps0_fseq_rect.
-  + exists (λ n, g +₀ eps0_exp_S e n); now constructor.
+  + exists (λ n, g +₀ ω^⟨e,n⟩); now constructor.
   + exists (λ n, g +₀ ω^(lam n)); constructor; auto.
 Qed.
 
@@ -1840,8 +1875,63 @@ Proof.
   apply eps0_fseq_spec.
 Qed.
 
+Fact eps0_fseq_omega_succ e (l : eps0_is_limit ω^(S₀ e)) n :
+    eps0_fseq l n = ω^⟨e,n⟩.
+Proof.
+  revert l; rewrite <- (eps0_add_zero_left ω^_); intros l.
+  rewrite eps0_fseq_fix_0.
+  + now rewrite eps0_add_zero_left.
+  + red; auto.
+Qed.
+
+Fact eps0_fseq_omega_limit e (l : eps0_is_limit ω^e) (l' : eps0_is_limit e) n :
+    eps0_fseq l n = ω^(eps0_fseq l' n).
+Proof.
+  revert l; rewrite <- (eps0_add_zero_left ω^_); intros l.
+  rewrite eps0_fseq_fix_1 with (l' := l').
+  + now rewrite eps0_add_zero_left.
+  + red; auto.
+Qed.
+
+Fact eps0_head_least_split e g i f :
+    g <ε₀ ω^e
+  → ω^f <ε₀ ω^e
+  → eps0_least_split g f
+  → eps0_least_split (ω^⟨e,i⟩ +₀ g) f.
+Proof.
+  intros H1 H2 H3 b Hb.
+  destruct (eps0_le_lt_dec (ω^⟨e,i⟩ +₀ g) b) as [ | C ]; auto.
+  apply eps0_lt_add_inv_add in C as [ C | (k & -> & C) ].
+  - assert (b +₀ eps0_omega f <ε₀ ω^⟨e,i⟩) as D.
+    1:{ apply eps0_add_below_exp_S; auto. }
+    rewrite <- Hb, eps0_add_assoc in D.
+    now apply eps0_incr_not_lt in D.
+  - rewrite !eps0_add_assoc in Hb.
+    apply eps0_add_cancel, H3 in Hb.
+    destruct (@eps0_lt_irrefl k).
+    now apply eps0_lt_le_trans with (1 := C). 
+Qed.
+
+(* Another computation for fseq :
+     fseq (ω^e.i +₀ f) n = ω^e.i + fseq f n
+   when f < ω^e *)
+Lemma eps0_fseq_head e i f (l : eps0_is_limit (ω^⟨e,i⟩ +₀ f)) (l' : eps0_is_limit f) n :
+    f <ε₀ ω^e → eps0_fseq l n = ω^⟨e,i⟩ +₀ eps0_fseq l' n.
+Proof.
+  intros Hf; revert l.
+  induction l' as [ g j h | ] using eps0_fseq_rect; rewrite <- eps0_add_assoc; intros l.
+  + rewrite !eps0_fseq_fix_0; auto.
+    * now rewrite eps0_add_assoc.
+    * apply eps0_head_least_split; auto;
+        apply eps0_le_lt_trans with (2 := Hf); auto.
+  + rewrite !eps0_fseq_fix_1 with (l' := l'1); auto.
+    * now rewrite eps0_add_assoc.
+    * apply eps0_head_least_split; auto;
+        apply eps0_le_lt_trans with (2 := Hf); auto.
+Qed.
+
 (** The fundemental sequence is monotonic *)
-Fact eps0_fseq_mono e l : ∀ n m, n < m → @eps0_fseq e l n <ε₀ eps0_fseq l m.
+Fact eps0_fseq_mono e (l : eps0_is_limit e) : ∀ n m, n < m → eps0_fseq l n <ε₀ eps0_fseq l m.
 Proof.
   induction l using eps0_fseq_rect; intros n m Hnm.
   + rewrite !eps0_fseq_fix_0; auto.
@@ -1860,7 +1950,7 @@ Proof. intros ? ?; destruct (eps0_le_lt_dec u v); eauto. Qed.
       w.r.t. the fundemental sequence of e 
 
       This has become a nice proof *)
-Theorem eps0_lt_fseq_inv e l f : f <ε₀ e → ∃n, f <ε₀ @eps0_fseq e l n.
+Theorem eps0_lt_fseq_inv e (l : eps0_is_limit e) f : f <ε₀ e → ∃n, f <ε₀ eps0_fseq l n.
 Proof.
   (* We capture the fundemental sequence via its inductive spec *)
   revert f; generalize (eps0_fseq l) (eps0_fseq_spec l).
@@ -1889,7 +1979,7 @@ Proof.
 Qed.
 
 (** The fundemental sequence is lesser than its limit *)
-Theorem eps0_fseq_lt e l n : @eps0_fseq e l n <ε₀ e.
+Theorem eps0_fseq_lt e (l : eps0_is_limit e) n : eps0_fseq l n <ε₀ e.
 Proof.
   generalize (eps0_fseq l) (eps0_fseq_spec l) n; clear n l.
   induction 1 as [ | g b r Hr IH ].
