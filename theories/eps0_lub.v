@@ -31,7 +31,7 @@ Section upper_bound.
     + apply H2, H1.
   Qed.
 
-  Hypothesis (R_refl : reflexive _ R)
+  Hypothesis (R_refl : reflexive R)
              (R_trans : transitive R).
 
   Fact lub_iff P u : lub P u ↔ ∀v, ub P v ↔ R u v.

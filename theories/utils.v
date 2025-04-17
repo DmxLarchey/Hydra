@@ -22,6 +22,7 @@ Set Implicit Arguments.
 Arguments clos_trans {_}.
 Arguments clos_refl_trans {_}.
 Arguments transitive {_}.
+Arguments reflexive {_}.
 
 (** Tactics *)
 
