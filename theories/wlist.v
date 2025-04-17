@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Utf8.
-From Hydra Require Import utils ordered lex_list.
+From Hydra Require Import utils pos ordered lex_list.
 
 Import ListNotations.
 
@@ -25,7 +25,7 @@ Section wlist_add.
             (R_irrefl : ∀x, ¬ R x x)
             (R_trans : transitive R).
 
-  Implicit Type (l m : list (X*nat)).
+  Implicit Type (l m : list (X*pos)).
 
   Fixpoint wlist_cut m y j :=
     match m with
@@ -33,7 +33,7 @@ Section wlist_add.
     | (x,i)::m =>
       match R_sdec x y with
       | sdec_lt _ _ _ _ => [(y,j)]
-      | sdec_eq _ _     => [(x,i+j)]
+      | sdec_eq _ _     => [(x,i +ₚ j)]
       | sdec_gt _ _ _ _ => (x,i)::wlist_cut m y j
       end
     end.
@@ -86,7 +86,7 @@ Section wlist_add.
     constructor; auto.
   Qed.
 
-  Fact wlist_cut_eq i r y j : wlist_cut ((y,i)::r) y j = [(y,i+j)].
+  Fact wlist_cut_eq i r y j : wlist_cut ((y,i)::r) y j = [(y,i +ₚ j)].
   Proof. simpl; destruct sdec_eq_inv with (s := R_sdec y y); auto. Qed.
 
   Fact wlist_cut_lt x i r y j : R x y → wlist_cut ((x,i)::r) y j = [(y,j)].
@@ -94,7 +94,7 @@ Section wlist_add.
 
   Fact wlist_cut_spec2 l y i r j :
       Forall (λ x, R y (fst x)) l
-    → wlist_cut (l++[(y,i)]++r) y j = l++[(y,i+j)].
+    → wlist_cut (l++[(y,i)]++r) y j = l++[(y,i +ₚ j)].
   Proof.
     induction 1 as [ | (x,k) m H1 H2 IH2 ]; simpl; auto.
     + destruct sdec_eq_inv with (s := R_sdec y y); auto.
@@ -120,7 +120,7 @@ Section wlist_add.
     + exists [], j; auto.
     + destruct (R_sdec x y) as [ x y H | x | x y H ].
       * exists [], j; auto.
-      * exists [], (i+j); split; auto; lia.
+      * exists [], (i +ₚ j); split; auto.
       * exists ((x,i)::m), k; split; simpl; auto.
         now f_equal.
   Qed. 
@@ -198,7 +198,7 @@ Section wlist_add.
 
   Fact wlist_add_eq i r y j m :
       wlist_add ((y,i)::r) ((y,j)::m)
-   = (y,i+j)::m.
+   = (y,i +ₚ j)::m.
   Proof.
     unfold wlist_add.
     now rewrite wlist_cut_eq.
@@ -226,7 +226,7 @@ Section wlist_add.
   Fact wlist_add_spec_2 l y i r j m :
       Forall (λ x, R y (fst x)) l
     → wlist_add (l++[(y,i)]++r) ((y,j)::m)
-    = l++[(y,i+j)]++m.
+    = l++[(y,i +ₚ j)]++m.
   Proof.
     intros H.
     simpl app at 2.
@@ -243,14 +243,14 @@ Section wlist_add.
     rewrite wlist_add_gt_list, wlist_add_lt; auto.
   Qed.
   
-  Fact wlist_add_common l y : ∃ l' i, ∀ j m, wlist_add l ((y,j)::m) = l'++(y,i+j)::m.
+  Fact wlist_add_common l y : ∃ l' i, ∀ j m, wlist_add l ((y,j)::m) = l'++(y,i + j)::m.
   Proof.
     simpl.
     induction l as [ | (x,i) l (l' & k & Hl') ]; simpl.
     + exists [], 0; auto.
     + destruct (R_sdec x y) as [ x y H | y | x y H ].
       * exists [], 0; auto.
-      * exists [], i; auto.
+      * exists [], (1+i); auto.
       * exists ((x,i)::l'), k.
         intros; simpl; f_equal; auto.
   Qed. 
@@ -258,14 +258,14 @@ Section wlist_add.
   Fact wlist_add_choice x i l y j m :
     ∃ z k r, wlist_add ((x,i)::l) ((y,j)::m) = (z,k)::r
            ∧ ( R x y ∧ z = y ∧ k = j ∧ r = m
-             ∨ x = y ∧ z = x ∧ k = i+j ∧ r = m
+             ∨ x = y ∧ z = x ∧ k = i +ₚ j ∧ r = m
              ∨ R y x ∧ z = x ∧ k = i ∧ r = wlist_add l ((y,j)::m) ).
   Proof.
     destruct (R_sdec x y) as [ x y H | x | x y H ].
     + rewrite wlist_add_lt; auto.
       exists y, j, m; split; auto.
     + rewrite wlist_add_eq.
-      exists x, (i+j), m; split; auto; right; auto.
+      exists x, (i +ₚ j), m; split; auto; right; auto.
     + rewrite wlist_add_gt; auto.
       exists x, i, (wlist_add l ((y,j)::m)); split; auto; do 2 right; auto.
   Qed.
@@ -285,8 +285,7 @@ Section wlist_add.
       * simpl app at 2.
         rewrite wlist_add_gt_list, wlist_add_eq; auto.
         intros [H|[[=]|H]]%in_app_iff; subst; eauto.
-        - exists i; rewrite in_app_iff; auto.
-        - exists j; simpl; split; eauto; lia.
+        exists i; rewrite in_app_iff; auto.
       * simpl app at 2. 
         rewrite wlist_add_gt_list, wlist_add_lt; auto. 
         intros []%in_app_iff; eauto.
@@ -294,7 +293,7 @@ Section wlist_add.
   Qed.
 
   Fact wlist_add_last l m y j :
-    ∃ r k, j ≤ k ∧ wlist_add l (m++[(y,j)]) = r++[(y,k)].
+    ∃ r (k : pos), j ≤ k ∧ wlist_add l (m++[(y,j)]) = r++[(y,k)].
   Proof.
     destruct m as [ | (z,p) m ]; simpl.
     + destruct (wlist_cut_last l y j) as (r & k & ? & E).
@@ -353,7 +352,7 @@ Section wlist_add.
       destruct (R_sdec y z) as [ y z F | y | y z F ]; simpl app.
       * rewrite wlist_add_lt, !wlist_add_middle_lt; auto.
       * rewrite wlist_add_eq, !wlist_add_gt_list, !wlist_add_eq; auto.
-        do 3 f_equal; lia.
+        now rewrite pos_add_assoc.
       * rewrite wlist_add_gt, wlist_add_gt_list,
                 wlist_add_gt_list, wlist_add_eq,
                 wlist_add_gt; auto.
@@ -376,7 +375,7 @@ Section wlist_add.
     → ∃r, m = l++r
         ∧ x = y
         ∧ Forall (λ x, R y (fst x)) l
-        ∧ (i = j ∨ ∃ p r', p+i = j ∧ r = (x,p)::r').
+        ∧ (i = j ∨ ∃ p r', p +ₚ i = j ∧ r = (x,p)::r').
   Proof.
     destruct (wlist_cut_choice m x)
       as [ G1 
