@@ -480,6 +480,43 @@ Section E0.
     intros ? ? ? ? -> -> (? & ? & ?); eauto.
   Qed.
 
+  (* An alternative proof of the result that does not
+     rely on the inclusion cnf_lt_lpo *)
+
+  Lemma cnf_Acc z : cnf z → Acc (λ x y, cnf x ∧ x <E₀ y) z.
+  Proof.
+    set (R := λ x y, cnf x ∧ x <E₀ y).
+    set (T := lex2 R lt).
+    assert (HRT1 : ∀l, (∀ x i, (x,i) ∈ l → cnf x) 
+                     → ordered E0_lt⁻¹ (map fst l) 
+                     → ordered (ge T) l).
+    1:{ intros l H.
+        apply ordered_morphism with (f := fun x y => x = fst y).
+        + intros ? ? [] [] ([] & <- & ?)%in_map_iff ([] & <- & ?)%in_map_iff.
+          simpl; intros; subst; right; left; auto; split; eauto.
+        + clear H; induction l as [ | [] ]; simpl; auto. } 
+    assert (HR : forall x i, Acc R x -> Acc T (x,i)).
+    1: intros x i Hx; apply Acc_lex2; auto.  
+    induction 1 as [ l H1 H2 IH ] using cnf_rect.
+    assert (Acc (λ u v, ordered (ge T) u ∧ lex_list T u v) l) as H.
+    1:{ apply lex_list_Acc_ordered; auto.
+        apply Forall_forall; intros [] ?%IH; auto. }
+    revert H.
+    apply Acc_rel_morph with (f := fun x y => [x]₀ = y); auto.
+    + intros []; eauto.
+    + clear l H1 H2 IH.
+      intros l m ? ? <- <- ([G1 G2]%cnf_fix & H%E0_lt_inv); split; auto.
+      revert H; apply lex_list_mono.
+      intros [] [] ? ?; apply lex2_mono; simpl; auto; split; eauto.
+  Qed.
+
+  (** The fundamental theorem: <E₀ is well-founded on cnf *)
+  Theorem E0_lt_wf_alt : well_founded (λ x y, cnf x ∧ x <E₀ y).
+  Proof.
+    intros z; constructor.
+    intros ? []; now apply cnf_Acc.
+  Qed.
+
   (** The ordinal addition via wlist_add *)
 
   Opaque wlist_add.

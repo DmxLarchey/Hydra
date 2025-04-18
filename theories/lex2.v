@@ -83,3 +83,11 @@ End lex2.
 
 Arguments lex2 {_ _}.
 
+Fact lex2_mono X I (R R' : X → X → Prop) (T T' : I → I → Prop) p q :
+    (R (fst p) (fst q) → R' (fst p) (fst q))
+  → (T (snd p) (snd q) → T' (snd p) (snd q))
+  → lex2 R  T  p q 
+  → lex2 R' T' p q.
+Proof. induction 3; [ constructor 1 | constructor 2 ]; auto. Qed.
+
+

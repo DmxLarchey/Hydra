@@ -257,6 +257,9 @@ Section mono.
 
 End mono.
 
+
+(*
+
 Section lex_list_sim.
 
   (* Simulation *)
@@ -281,6 +284,7 @@ Section lex_list_sim.
   Qed.
 
 End lex_list_sim. 
+*)
 
 Fact Acc_lex_list_nil X P (R : X → X → Prop) : Acc (λ l m, P l ∧ lex_list R l m) [].
 Proof. constructor; intros [] (? & []%lex_list_inv). Qed.
