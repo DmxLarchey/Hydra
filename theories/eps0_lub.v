@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos eps0 eps0_least_split eps0_fseq.
+From Hydra Require Import utils pos eps0 eps0_ltf eps0_fseq eps0_mult.
 
 Set Implicit Arguments.
 
@@ -91,7 +91,7 @@ Proof.
   + intros v Hv; apply Hv, eps0_lt_succ.
 Qed.
 
-Hint Resolve eps0_add_mono eps0_add_mono_right eps0_lt_le_weak : core.
+Hint Resolve eps0_add_mono eps0_add_mono_right eps0_lt_le_weak eps0_is_limit_pos : core.
 
 (** We need the fundemental sequence to work with lubs 
     constructivelly !!! *)

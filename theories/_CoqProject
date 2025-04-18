@@ -9,7 +9,8 @@ lex2.v
 wlist.v
 E0.v
 eps0.v
-eps0_least_split.v
+eps0_mult.v
+eps0_ltf.v
 eps0_fseq.v
 eps0_lub.v
 fgh.v

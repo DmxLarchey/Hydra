@@ -9,6 +9,7 @@
 
 From Coq Require Import Arith Lia Utf8.
 
+From Hydra Require Import ordered.
 (* pos is the same type as nat but viewed as {1,2,...}
    and not {0,1,...} *)
 Definition pos := nat.
@@ -38,7 +39,10 @@ Section pos.
   Qed.
 
   Fact pos_le_lt_iff i j : i ≤ j ↔ i = j ∨ i < j.
-  Proof. solve pos. Qed. 
+  Proof. solve pos. Qed.
+
+  Fact pos_lt_sdec i j : sdec lt i j.
+  Proof. apply lt_sdec. Qed.
 
   Fact pos_one_or_succ i : (i = 1ₚ) + { j | i = j +ₚ 1ₚ }.
   Proof. induction i using pos_rect; eauto. Qed.
@@ -97,6 +101,9 @@ Section pos.
   Fact pos_not_lt_one i : ¬ i < 1ₚ.
   Proof. solve pos. Qed.
 
+  Fact pos_lt_iff_le_succ i j : i < j ↔ i +ₚ 1ₚ ≤ j.
+  Proof. solve pos. Qed.
+
   Fact pos_lt_sub i j : i < j → { k | j = i +ₚ k }.
   Proof. exists (j-i-1); solve pos. Qed.
 
@@ -124,6 +131,7 @@ Section pos.
 End pos.
 
 #[global] Hint Resolve
+    pos_one_least
     pos_one_lt_S
     pos_add_sincr_left
     pos_add_sincr_right

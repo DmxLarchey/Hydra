@@ -23,10 +23,10 @@ Set Implicit Arguments.
 #[local] Hint Resolve clos_trans_rev transitive_rev : core.
 #[local] Hint Constructors lex2 : core.
 
-#[global] Reserved Notation "a '+₀' b"  (at level 31, left associativity, format "a  +₀  b" ).
-#[global] Reserved Notation "a '*₀' b"  (at level 29, left associativity, format "a  *₀  b" ).
-#[global] Reserved Notation "'ω^⟨' e , i '⟩'" (at level 0, format "ω^⟨ e , i ⟩").
-#[global] Reserved Notation "'ω^' e" (at level 0, format "ω^ e").
+#[local] Reserved Notation "a '+₀' b"  (at level 31, left associativity, format "a  +₀  b" ).
+#[local] Reserved Notation "a '*₀' b"  (at level 29, left associativity, format "a  *₀  b" ).
+#[local] Reserved Notation "'ω^⟨' e , i '⟩'" (at level 0, format "ω^⟨ e , i ⟩").
+#[local] Reserved Notation "'ω^' e" (at level 0, format "ω^ e").
 
 #[local] Reserved Notation "'[' l ']₀'"  (at level 0, no associativity, format "[ l ]₀").
 #[local] Reserved Notation "⌊ e ⌋₀"    (at level 0, e at level 200, format "⌊ e ⌋₀").
@@ -153,10 +153,7 @@ Section E0.
 
   Hint Constructors sdec : core.
 
-  Lemma lt_sdec i j : sdec lt i j.
-  Proof. destruct (lt_eq_lt_dec i j) as [ [ | []] | ]; eauto. Qed.
-
-  Hint Resolve lt_sdec lex2_sdec : core.
+  Hint Resolve pos_lt_sdec lex2_sdec : core.
 
   (* computably total *)
   Lemma E0_lt_sdec e f : sdec E0_lt e f.

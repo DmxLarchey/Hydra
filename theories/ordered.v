@@ -96,6 +96,11 @@ Check sdec_lt_inv.
 Check sdec_eq_inv.
 Check sdec_gt_inv.
 
+#[local] Hint Constructors sdec : core.
+
+Lemma lt_sdec i j : sdec lt i j.
+Proof. destruct (lt_eq_lt_dec i j) as [ [ | []] | ]; eauto. Qed.
+
 Section ordered.
 
   Variables (X : Type).
