@@ -255,6 +255,19 @@ End ordered.
 Fact ordered_from_ge_Acc X R (x : X) l : ordered_from (ge R) x l → Acc R x → ∀y, y ∈ l → Acc R y.
 Proof. induction 1 as [ | ? ? ? [ <- | ] ]; intros ? ? []; subst; eauto. Qed.
 
+Fact ordered_from_crt_Acc X R (x : X) l : ordered_from (clos_refl_trans R⁻¹) x l → Acc R x → ∀y, y ∈ l → Acc R y.
+Proof. 
+  induction 1 as [ | x y l H1 H2 IH ]; simpl; [ easy | ].
+  apply clos_refl_trans_inv in H1 as [ <- | H1%clos_trans_rev ].
+  + intros Hx z [ <- | Hz ]; auto.
+  + intros Hx.
+    assert (Acc R y) as Hy.
+    * apply Acc_clos_trans in Hx.
+      generalize (Acc_inv Hx H1).
+      apply Acc_incl; now constructor.
+    * intros ? [ <- | ]; eauto.
+Qed.
+
 Fact ordered_mono_map X Y (f : X → Y) (R : X → X → Prop) (T : Y → Y → Prop) l :
          (∀ a b, a ∈ l → b ∈ l → R a b → T (f a) (f b))
         → ordered R l → ordered T (map f l).

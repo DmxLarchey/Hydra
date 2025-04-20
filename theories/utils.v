@@ -76,6 +76,10 @@ Section clos_trans.
 
   Fact clos_trans_rev R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
   Proof. induction 1; eauto. Qed.
+
+  Fact clos_refl_trans_rev R x y : @clos_refl_trans X R x y → clos_refl_trans R⁻¹ y x. 
+  Proof. induction 1; eauto. Qed.
+
   Fact clos_t_rt R x y z :
        clos_trans R x y → clos_refl_trans R y z → clos_trans R x z.
   Proof. induction 2; eauto. Qed.
@@ -94,13 +98,19 @@ Section clos_trans.
         → (∀ l m, clos_trans R l m → clos_trans T l m).
   Proof. induction 2; eauto. Qed.
 
-  Hint Resolve clos_trans_rev : core.
+  Hint Resolve clos_trans_rev clos_refl_trans_rev : core.
 
   Fact clos_trans_rev_iff R x y : clos_trans R⁻¹ x y ↔ (clos_trans R)⁻¹ x y.
   Proof. split; auto. Qed.
 
+  Fact clos_refl_trans_rev_iff R x y : clos_refl_trans R⁻¹ x y ↔ (clos_refl_trans R)⁻¹ x y.
+  Proof. split; auto. Qed.
+
   Fact transitive_rev R : transitive R → transitive R⁻¹.
   Proof. unfold transitive; eauto. Qed.
+
+  Fact clos_refl_trans_inv R x y : clos_refl_trans R x y → x = y ∨ clos_trans R x y.
+  Proof. induction 1 as [ | | x y z _ [] _ [] ]; subst; eauto. Qed.
 
 End clos_trans.
 
