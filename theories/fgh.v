@@ -17,7 +17,9 @@ Set Implicit Arguments.
 
 Section Fast_Growing_Hierarchy.
 
-  (** Construction of the Grzegorczyk Fast Growing Hierarchy 
+  (** Construction of the Grzegorczyk Fast Growing Hierarchy
+
+      F : ε₀ → nat → nat
 
       F 0₀ n      := S n             for 0₀
       F (S₀ e) n  := (F e)^{S n} n   for a successor ordinal
@@ -110,6 +112,30 @@ Section Fast_Growing_Hierarchy.
     solve fgh.
     constructor 3 with l; auto.
   Qed.
+
+  (* The fundamental sequence for ε₀ is increasing and unbounded in ε₀ *)
+
+  Definition eps0_fseq_eps0 n := iter (λ e, ω^e) n 0₀.
+
+  Fact eps0_fseq_eps0_incr n : eps0_fseq_eps0 n <ε₀ eps0_fseq_eps0 (S n).
+  Proof. unfold eps0_fseq_eps0; rewrite iter_S; apply eps0_lt_omega. Qed.
+
+  Theorem eps0_fseq_eps0_bound e : { n | e <ε₀ eps0_fseq_eps0 n }.
+  Proof.
+    unfold eps0_fseq_eps0.
+    induction e as [ | e i f H (n & Hn) _ ] using eps0_hnf_rect.
+    + exists 1; apply eps0_lt_omega.
+    + exists (S n); rewrite iter_S.
+      apply eps0_add_below_omega.
+      * apply eps0_exp_mono_left; auto.
+      * apply eps0_lt_le_trans with (1 := H).
+        apply eps0_omega_mono_le, eps0_lt_le_weak; auto.
+  Qed.
+
+  (* This function grows faster than any function definable in HA/PA 
+     A proof of this result would be very nice addition *)
+
+  Definition FGH_eps0 n := FGH (eps0_fseq_eps0 n) n.
 
 End Fast_Growing_Hierarchy.
 

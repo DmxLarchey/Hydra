@@ -61,6 +61,14 @@ Section iter.
     now rewrite E, IHn.
   Qed.
 
+  Fact iter_add f n m x : iter f (m+n) x = iter f n (iter f m x).
+  Proof. induction m in x |- *; simpl; auto. Qed.
+
+  Fact iter_S f n x : iter f (S n) x = f (iter f n x).
+  Proof. 
+    replace (S n) with (n+1) by lia; now rewrite iter_add.
+  Qed. 
+
 End iter.
 
 Arguments iter {_}.
