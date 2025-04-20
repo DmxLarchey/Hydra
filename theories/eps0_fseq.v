@@ -20,7 +20,7 @@ Section eps0_ltf_pos_rect.
   (** Induction principle corresponding to the following building rules 
       for ordinals below ε₀:
 
-                    e      g  e  e≠0₀  eps0_least_split g e
+                    e      g  e  e≠0₀  eps0_ltf g e
         ------   ------   ----------------------------------
           0₀      S₀ e             g +₀ ω^e
    *)
