@@ -64,13 +64,13 @@ Qed.
 Theorem eps0_fseq_lub e l : lub eps0_le (λ x, ∃n, x = @eps0_fseq e l n) e.
 Proof.
   apply eps0_lub_simpler.
-  + intros x (n & ->); left; apply eps0_fseq_lt.
+  + intros x (n & ->); apply eps0_le_iff_lt; left; apply eps0_fseq_lt.
   + intros u Hu.
     apply eps0_lt_fseq_inv with (l := l) in Hu as (n & Hn); auto.
     exists (eps0_fseq l n); eauto.
 Qed.
 
-#[local] Hint Resolve eps0_fseq_lt : core.
+#[local] Hint Resolve eps0_fseq_lt eps0_lt_le_weak : core.
 
 (* A limit ordinal is the ≤ε₀-lub of <ε₀-smaller ordinals.
    This is also the case of 0₀. But of course, this is not
@@ -78,7 +78,7 @@ Qed.
 Theorem eps0_is_limit_lub e : eps0_is_limit e → lub eps0_le (λ x, x <ε₀ e) e.
 Proof.
   intros l; apply eps0_lub_simpler.
-  + now left.
+  + intro; auto.
   + intros ? []%(eps0_lt_fseq_inv l); eauto.
 Qed.
 
@@ -140,7 +140,7 @@ Proof.
   + intros v Hv.
     destruct (eps0_zero_or_pos a) as [ -> | Ha ].
     1: rewrite eps0_mult_zero_left in Hv; now apply eps0_zero_not_gt in Hv.
-    generalize (eps0_mult_is_limit Ha l); intros l'.
+    generalize (eps0_mult_is_limit _ Ha l); intros l'.
     apply eps0_lt_fseq_inv with (l := l') in Hv.
     destruct Hv as (n & Hn).
     exists (a*₀eps0_fseq l n); split.

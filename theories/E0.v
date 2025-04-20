@@ -233,7 +233,16 @@ Section E0.
 
   Fact E0_lt_le_trans e f g : e <E₀ f → f ≤E₀ g → e <E₀ g.
   Proof. intros ? []; subst; eauto. Qed.
-  
+
+  Fact E0_le_dec e f : { e ≤E₀ f } + { ~ e ≤E₀ f }.
+  Proof.
+    destruct (E0_lt_sdec e f) as [ e f H | e | e f H ]; simpl; auto.
+    + now left; left.
+    + right; intros C.
+      apply (@E0_lt_irrefl e),
+             E0_le_lt_trans with (1 := C); trivial.
+  Qed.
+
   Fact E0_le_lt_dec e f : { e ≤E₀ f } + { f <E₀ e }.
   Proof. destruct (E0_lt_sdec e f); simpl; auto; now do 2 left. Qed. 
 

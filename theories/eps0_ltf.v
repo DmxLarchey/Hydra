@@ -86,6 +86,7 @@ Proof.
     * rewrite eps0_add_hnf_eq, eps0_add_zero_right in Hb; auto.
       apply eps0_exp_inj, proj2, pos_succ_inj in Hb as <-; auto.
     * apply eps0_le_trans with ω^⟨g,i⟩; auto.
+      apply eps0_le_iff_lt.
       left; now apply eps0_exp_mono_left.
 Qed.
 
@@ -99,7 +100,7 @@ Proof.
   + assert (ω^h <ε₀ ω^e) as Hh. 
     1:{ apply eps0_le_lt_trans with (2 := Hg); auto. }
     destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
-    apply eps0_le_lt_trans with (2 := eps0_add_below_exp _ _ C Hh).
+    apply eps0_le_lt_trans with (2 := eps0_add_below_exp _ _ _ _ C Hh).
     rewrite <- Hb, eps0_add_assoc; auto.
   + apply eps0_add_mono; auto.
     apply Hgh.

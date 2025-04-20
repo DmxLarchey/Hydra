@@ -149,13 +149,15 @@ Section eps0_mpos.
     destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
     destruct (eps0_zero_or_pos a) as [ -> | ].
     + rewrite !eps0_mpos_fix_0; auto.
-    + left; apply eps0_mpos_mono_right; auto; lia.
+    + apply eps0_le_iff_lt.
+      left; apply eps0_mpos_mono_right; auto; lia.
   Qed.
 
   Fact eps0_mpos_mono a b m n : a ≤ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
   Proof.
+    rewrite eps0_le_iff_lt.
     intros [ H1 | -> ].
-    + left; now apply eps0_mpos_mono_left.
+    + rewrite eps0_le_iff_lt; left; now apply eps0_mpos_mono_left.
     + apply eps0_mpos_mono_right_le.
   Qed.
 
@@ -258,7 +260,7 @@ Section eps0_momega.
       a ≤ε₀ b
     → eps0_momega a c ≤ε₀ eps0_momega b c.
   Proof.
-    intros [ Hab | <- ]; auto.
+    intros [ Hab | <- ]%eps0_le_iff_lt; auto.
     destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
       destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Hab.
@@ -487,7 +489,7 @@ Section eps0_mult.
       destruct (eps0_zero_or_pos f) as [ -> | Hf ].
       * rewrite eps0_mult_zero_right, eps0_add_zero_right.
         apply eps0_mpos_gt_zero; auto.
-        apply eps0_lt_le_trans with (2 := eps0_momega_lt_pos Ha H1); auto.
+        apply eps0_lt_le_trans with (2 := eps0_momega_lt_pos _ _ Ha H1); auto.
       * apply eps0_lt_le_trans with (1 := IH2 Hf); auto.
   Qed.
 
@@ -506,7 +508,7 @@ Section eps0_mult.
     intros Hab.
     induction e as [ | n | e n g H1 IH1 IH2 ] using eps0_hnf_pos_rect.
     + rewrite !eps0_mult_zero_right; auto.
-    + rewrite !eps0_mult_pos_right.
+    + rewrite !eps0_mult_pos_right, eps0_le_iff_lt.
       left; apply eps0_mpos_mono_left; auto.
     + rewrite !eps0_mult_right; auto.
       apply eps0_add_mono; auto.
@@ -519,13 +521,13 @@ Section eps0_mult.
   Proof.
     destruct (eps0_zero_or_pos a) as [ -> | Ha ].
     1: rewrite eps0_mult_zero_left; auto.
-    intros [ H1 | <- ] [ H2 | <- ].
+    intros [ H1 | <- ]%eps0_le_iff_lt [ H2 | <- ]%eps0_le_iff_lt.
     + apply eps0_le_trans with (a *₀ f).
-      * left; apply eps0_mult_mono_right; auto.
+      * rewrite eps0_le_iff_lt; left; apply eps0_mult_mono_right; auto.
       * now apply eps0_mult_mono_left.
     + now apply eps0_mult_mono_left.
-    + left; now apply eps0_mult_mono_right.
-    + now right.
+    + rewrite eps0_le_iff_lt; left; now apply eps0_mult_mono_right.
+    + rewrite eps0_le_iff_lt; now right.
   Qed.
 
   Fact eps0_mult_hnf a i b e j f :
@@ -588,7 +590,8 @@ Section eps0_mult.
     apply eps0_le_lt_trans with (ω^⟨e,n⟩ *₀ b).
     + apply eps0_mult_mono; auto.
     + destruct (eps0_zero_or_pos f) as [ -> | ].
-      * apply eps0_lt_one in H2 as ->.
+      * rewrite eps0_omega_zero in H2.
+        apply eps0_lt_one in H2 as ->.
         rewrite eps0_mult_zero_right; auto.
       * rewrite <- eps0_mult_exp_omega with (i := n); auto.
         apply eps0_mult_mono_right; auto.

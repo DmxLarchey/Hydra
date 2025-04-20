@@ -338,6 +338,7 @@ Section eps0_fseq.
     induction a as [ | b i c Hc _ IH ] using eps0_hnf_rect.
     + intro e; rewrite (eps0_add_zero_left e).
       intros; rewrite eps0_add_zero_left; auto.
+      apply eps0_le_iff_lt.
       right; apply eps0_fseq_pirr.
     + intros e; destruct e as [ | f n g Hg _ _ ] using eps0_hnf_rect.
       1: intros l; exfalso; now apply (proj1 l).
