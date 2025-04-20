@@ -43,7 +43,8 @@ Section lex2.
     Lemma lex2_trans xi yj zk : xi ∈ l → yj ∈ m → zk ∈ p → lex2 xi yj → lex2 yj zk → lex2 xi zk.
     Proof.
       revert xi yj zk.
-      intros [] [] [] ? ? ? [ | (<- & ?) ]%lex2_inv [ | (<- & ?) ]%lex2_inv; eauto.
+      intros [] [] [] ? ? ? [ | (<- & ?) ]%lex2_inv
+                            [ | (<- & ?) ]%lex2_inv; eauto.
     Qed.
 
   End lex2_trans.
@@ -56,9 +57,9 @@ Section lex2.
               (RX_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RX x y)
               (RI_sdec : ∀ x i y j, (x,i) ∈ l → (y,j) ∈ m → sdec RI i j).
 
-    Lemma lex2_sdec xi yj : xi ∈ l → yj ∈ m → sdec lex2 xi yj.
+    Lemma lex2_sdec : ∀ xi yj, xi ∈ l → yj ∈ m → sdec lex2 xi yj.
     Proof.
-      revert xi yj; intros (x,i) (y,j) ? ?.
+      intros (x,i) (y,j) ? ?.
       destruct (RX_sdec x i y j) as [| x |]; eauto.
       destruct (RI_sdec x i x j); eauto.
     Qed.
@@ -71,8 +72,8 @@ Section lex2.
 
     Fact Acc_lex2 x : Acc RX x → ∀i, Acc lex2 (x,i).
     Proof.
-      induction 1 as [ x _ IHx ].
-      intros i; induction i using (well_founded_induction RI_wf).
+      induction 1 as [ x _ IHx ]; intros i.
+      induction i using (well_founded_induction RI_wf).
       constructor.
       intros [] [ | (<- & ?) ]%lex2_inv; eauto.
     Qed.

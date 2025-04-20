@@ -69,7 +69,8 @@ Section list_order.
     + intros (? & ? & ? & ? & -> & -> & ?); eauto.
   Qed.
 
-  (* These two are key lemmas in the proof of (Acc lo_step) below *)
+  (** These two are key lemmas in the proof of (Acc lo_step) below *)
+
   Local Fact lo_step_nil_inv l : ~ l ⊏ [].
   Proof. now intros ([] & ? & ? & ? & ? & ? & ?)%lo_step_inv. Qed.
 
@@ -95,7 +96,7 @@ Section list_order.
        → W r 
        → ∀l, l ≺ₗ y → W (l++r).
     Proof.
-      intros hy ?. 
+      intros hy ? l. 
       induction l; simpl; eauto.
       intros; apply hy; eauto.
     Qed.
@@ -121,7 +122,7 @@ Section list_order.
 
   End Acc_lo_step.
 
-  Hint Resolve Acc_lo_step_nil 
+  Hint Resolve Acc_lo_step_nil
                Acc_lo_step_cons : core.
 
   (* W is closed under [] and x::_ for any accessible x
@@ -200,10 +201,25 @@ Section list_order.
   Theorem Acc_lo_iff l : Acc lo l ↔ ∀x, x ∈ l → Acc R x.
   Proof. unfold lo; split; eauto. Qed.
 
-  Corollary wf_mso : well_founded R → well_founded lo.
+  Corollary wf_lo : well_founded R → well_founded lo.
   Proof. intros ? ?; apply Acc_lo_iff; auto. Qed.
 
 End list_order.
 
 Arguments lo_step {_}.
 Arguments lo {_}.
+
+Section mono.
+
+  Variables (X : Type) (R T : X → X → Prop).
+
+  Fact lo_step_mono : R ⊆₂ T → lo_step R ⊆₂ lo_step T.
+  Proof. induction 2; constructor; eauto. Qed.
+
+  Hint Resolve lo_step_mono : core.
+
+  Fact lo_mono : R ⊆₂ T → lo R ⊆₂ lo T.
+  Proof. intro; apply clos_trans_mono; eauto. Qed.
+
+End mono.
+

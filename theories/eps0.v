@@ -129,7 +129,7 @@ Section eps0_order.
   (* <ε₀ is well-founded *)
   Fact wf_eps0_lt : well_founded eps0_lt.
   Proof.
-    generalize E0_lt_wf.
+    generalize wf_lt_cnf.
     apply wf_rel_morph with (f := λ x y, x = π₁ y).
     + intros []; eauto.
     + unfold eps0_lt; intros ? ? [] [] -> ->; simpl; eauto.
@@ -523,18 +523,6 @@ Section eps0_omega.
       rewrite E in H; now apply eps0_lt_irrefl in H.
   Qed.
 
-(*
-  Fact eps0_zero_neq_exp_add e n f: 0₀ ≠ ω^⟨e,n⟩ +₀ f.
-  Proof.
-    intros H.
-    apply (@eps0_lt_irrefl 0₀).
-    rewrite H at 2.
-    apply eps0_lt_le_trans with (1 := eps0_lt_zero_exp e n).
-    rewrite <- (eps0_add_zero_right ω^⟨e,n⟩) at 1.
-    apply eps0_add_mono; auto.
-  Qed.
-*)
-
   (* ωᵉ = ωᵉ.(1+0) *)
   Definition eps0_omega (e : ε₀) := ω^⟨e,1ₚ⟩.
   Notation "ω^ e" := (eps0_omega e).
@@ -639,7 +627,7 @@ Section eps0_omega.
     Theorem eps0_hnf_rect : ∀e, P e.
     Proof.
       intros (e & he); revert e he.
-      apply cnf_head_rect.
+      apply cnf_head_dep_rect.
       + intros; revert HP0; apply eps0_pirr with (1 := eq_refl).
       + intros e he i f hf h H Hf He.
         refine (@eps0_pirr P _ _ _ _ _ (@HP1 _ i _ _ He Hf)); auto.
@@ -715,14 +703,6 @@ Section eps0_omega.
   Proof. apply eps0_lt_le_trans with ω^⟨e,i⟩; auto. Qed.
 
   Hint Resolve eps0_lt_zero_hnf : core.
-
-(*
-  Fact eps0_not_head_split_lt_zero e i f : ¬ ω^⟨e,i⟩ +₀ f <ε₀ 0₀.
-  Proof. apply eps0_zero_not_gt. Qed.
-
-  Fact eps0_not_eps_S_lt_zero e i : ¬ ω^⟨e,i⟩ <ε₀ 0₀.
-  Proof. apply eps0_zero_not_gt. Qed.
-*)
 
   Fact eps0_eq_exp_hnf_inv e₁ i₁ e₂ i₂ f₂ :
       ω^⟨e₁,i₁⟩ = ω^⟨e₂,i₂⟩ +₀ f₂
@@ -814,10 +794,6 @@ Section eps0_omega.
     + exists 0; auto.
     + exists n; apply eps0_lt_le_trans with (1 := H1); auto.
   Qed.
-
-(*
-  Hint Resolve eps0_exp_S_mono_left eps0_exp_S_mono : core.
-  *)
 
   Fact eps0_le_add_exp_omega e n m : n < m → ω^⟨e,n⟩ +₀ ω^e ≤ε₀ ω^⟨e,m⟩.
   Proof.

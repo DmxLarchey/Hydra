@@ -14,7 +14,6 @@ Import ListNotations.
 
 Set Implicit Arguments.
 
-#[local] Infix "∈" := In (at level 70, no associativity).
 #[local] Hint Resolve transitive_rev : core.
 #[local] Hint Resolve in_cons in_eq in_elt in_or_app : core.
 

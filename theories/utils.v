@@ -16,7 +16,8 @@ Set Implicit Arguments.
 (** Notations with global scope *)
 
 #[global] Notation "x ∈ l" := (In x l) (at level 70, no associativity, format "x  ∈  l").
-#[global] Notation ge R := (λ x y, x = y ∨ R y x).
+#[global] Notation "P '⊆₁' Q" := (forall x, P x -> Q x) (at level 70, no associativity, format "P  ⊆₁  Q").
+#[global] Notation "P '⊆₂' Q" := (forall x y, P x y -> Q x y) (at level 70, no associativity, format "P  ⊆₂  Q").
 #[global] Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
 
 Arguments clos_trans {_}.
@@ -74,29 +75,33 @@ Section clos_trans.
 
   Implicit Type (R T : X → X → Prop).
 
-  Fact clos_trans_rev R x y : @clos_trans X R x y → clos_trans R⁻¹ y x. 
+  Fact clos_trans_rev R x y : clos_trans R x y → clos_trans R⁻¹ y x. 
   Proof. induction 1; eauto. Qed.
 
-  Fact clos_refl_trans_rev R x y : @clos_refl_trans X R x y → clos_refl_trans R⁻¹ y x. 
+  Fact clos_refl_trans_rev R x y : clos_refl_trans R x y → clos_refl_trans R⁻¹ y x. 
   Proof. induction 1; eauto. Qed.
 
   Fact clos_t_rt R x y z :
        clos_trans R x y → clos_refl_trans R y z → clos_trans R x z.
   Proof. induction 2; eauto. Qed.
 
-  Fact clos_trans_ge R : transitive R → ∀ x y, clos_trans (ge R) x y → ge R x y.
-  Proof. 
-    intros HR; red in HR.
-    induction 1 as [ ? ? [] | ? ? ? _ [] _ [] ]; subst; eauto.
-  Qed.
+  Fact transitive_clos_t R : transitive (clos_trans R).
+  Proof. red; eauto. Qed.
 
-  Fact clos_t_ge_rt R x y : clos_trans (ge R) x y → clos_refl_trans R y x.
-  Proof. induction 1 as [ ? ? [ <- | ] | ]; eauto. Qed.
+  Fact transitive_clos_rt R : transitive (clos_refl_trans R).
+  Proof. red; eauto. Qed.
 
-  Fact clos_trans_mono R T : 
-          (∀ x y, R x y → T x y)
-        → (∀ l m, clos_trans R l m → clos_trans T l m).
+  Fact transitive__clos_trans R : transitive R → clos_trans R ⊆₂ R.
   Proof. induction 2; eauto. Qed.
+
+  Fact clos_trans_mono R T : R ⊆₂ T → clos_trans R ⊆₂ clos_trans T.
+  Proof. induction 2; eauto. Qed.
+
+  Fact clos_refl_trans_mono  R T : R ⊆₂ T → clos_refl_trans R ⊆₂ clos_refl_trans T.
+  Proof. induction 2; eauto. Qed.
+
+  Fact clos_refl_trans_inv R x y : clos_refl_trans R x y → x = y ∨ clos_trans R x y.
+  Proof. induction 1 as [ | | x y z _ [] _ [] ]; subst; eauto. Qed.
 
   Hint Resolve clos_trans_rev clos_refl_trans_rev : core.
 
@@ -108,9 +113,6 @@ Section clos_trans.
 
   Fact transitive_rev R : transitive R → transitive R⁻¹.
   Proof. unfold transitive; eauto. Qed.
-
-  Fact clos_refl_trans_inv R x y : clos_refl_trans R x y → x = y ∨ clos_trans R x y.
-  Proof. induction 1 as [ | | x y z _ [] _ [] ]; subst; eauto. Qed.
 
 End clos_trans.
 
@@ -156,7 +158,7 @@ Proof. destruct l as [ | ? [] ]; inversion 1; auto. Qed.
 Fact list_split {X} (l₁ l₂ r₁ r₂ : list X) :
     l₁++r₁ = l₂++r₂
   → ∃m, l₁++m = l₂ ∧ r₁ = m++r₂
-     ∨  l₁ = l₂++m ∧ m++r₁ = r₂.
+      ∨ l₁ = l₂++m ∧ m++r₁ = r₂.
 Proof.
   revert l₂; induction l₁ as [ | x l1 IH ]; intros [ | y l2 ]; simpl.
   + exists []; auto.
@@ -168,7 +170,7 @@ Qed.
 Fact list_split_cons {X} (l₁ l₂ r₁ r₂ : list X) x :
     l₁++r₁ = l₂++[x]++r₂
   → ∃m, l₁++m = l₂ ∧ r₁ = m++[x]++r₂
-     ∨  l₁ = l₂++[x]++m ∧ m++r₁ = r₂.
+      ∨ l₁ = l₂++[x]++m ∧ m++r₁ = r₂.
 Proof.
   intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst; eauto.
   destruct m as [ | y m ]; simpl in H2.
@@ -180,7 +182,7 @@ Fact list_split_cons2 {X} (l₁ l₂ r₁ r₂ : list X) x y :
     l₁++[x]++r₁ = l₂++[y]++r₂
   → l₁ = l₂ ∧ x = y ∧ r₁ = r₂
   ∨ ∃m, l₁++[x]++m = l₂ ∧ r₁ = m++[y]++r₂
-     ∨  l₁ = l₂++[y]++m ∧ m++[x]++r₁ = r₂.
+      ∨ l₁ = l₂++[y]++m ∧ m++[x]++r₁ = r₂.
 Proof.
   intros (m & [ [H1 H2] | [H1 H2] ])%list_split; subst.
   + destruct m as [ | z m ]; simpl in H2.
@@ -199,8 +201,8 @@ Fact list_nil_choose X (l : list X) : {l = []} + {l ≠ []}.
 Proof. destruct l; eauto; now right. Qed.
 
 Fact list_fall_choose X (P Q : X → Prop) l :
-        (∀x, x ∈ l → {P x} + {Q x})
-      → { x | x ∈ l ∧ P x } + { ∀x, x ∈ l → Q x }.
+    (∀x, x ∈ l → {P x} + {Q x})
+  → { x | x ∈ l ∧ P x } + { ∀x, x ∈ l → Q x }.
 Proof.
   induction l as [ | x l IHl ]; intros Hl.
   + now right.
@@ -210,7 +212,7 @@ Proof.
 Qed.
 
 Fact fold_right_conj X (P : X → Prop) l :
-         fold_right (λ x, and (P x)) True l ↔ ∀x, x ∈ l → P x.
+  fold_right (λ x, and (P x)) True l ↔ ∀x, x ∈ l → P x.
 Proof.
   rewrite <- Forall_forall.
   induction l; simpl.
@@ -233,7 +235,7 @@ Section squash.
   Fact squash_iff : squash ↔ P.
   Proof. unfold squash; destruct d; tauto. Qed.
 
-  Fact squash_pirr : ∀ p1 p2 : squash, p1 = p2.
+  Fact squash_pirr : ∀ p q : squash, p = q.
   Proof. unfold squash; destruct d; now intros [] []. Qed.
 
 End squash.
@@ -242,8 +244,11 @@ End squash.
 
 #[local] Hint Resolve Acc_inv Acc_intro : core.
 
-Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ~ R x x.
-Proof. induction 1 as [ x _ IH ]; intros H; exact (IH _ H H). Qed.
+Fact Acc_irrefl X (R : X → X → Prop) x : Acc R x → ¬ R x x.
+Proof. unfold not; induction 1; eauto. Qed.
+
+Fact Acc_inv_crt X R x y : @clos_refl_trans X R x y → Acc R y → Acc R x.
+Proof. induction 1; eauto. Qed.
 
 Section wf_rel_morph.
 
@@ -266,3 +271,13 @@ Section wf_rel_morph.
   Proof. intros ? y; destruct (f_surj y); eauto. Qed.
 
 End wf_rel_morph.
+
+Fact well_founded_both__left X R P :
+    well_founded (λ x y : X, P x ∧ P y ∧ R x y)
+  → well_founded (λ x y : X, P x ∧ R x y).
+Proof.
+  intros H k; constructor; intros y (Hy & _); clear k.
+  induction y as [ y IH ] using (well_founded_induction H).
+  constructor; intros ? []; now apply IH.
+Qed.
+
