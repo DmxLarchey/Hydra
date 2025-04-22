@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Utf8.
+From Coq Require Import List Relations Utf8.
 From Hydra Require Import utils pos ordered lex_list.
 
 Import ListNotations.
@@ -242,16 +242,19 @@ Section wlist_add.
     rewrite wlist_add_gt_list, wlist_add_lt; auto.
   Qed.
   
-  Fact wlist_add_common l y : ∃ l' i, ∀ j m, wlist_add l ((y,j)::m) = l'++(y,i + j)::m.
+  Fact wlist_add_common l y : ∃ l', (∀ j m, wlist_add l ((y,j)::m) = l'++(y,j)::m)
+                                  ∨ (∃i, ∀ j m, wlist_add l ((y,j)::m) = l'++(y,i +ₚ j)::m).
   Proof.
     simpl.
-    induction l as [ | (x,i) l (l' & k & Hl') ]; simpl.
-    + exists [], 0; auto.
+    induction l as [ | (x,i) l (l' & Hl') ]; simpl.
+    + exists []; now left.
     + destruct (R_sdec x y) as [ x y H | y | x y H ].
-      * exists [], 0; auto.
-      * exists [], (1+i); auto.
-      * exists ((x,i)::l'), k.
-        intros; simpl; f_equal; auto.
+      * exists []; auto.
+      * exists []; right; exists i; auto.
+      * exists ((x,i)::l').
+        destruct Hl' as [ Hl' | (j & Hj) ].
+        - left; intros; simpl; f_equal; auto. 
+        - right; exists j; intros; simpl; f_equal; auto.
   Qed. 
 
   Fact wlist_add_choice x i l y j m :

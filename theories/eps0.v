@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
+From Coq Require Import List Relations (* Arith Lia *) Wellfounded Utf8.
 From Hydra Require Import utils pos ordered lex2 lex_list list_order wlist E0.
 
 Import ListNotations.
@@ -544,6 +544,9 @@ Section eps0_omega.
   (* ωᵉ = ωᵉ.(1+0) *)
   Definition eps0_omega (e : ε₀) := ω^⟨e,1ₚ⟩.
   Notation "ω^ e" := (eps0_omega e).
+  
+  Fact eps0_omega_eq_exp e : ω^e = ω^⟨e,1ₚ⟩.
+  Proof. trivial. Qed.
 
   Fact eps0_omega_zero : ω^0₀ = 1₀.
   Proof. apply eps0_eq_iff; trivial. Qed.
@@ -1001,24 +1004,26 @@ Proof. intros H; contradict H; now apply eps0_succ_eq_tf in H. Qed.
 Fact eps0_succ_eq_omega a e : S₀ a = ω^e → e = 0₀ ∧ a = 0₀.
 Proof. rewrite <- (eps0_add_zero_left ω^e); apply eps0_succ_eq_tf. Qed.
 
-Fact eps0_add_one_left e : (e = 0₀) + { f | e = 1₀ +₀ f }.
+Fact eps0_add_one_left_choice e : (e = 0₀) + { f | e = 1₀ +₀ f }.
 Proof.
   induction e as [ | n | e i f ? ? _ _ ] using eps0_hnf_pos_rect.
   + now left.
   + right.
-    destruct (pos_one_or_succ n) as [ -> | (k & ->) ].
-    * exists 0₀; now rewrite eps0_add_zero_right, <- eps0_omega_zero.
-    * exists ω^⟨0₀,k⟩.
-      rewrite <- eps0_omega_zero.
-      unfold eps0_omega.
-      rewrite eps0_add_exp.
-      f_equal.
-      now rewrite pos_add_comm.
+    (* In case n is not in nat* but in eps0*, then n can be above
+       eg (ε₀)⁰.ω then we write (ε₀)⁰.ω = 1 + (ε₀)⁰.ω *)
+    (* 1+n is either 1 or 1+i *)
+    destruct (pos_one_or_next n) as [ -> | (k & ->) ].
+    * (*  ω⁰.1 = 1+0 *)
+      exists 0₀; now rewrite eps0_add_zero_right, <- eps0_omega_zero.
+    * (* ω⁰.(1+(1+i)) = ω⁰.1 + ω⁰.(1+i) *)
+      exists ω^⟨0₀,k⟩; now rewrite <- eps0_omega_zero, eps0_omega_eq_exp, eps0_add_exp.
   + right.
     exists (ω^⟨e,i⟩ +₀ f).
-    rewrite <- eps0_add_assoc, <- eps0_omega_zero.
-    unfold eps0_omega.
-    rewrite eps0_add_exp_lt; auto.
+    rewrite <- eps0_add_assoc, <- eps0_omega_zero, eps0_omega_eq_exp, eps0_add_exp_lt; auto.
 Qed.
+
+Fact eps0_add_one_left_inj e f : 1₀ +₀ e = 1₀ +₀ f → e = f.
+Proof. apply eps0_add_cancel. Qed.
+
     
 

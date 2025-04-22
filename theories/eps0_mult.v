@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
+From Coq Require Import List Relations (* Arith Lia *) Wellfounded Utf8.
 From Hydra Require Import utils pos ordered eps0.
 
 Import ListNotations.
@@ -81,7 +81,7 @@ Section eps0_mpos.
   Fact eps0_mpos_omega_add n α β : β <ε₀ ω^α → eps0_mpos (ω^α +₀ β) n = ω^⟨α,n⟩ +₀ β.
   Proof.
     intros; unfold eps0_omega.
-    rewrite eps0_mpos_fix_1; auto.
+    rewrite eps0_mpos_fix_1, pos_mul_one_left; auto.
   Qed.
 
   Fact eps0_mpos_omega n α : eps0_mpos ω^α n = ω^⟨α,n⟩.
@@ -105,6 +105,7 @@ Section eps0_mpos.
     + rewrite !eps0_mpos_fix_1, pos_mul_assoc; auto.
   Qed.
 
+  (** a.2 < b.2 *)
   Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
   Proof.
     intros Hab Hmn.
@@ -113,22 +114,60 @@ Section eps0_mpos.
     + now apply eps0_lt_irrefl in Hab.
     + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
     + now apply eps0_zero_not_gt in Hab.
-    + apply eps0_lt_hnf_inv in Hab; auto.
+    + (* ε₀.(i.n) < ε₀.(j.m) *)
+    apply eps0_lt_hnf_inv in Hab; auto.
       rewrite !eps0_mpos_fix_1; auto.
       apply eps0_lt_hnf_inv; auto.
       destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
-      * right; split; auto; left.
-        now apply pos_mul_mono_left.
+      * right; split; auto.
+        admit.
+(*        now apply pos_mul_mono_left. *)
       * apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
         right; split; auto; left.
         now apply pos_mul_mono_right.
-  Qed.
+  Admitted.
+  
+  Fact eps0_mpos_mono_left_le a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
+  Proof.
+    intros Hab Hmn.
+    destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
+      destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
+    + now apply eps0_lt_irrefl in Hab.
+    + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
+    + now apply eps0_zero_not_gt in Hab.
+    + (* ε₀.(i.n) < ε₀.(j.m) *)
+      apply eps0_lt_hnf_inv in Hab; auto.
+      rewrite !eps0_mpos_fix_1; auto.
+      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+      * apply eps0_lt_le_weak, eps0_lt_hnf_inv; auto. 
+      * (* (ε₀.ω²).k = (ε₀.ω).k ? 
+           because then ε₀.ω + 2 < ε₀.ω² + 1
+           but (ε₀.ω + 2).k
+      
+       *)
+      
+      apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
+        right; split; auto; left.
+        now apply pos_mul_mono_right.
+      
+      rewrite !eps0_mpos_fix_1; auto.
+      apply eps0_lt_hnf_inv; auto.
+      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+      * right; split; auto.
+        admit.
+(*        now apply pos_mul_mono_left. *)
+      * apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
+        right; split; auto; left.
+        now apply pos_mul_mono_right.
+  Admitted.
 
   Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
   Proof.
     intros H.
-    apply eps0_mpos_mono_left with (n := n) (m := n) in H; auto.
-    now rewrite eps0_mpos_fix_0 in H.
+    apply eps0_lt_le_trans with (1 := H).
+    destruct (pos_one_or_next n) as [ -> | (k & ->) ].
+    + rewrite eps0_mpos_one; auto.
+    + rewrite <- eps0_mpos_add, eps0_mpos_one; auto.
   Qed.
 
   Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.

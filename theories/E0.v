@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
+From Coq Require Import List Relations Wellfounded Utf8.
 From Hydra Require Import utils pos ordered lex2 lex_list list_order wlist.
 
 Import ListNotations.
@@ -335,7 +335,7 @@ Section E0.
 
     (** We show that <E₀ is wf on cnf *)
 
-    Hint Resolve lt_wf : core.
+    Hint Resolve pos_lt_wf : core.
 
     Let R x y := cnf x ∧ x <E₀ y.
     Let T := lex2 R lt.
@@ -530,7 +530,8 @@ Section E0.
     + destruct (E0_lt_sdec a y).
       * rewrite !wlist_add_lt; auto.
       * rewrite !wlist_add_eq; auto.
-        left; constructor; constructor 2; right; auto.
+        assert (u +ₚ j ≤ v +ₚ j) as [ -> | ]%pos_le_lt_iff; auto.
+        left; constructor; constructor 2; now right.
       * rewrite !wlist_add_gt; auto.
         left; constructor; constructor 2; now right.
     + destruct (E0_lt_sdec x y).
@@ -590,10 +591,8 @@ Section E0.
           as (a & b & c & -> & H); auto.
         constructor 2; left.
         destruct H as [ (_ & <- & _) | [ (_& <- & _) | (_ & -> & _)] ]; auto.
-    + destruct (wlist_add_common E0_lt_sdec l y) as (l' & i & H).
-      rewrite !H.
-      apply lex_list_app_head.
-      constructor 2; right; lia.
+    + destruct (wlist_add_common E0_lt_sdec l y) as (l' & [ H | (i & H) ]);
+        rewrite !H; apply lex_list_app_head; constructor 2; right; auto.
     + rewrite !wlist_add_cons_right. 
       now apply lex_list_app_head.
   Qed.
@@ -1030,7 +1029,7 @@ Section E0_lpo.
       intros [] [] ? ? [| (<- & ?)]%lex2_inv; eauto.
   Qed.
 
-  Hint Resolve lt_wf Acc_lex2 : core.
+  Hint Resolve pos_lt_wf Acc_lex2 : core.
 
   (* Nested list ordering (or list path ordering) is well_founded,
      the critical lemma being Acc_lo_iff !! *) 

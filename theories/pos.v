@@ -14,8 +14,8 @@ From Hydra Require Import ordered.
    and not {0,1,...} *)
 Definition pos := nat.
 
-Definition pos_add (i j : pos) := S (i+j).
-Definition pos_mul (i j : pos) := i*j+i+j.
+Definition pos_add (i j : pos) := i+1+j.
+Definition pos_mul (i j : pos) := i+(1+i)*j.
 Definition pos_one := 0.
 
 #[global] Notation "x '+ₚ' y" := (pos_add x y) (at level 31, left associativity).
@@ -24,6 +24,10 @@ Definition pos_one := 0.
 
 Section pos.
 
+  (* The idea is that we use nat = {0} + nat 
+     and every non zero nat is of the form 1 + n for n in nat
+     This generalizes to epsilon0 *)
+
   Tactic Notation "solve" "pos" :=
     unfold pos_add, pos_mul, pos_one; lia || ring || auto.
 
@@ -31,24 +35,44 @@ Section pos.
 
   Local Fact pos_rect (P : pos → Type) :
       P 1ₚ
-    → (∀n, P n → P (n +ₚ 1ₚ))
+    → (∀n, P n → P (1ₚ +ₚ n))
     → ∀n, P n.
   Proof.
     intros H1 H2; apply nat_rect; auto.
-    intros; replace (S n) with (n +ₚ 1ₚ); auto.
+(*    intros; replace (S n) with (n +ₚ 1ₚ); auto. *)
   Qed.
+  
+  Fact pos_lt_wf : well_founded (λ i j, i < j).
+  Proof. apply lt_wf. Qed.
 
   Fact pos_le_lt_iff i j : i ≤ j ↔ i = j ∨ i < j.
   Proof. solve pos. Qed.
 
   Fact pos_lt_sdec i j : sdec lt i j.
   Proof. apply lt_sdec. Qed.
+  
+  Fact pos_one_or_next i : (i = 1ₚ) + { j | i = 1ₚ +ₚ j }.
+  Proof.
+    induction i as [ | i ] using pos_rect; eauto.
+  Qed.
 
   Fact pos_one_or_succ i : (i = 1ₚ) + { j | i = j +ₚ 1ₚ }.
-  Proof. induction i using pos_rect; eauto. Qed.
+  Proof.
+    induction i as [ | i ] using pos_rect; eauto.
+    right; exists i; solve pos.
+  Qed.
 
-  Fact pos_add_is_succ i j : { k | i +ₚ j = k +ₚ 1ₚ }.
+  (* (1+i)+(1+j) = 1+(i+1+j) *)
+  Fact pos_add_is_next i j : { k | i +ₚ j = 1ₚ +ₚ k }.
   Proof. exists (i+j); solve pos. Qed.
+  
+  
+  (*
+  (* (1+i)*(1+j) = (1+i)*1+(1+i)*j = 1+i+(1+i)*j *)
+  Fact pos_mul_is_next i j : { k | i *ₚ j = 1ₚ +ₚ k }.
+  Proof. exists (i+i*(1+j)); solve pos. Qed.
+  
+  *)
 
   Fact pos_succ_neq_one i : i +ₚ 1ₚ ≠ 1ₚ.
   Proof. solve pos. Qed.
@@ -56,14 +80,18 @@ Section pos.
   Fact pos_succ_inj i j : i +ₚ 1ₚ = j +ₚ 1ₚ → i = j.
   Proof. solve pos. Qed.
 
+(*
   Fact pos_add_comm i j : i +ₚ j = j +ₚ i.
   Proof. solve pos. Qed.
+  *)
 
   Fact pos_add_assoc i j k : (i +ₚ j) +ₚ k = i +ₚ (j +ₚ k).
   Proof. solve pos. Qed.
 
+(*
   Fact pos_mul_comm i j : i *ₚ j = j *ₚ i.
   Proof. solve pos. Qed.
+  *)
 
   Fact pos_mul_assoc i j k : (i *ₚ j) *ₚ k = i *ₚ (j *ₚ k).
   Proof. solve pos. Qed.
@@ -74,8 +102,10 @@ Section pos.
   Fact pos_mul_one_right i : i *ₚ 1ₚ = i.
   Proof. solve pos. Qed.
 
+(*
   Fact pos_mul_distr_left i j k : (i +ₚ j) *ₚ k = i *ₚ k +ₚ j *ₚ k.
   Proof. solve pos. Qed.
+  *)
 
   Fact pos_mul_distr_right i j k : k *ₚ (i +ₚ j)  = k *ₚ i +ₚ k *ₚ j.
   Proof. solve pos. Qed.
@@ -92,8 +122,19 @@ Section pos.
   Fact pos_add_incr_left i j : j ≤ i +ₚ j.
   Proof. solve pos. Qed.
 
+(*
   Fact pos_add_mono_lt_left i j k : i < j → i +ₚ k < j +ₚ k.
   Proof. solve pos. Qed.
+  *)
+  
+  Fact pos_add_mono_lt_right i j k : i < j → k +ₚ i < k +ₚ j.
+  Proof. solve pos. Qed.
+  
+  Fact pos_add_mono_le_left i j k : i ≤ j → i +ₚ k ≤ j +ₚ k.
+  Proof. solve pos. Qed.
+  
+  Fact pos_lt_le_weak i j : i < j → i ≤ j.
+  Proof. rewrite pos_le_lt_iff; now right. Qed.
 
   Fact pos_one_least i : 1ₚ ≤ i.
   Proof. solve pos. Qed.
@@ -107,23 +148,18 @@ Section pos.
   Fact pos_lt_sub i j : i < j → { k | j = i +ₚ k }.
   Proof. exists (j-i-1); solve pos. Qed.
 
-  Fact pos_mul_mono_left i j p k : i < j → p ≤ k → i *ₚ p < j *ₚ k.
-  Proof. 
+  Fact pos_mul_mono_right i j p k : i ≤ j → p < k → i *ₚ p < j *ₚ k.
+  Proof.
     solve pos; intros H1 H2.
     assert (i*p <= j*k).
     + apply Nat.mul_le_mono; lia.
     + lia.
   Qed.
 
-  Fact pos_mul_mono_right i j p k : i ≤ j → p < k → i *ₚ p < j *ₚ k.
-  Proof.
-    intros; rewrite (pos_mul_comm i), (pos_mul_comm j); now apply pos_mul_mono_left.
-  Qed.
-
   Fact pos_mul_mono i j p k : i ≤ j → p ≤ k → i *ₚ p ≤ j *ₚ k.
-  Proof. 
+  Proof.
     solve pos; intros H1 H2.
-     assert (i*p <= j*k).
+    assert (i*p <= j*k).
     + apply Nat.mul_le_mono; lia.
     + lia.
   Qed.
@@ -136,5 +172,7 @@ End pos.
     pos_add_sincr_left
     pos_add_sincr_right
     pos_add_incr_left 
-    pos_add_mono_lt_left : core. 
+    pos_add_mono_lt_right 
+    pos_lt_le_weak
+    pos_add_mono_le_left : core. 
 
