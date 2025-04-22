@@ -1001,3 +1001,24 @@ Proof. intros H; contradict H; now apply eps0_succ_eq_tf in H. Qed.
 Fact eps0_succ_eq_omega a e : S₀ a = ω^e → e = 0₀ ∧ a = 0₀.
 Proof. rewrite <- (eps0_add_zero_left ω^e); apply eps0_succ_eq_tf. Qed.
 
+Fact eps0_add_one_left e : (e = 0₀) + { f | e = 1₀ +₀ f }.
+Proof.
+  induction e as [ | n | e i f ? ? _ _ ] using eps0_hnf_pos_rect.
+  + now left.
+  + right.
+    destruct (pos_one_or_succ n) as [ -> | (k & ->) ].
+    * exists 0₀; now rewrite eps0_add_zero_right, <- eps0_omega_zero.
+    * exists ω^⟨0₀,k⟩.
+      rewrite <- eps0_omega_zero.
+      unfold eps0_omega.
+      rewrite eps0_add_exp.
+      f_equal.
+      now rewrite pos_add_comm.
+  + right.
+    exists (ω^⟨e,i⟩ +₀ f).
+    rewrite <- eps0_add_assoc, <- eps0_omega_zero.
+    unfold eps0_omega.
+    rewrite eps0_add_exp_lt; auto.
+Qed.
+    
+

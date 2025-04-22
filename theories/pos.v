@@ -29,7 +29,7 @@ Section pos.
 
   Implicit Type (i j k pn : pos).
 
-  Fact pos_rect (P : pos → Type) :
+  Local Fact pos_rect (P : pos → Type) :
       P 1ₚ
     → (∀n, P n → P (n +ₚ 1ₚ))
     → ∀n, P n.
