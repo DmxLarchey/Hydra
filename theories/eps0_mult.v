@@ -105,7 +105,57 @@ Section eps0_mpos.
     + rewrite !eps0_mpos_fix_1, pos_mul_assoc; auto.
   Qed.
 
-  (** a.2 < b.2 *)
+  (* (ε₀²+ε₀.i).ω = ε₀².ω
+  
+     we have ε₀².n <= (ε₀²+ε₀.i).n <= (ε₀² + ε₀²).n <= ε₀².(2n) < ε₀².ω
+     hence sup (ε₀²+ε₀.i).n = ε₀².ω
+ 
+    So we have ε₀²+ε₀.1 < ε₀²+ε₀.2 but (ε₀²+ε₀.1).ω = (ε₀²+ε₀.2).ω
+ 
+     Also the definition of eps0_mpos is not correct for ordinals above ω ? 
+     
+     (ε₀²+ε₀).ω  = sup (ε₀²+ε₀).n = sup (ε₀².n+ε₀) = ε₀².ω (indeed ε₀².n+ε₀ <= ε₀².(n+1) < ε₀².ω
+     (ε₀²+ε₀).ω² = sup (ε₀²+ε₀).(ω.n) = sup ((ε₀²+ε₀).ω).n = sup (ε₀².ω).n =sup ε₀².(ω.n) = ε₀².ω²
+     
+     So the rule for multiplication by a pos does not extend beyond ω and the
+     definition is thus not correct 
+     
+     If α is a natural number ordinal 
+       (ε²+ε.i).(S^k n)) = (ε²+ε.i).(S n) + (ε²+ε.i) = (ε²+ε.i).n + (ε²+ε.i) + ... + (ε²+ε.i) = (ε²+ε.i).n + ε².k + ε.i
+     
+     If α is a limit ordinal λₙ ~> α
+       (ε²+ε.i).α = ε².α ? 
+       ε².λₙ <= (ε²+ε.i).λₙ <= (ε²+ε²).λₙ <= ε².(2.λₙ) < ε².α ???
+       
+       limit for ω² is λₙ = ω.n
+       limit for ω.2 is λₙ = ω+n, 2.λₙ = λₙ+λₙ = (ω+n)+(ω+n) = ω.2+n not below  ω.2
+       
+       *)
+  
+  Fact eps0_mpos_mono_left a b n : a <ε₀ b → eps0_mpos a n <ε₀ eps0_mpos b n.
+  Proof.
+    intros Hab.
+    destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
+      destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
+    + now apply eps0_lt_irrefl in Hab.
+    + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
+    + now apply eps0_zero_not_gt in Hab.
+    + (* ε₀.(i.n) < ε₀.(j.m) *)
+      apply eps0_lt_hnf_inv in Hab; auto.
+      rewrite !eps0_mpos_fix_1; auto.
+      apply eps0_lt_hnf_inv; auto.
+      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+      * right; split; auto.
+        admit.
+(*        now apply pos_mul_mono_left. *)
+      * apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
+        right; split; auto; left.
+        now apply pos_mul_mono_right.
+  Admitted.
+  
+  
+  
+  (*
   Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
   Proof.
     intros Hab Hmn.
@@ -127,39 +177,18 @@ Section eps0_mpos.
         now apply pos_mul_mono_right.
   Admitted.
   
-  Fact eps0_mpos_mono_left_le a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
-  Proof.
-    intros Hab Hmn.
-    destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
-      destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
-    + now apply eps0_lt_irrefl in Hab.
-    + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
-    + now apply eps0_zero_not_gt in Hab.
-    + (* ε₀.(i.n) < ε₀.(j.m) *)
-      apply eps0_lt_hnf_inv in Hab; auto.
-      rewrite !eps0_mpos_fix_1; auto.
-      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
-      * apply eps0_lt_le_weak, eps0_lt_hnf_inv; auto. 
-      * (* (ε₀.ω²).k = (ε₀.ω).k ? 
-           because then ε₀.ω + 2 < ε₀.ω² + 1
-           but (ε₀.ω + 2).k
-      
-       *)
-      
-      apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
-        right; split; auto; left.
-        now apply pos_mul_mono_right.
-      
-      rewrite !eps0_mpos_fix_1; auto.
-      apply eps0_lt_hnf_inv; auto.
-      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
-      * right; split; auto.
-        admit.
-(*        now apply pos_mul_mono_left. *)
-      * apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
-        right; split; auto; left.
-        now apply pos_mul_mono_right.
-  Admitted.
+  *)
+  
+  (* (ε₀²+ε₀).ω² = ?
+     (ε₀²+ε₀).ω  = ε₀².ω
+     
+     Maybe the definition of mpos is not correct for ordinals above ω ? 
+     
+     (ε₀²+ε₀).ω  = sup (ε₀²+ε₀).n = sup (ε₀².n+ε₀) = ε₀².ω (indeed ε₀².n+ε₀ <= ε₀².(n+1) < ε₀².ω
+     (ε₀²+ε₀).ω² = sup (ε₀²+ε₀).(ω.n) = sup ((ε₀²+ε₀).ω).n = sup (ε₀².ω).n =sup ε₀².(ω.n) = ε₀².ω²
+     
+     So the rule for multiplication by a pos does not extend beyond ω and the
+     definition is thus not correct  *)
 
   Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
   Proof.
@@ -170,7 +199,7 @@ Section eps0_mpos.
     + rewrite <- eps0_mpos_add, eps0_mpos_one; auto.
   Qed.
 
-  Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+  Hint Resolve (* eps0_mpos_mono_left *) eps0_mpos_gt_zero : core.
 
   Fact eps0_mpos_mono_right a n m : 0₀ <ε₀ a → n < m → eps0_mpos a n <ε₀ eps0_mpos a m.
   Proof.
@@ -185,26 +214,30 @@ Section eps0_mpos.
 
   Fact eps0_mpos_mono_right_le a n m : n ≤ m → eps0_mpos a n ≤ε₀ eps0_mpos a m.
   Proof.
-    destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
+    intros [ <- | H ]%pos_le_lt_iff; auto.
     destruct (eps0_zero_or_pos a) as [ -> | ].
     + rewrite !eps0_mpos_fix_0; auto.
     + apply eps0_le_iff_lt.
-      left; apply eps0_mpos_mono_right; auto; lia.
+      left; apply eps0_mpos_mono_right; auto.
   Qed.
 
+(*
   Fact eps0_mpos_mono a b m n : a ≤ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
   Proof.
     rewrite eps0_le_iff_lt.
     intros [ H1 | -> ].
-    + rewrite eps0_le_iff_lt; left; now apply eps0_mpos_mono_left.
+    + rewrite eps0_le_iff_lt. left; now apply eps0_mpos_mono_left.
     + apply eps0_mpos_mono_right_le.
   Qed.
+  *)
 
   Fact eps0_mpos_below_omega a n e : a <ε₀ ω^e → eps0_mpos a n <ε₀ ω^e.
   Proof.
     intros [ -> | (f & i & H1 & H2) ]%eps0_below_omega_inv.
     + rewrite eps0_mpos_fix_0; auto.
-    + apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
+    + rewrite  
+    
+    apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
       apply eps0_lt_trans with (1 := H1).
       rewrite eps0_mpos_exp.
       apply eps0_lt_exp_inv; auto.
@@ -612,7 +645,7 @@ Section eps0_mult.
   Proof.
     unfold eps0_omega.
     destruct (eps0_zero_or_pos f) as [ -> | ].
-    + now rewrite eps0_mult_exp_pos, eps0_add_zero_right.
+    + now rewrite eps0_mult_exp_pos, eps0_add_zero_right, pos_mul_one_left.
     + rewrite eps0_mult_exp; auto.
   Qed.
 
