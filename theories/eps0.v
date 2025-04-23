@@ -1020,5 +1020,3 @@ Proof.
     unfold eps0_omega.
     rewrite eps0_add_exp_lt; auto.
 Qed.
-    
-

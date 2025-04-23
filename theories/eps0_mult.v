@@ -683,6 +683,48 @@ Section eps0_mult.
 
   Fact eps0_mult_succ_right a e : a *₀ (S₀ e) = a *₀ e +₀ a.
   Proof. now rewrite <- eps0_add_one_right, eps0_mult_distr, eps0_mult_one_right. Qed.
+  
+  (** See comment here for an algo. 
+  
+            https://math.stackexchange.com/a/4133983   *)
+  
+  Fact eps0_euclid a d : 0₀ <ε₀ d → ∃ q r, a = d *₀ q +₀ r ∧ r <ε₀ d.
+  Proof.
+    destruct d as [ | e j f Hf _ _ ] using eps0_hnf_rect.
+    1: now intros ?%eps0_lt_irrefl.
+    intros _.
+    induction a as [ | a i b Hb IHa IHb ] using eps0_hnf_rect.
+    + exists 0₀, 0₀; rewrite eps0_mult_zero_right, eps0_add_zero_left; auto.
+    + destruct (eps0_lt_sdec a e) as [ a e H | a | a e H ].
+      * exists 0₀, (ω^⟨a,i⟩ +₀ b); split.
+        - rewrite eps0_mult_zero_right, eps0_add_zero_left; auto.
+        - apply eps0_lt_hnf_inv; auto.
+      * destruct (pos_lt_sdec i j) as [ i j H | i | i j H ].
+        - exists 0₀, (ω^⟨a,i⟩ +₀ b); split.
+          ++ rewrite eps0_mult_zero_right, eps0_add_zero_left; auto.
+          ++ apply eps0_lt_hnf_inv; auto.
+        - destruct IHb as (q' & r' & -> & Hb').
+          destruct (eps0_zero_or_pos q') as [ -> | Hq' ].
+          ++ apply eps0_lt_add_inv_add in Hb' as [ Hb' | (k & -> & Hk) ].
+             ** exists 1₀, r'; rewrite eps0_mult_zero_right, eps0_add_zero_left, eps0_mult_one_right.
+          exists (1₀ +₀ q'), r'.
+        exists 
+      destruct (IHb
+        apply eps0_lt_le_trans with ω^e.
+        Search eps0_lt eps0_exp.
+          ++ apply eps0_add_below_omega.
+             ** now apply eps0_exp_mono_left.
+             ** now apply eps0_lt_trans with (1 := Hb), eps0_exp_mono_left.
+          ++ admit.
+      * destruct (eps0_le_lt
+        apply eps0_lt_hnf.
+    destruct (eps0_lt_sdec d a) as [ d a (b & -> & H)%eps0_lt_inv_add | d | d a H ].
+    + destruct (IH b) as (q & r & -> & ?); auto.
+      * admit.
+      * exists (
+      exists (
+    
+    Search eps0_lt eps0_add.
 
 End eps0_mult.
 
