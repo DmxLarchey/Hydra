@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos ordered lex2 lex_list list_order wlist E0.
+From Hydra Require Import utils ord ordered lex2 lex_list list_order wlist E0.
 
 Import ListNotations.
 
@@ -460,10 +460,12 @@ End eps0_add_extra.
 
 Section eps0_omega.
 
+  Implicit Types (n m : ord).
+
   Hint Resolve cnf_sg : core.
 
   (* ω^e.p where p is positive *)
-  Definition eps0_exp : ε₀ → pos → ε₀.
+  Definition eps0_exp : ε₀ → ord → ε₀.
   Proof.
     intros (e & He) p.
     exists (E0_cons [(e,p)]); auto.
@@ -471,7 +473,7 @@ Section eps0_omega.
 
   Notation "ω^⟨ e , i ⟩" := (eps0_exp e i).
 
-  Fact eps0_succ_exp n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,n +ₚ 1ₚ⟩.
+  Fact eps0_succ_exp n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,n +ₒ 1ₒ⟩.
   Proof. apply eps0_eq_iff; simpl; apply E0_succ_pos. Qed.
 
   Fact eps0_lt_exp : ∀ e n, e <ε₀ ω^⟨e,n⟩.
@@ -486,7 +488,7 @@ Section eps0_omega.
   Fact eps0_exp_mono_left : ∀ e f n m, e <ε₀ f → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
   Proof. intros [] [] ? N; rewrite !eps0_lt_iff; apply E0_lt_exp. Qed.
 
-  Fact eps0_add_exp : ∀ e i j, ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i +ₚ j⟩.
+  Fact eps0_add_exp : ∀ e i j, ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i +ₒ 1ₒ +ₒ j⟩.
   Proof.
     intros [] ? ?.
     apply eps0_eq_iff; unfold eps0_add, eps0_exp, proj1_sig.
@@ -508,19 +510,19 @@ Section eps0_omega.
 
   Hint Resolve eps0_exp_mono_left eps0_exp_mono_right : core.
 
-  Fact eps0_exp_mono e f n m : e ≤ε₀ f → n ≤ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
+  Fact eps0_exp_mono e f n m : e ≤ε₀ f → n ≤ₒ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
   Proof.
     intros [ H1 | <- ]%eps0_le_iff_lt H2; auto.
-    apply pos_le_lt_iff in H2 as [ <- | ]; auto.
+    apply ord_le_lt_iff in H2 as [ <- | ]; auto.
   Qed.
 
   Hint Resolve eps0_exp_mono : core.
 
-  Fact eps0_exp_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n < m.
+  Fact eps0_exp_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n <ₒ m.
   Proof.
     intros H.
     destruct (eps0_lt_sdec e f) as [ | e | e f H1 ]; auto.
-    + destruct (pos_lt_sdec n m) as [ | n | n m H2 ]; auto.
+    + destruct (ord_lt_sdec n m) as [ | n | n m H2 ]; auto.
       * contradict H; apply eps0_lt_irrefl.
       * destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
         apply eps0_lt_trans with (1 := H); auto.
@@ -534,7 +536,7 @@ Section eps0_omega.
     destruct (eps0_lt_sdec e f) as [ e f H | e | e f H ].
     + apply eps0_exp_mono_left with (n := n) (m := m) in H.
       rewrite E in H; now apply eps0_lt_irrefl in H.
-    + destruct (pos_lt_sdec n m) as [ n m H | | n m H ]; auto;
+    + destruct (ord_lt_sdec n m) as [ n m H | | n m H ]; auto;
         apply eps0_exp_mono_right with (e := e) in H;
         rewrite E in H; now apply eps0_lt_irrefl in H.
     + apply eps0_exp_mono_left with (n := m) (m := n) in H.
@@ -542,7 +544,7 @@ Section eps0_omega.
   Qed.
 
   (* ωᵉ = ωᵉ.(1+0) *)
-  Definition eps0_omega (e : ε₀) := ω^⟨e,1ₚ⟩.
+  Definition eps0_omega (e : ε₀) := ω^⟨e,0ₒ⟩.
   Notation "ω^ e" := (eps0_omega e).
 
   Fact eps0_omega_zero : ω^0₀ = 1₀.
@@ -613,7 +615,7 @@ Section eps0_omega.
   Fact eps0_add_hnf_eq e i₁ f₁ i₂ f₂ :
       f₁ <ε₀ ω^e
     → f₂ <ε₀ ω^e
-    → (ω^⟨e,i₁⟩ +₀ f₁) +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁ +ₚ i₂⟩ +₀ f₂.
+    → (ω^⟨e,i₁⟩ +₀ f₁) +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁ +ₒ 1ₒ +ₒ i₂⟩ +₀ f₂.
   Proof.
     revert e i₁ f₁ i₂ f₂.
     intros (e & He) i ([l] & Hf1) j ([m] & Hf2).
@@ -670,7 +672,7 @@ Section eps0_omega.
   Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
   Proof. now intros []%eps0_exp_inj. Qed.
 
-  Fact eps0_add_exp_omega e i : ω^⟨e,i⟩ +₀ ω^e = ω^⟨e,i +ₚ 1ₚ⟩.
+  Fact eps0_add_exp_omega e i : ω^⟨e,i⟩ +₀ ω^e = ω^⟨e,i +ₒ 1ₒ⟩.
   Proof. unfold eps0_omega; rewrite eps0_add_exp; auto. Qed.
 
   Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
@@ -700,7 +702,7 @@ Section eps0_omega.
   Fact eps0_lt_hnf_exp_inv e₁ i₁ f₁ e₂ i₂ :
       f₁ <ε₀ ω^e₁
     → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
-    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ <ₒ i₂.
   Proof.
     intro.
     rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩),
@@ -712,7 +714,7 @@ Section eps0_omega.
 
   Fact eps0_lt_exp_inv e₁ i₁ e₂ i₂ :
       ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩
-    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ < i₂.
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ <ₒ i₂.
   Proof.
     rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩).
     apply eps0_lt_hnf_exp_inv; auto.
@@ -756,7 +758,7 @@ Section eps0_omega.
 
   Fact eps0_add_exp_hnf_eq e i₁ i₂ f₂ :
       f₂ <ε₀ ω^e
-    → ω^⟨e,i₁⟩ +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁ +ₚ i₂⟩ +₀ f₂.
+    → ω^⟨e,i₁⟩ +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,i₁ +ₒ 1 +ₒ i₂⟩ +₀ f₂.
   Proof.
     intro.
     rewrite <- (eps0_add_zero_right ω^⟨e,i₁⟩).
@@ -768,25 +770,27 @@ Section eps0_omega.
         - ω^e.i +₀ b with i < n and b < ω^e
         - or < ω^f.i with f <ε₀ e  *)
 
+  Hint Resolve ord_lt_succ : core.
+
   Lemma eps0_below_exp_inv a e n :
       a <ε₀ ω^⟨e,n⟩
     → (a = 0₀)
-    + {i : _ & {b | a = ω^⟨e,i⟩ +₀ b ∧ i < n ∧ b <ε₀ ω^e}}
+    + {i : _ & {b | a = ω^⟨e,i⟩ +₀ b ∧ i <ₒ n ∧ b <ε₀ ω^e}}
     + {f : _ & {i | a <ε₀ ω^⟨f,i⟩ ∧ f <ε₀ e}}.
   Proof.
     destruct a as [ | g i h H _ _ ] using eps0_hnf_rect.
     + now do 2 left.
     + intros H1%eps0_lt_hnf_exp_inv; auto.
-      destruct (pos_one_or_succ n) as [ -> | (j & ->) ].
+      destruct (ord_zero_or_1add n) as [ -> | (j & ->) ].
       * right.
-        exists g, (i +ₚ 1ₚ).
+        exists g, (i +ₒ 1ₒ).
         rewrite eps0_lt_hnf_exp_inv; auto.
-        destruct H1 as [ | (-> & []%pos_not_lt_one) ]; auto.
+        destruct H1 as [ | (-> & []%ord_not_lt_zero) ]; auto.
       * destruct (eps0_le_lt_dec e g) as [ C | C ].
         - left; right; exists i, h.
           destruct H1 as [ | (-> & ?) ]; eauto.
           destruct (@eps0_lt_irrefl e); eauto.
-        - right; exists g, (i +ₚ 1ₚ); split; auto.
+        - right; exists g, (i +ₒ 1ₒ); split; auto.
           rewrite eps0_lt_hnf_exp_inv; auto.
   Qed.
 
