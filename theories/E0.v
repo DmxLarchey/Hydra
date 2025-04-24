@@ -7,8 +7,8 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos ordered lex2 lex_list list_order wlist.
+From Coq Require Import List Relations Wellfounded Utf8.
+From Hydra Require Import utils ord ordered lex2 lex_list list_order wlist.
 
 Import ListNotations.
 
@@ -34,19 +34,21 @@ Set Implicit Arguments.
 #[local] Reserved Notation "e '≤E₀' f" (at level 70, format "e  ≤E₀  f").
 #[local] Reserved Notation "e '≺E₀' f" (at level 70, format "e  ≺E₀  f").
 
+Opaque ord ord_zero ord_one ord_add ord_mul ord_le ord_lt.
+
 Section E0.
 
   Unset Elimination Schemes.
 
   (* The nested type of trees decorated with positive integers *)
   Inductive E0 : Set :=
-    | E0_cons : list (E0*pos) → E0.
+    | E0_cons : list (E0*ord) → E0.
 
   Notation "[ l ]₀" := (E0_cons l).
 
   (* The nested lexicographiv ordering on those nested trees *)
   Inductive E0_lt : E0 → E0 → Prop :=
-    | E0_lt_intro l m : lex_list (lex2 E0_lt lt) l m → E0_lt [l]₀ [m]₀.
+    | E0_lt_intro l m : lex_list (lex2 E0_lt ord_lt) l m → E0_lt [l]₀ [m]₀.
 
   Set Elimination Schemes.
 
@@ -109,7 +111,7 @@ Section E0.
 
   Section E0_fall_rect.
 
-    Variables (P : list (E0*pos) → Prop)
+    Variables (P : list _ → Prop)
               (Q : E0 → Type)
               (HQ : ∀l, P l 
                       → (∀ e i, (e,i) ∈ l → E0_fall P e)
@@ -125,7 +127,7 @@ Section E0.
  
   (* This inversion principle is enough to reason about <E₀, 
      proceeding by induction on arguments *)
-  Fact E0_lt_inv l m : [l]₀ <E₀ [m]₀ ↔ lex_list (lex2 E0_lt lt) l m.
+  Fact E0_lt_inv l m : [l]₀ <E₀ [m]₀ ↔ lex_list (lex2 E0_lt ord_lt) l m.
   Proof. split; auto; now inversion 1. Qed.
 
   (** We show that <E₀ is a strict order (irreflexive and transitive)
@@ -135,10 +137,10 @@ Section E0.
   Lemma E0_lt_irrefl e : ¬ e <E₀ e.
   Proof.
     induction e as [ l IH ].
-    intros ((?,i) & ? & [ ?%(IH _ i) | ?%lt_irrefl ]%lex2_irrefl)%E0_lt_inv%lex_list_irrefl; auto.
+    intros ((?,i) & ? & [ ?%(IH _ i) | ?%ord_lt_irrefl ]%lex2_irrefl)%E0_lt_inv%lex_list_irrefl; auto.
   Qed.
 
-  Hint Resolve lt_trans lex2_trans : core.
+  Hint Resolve ord_lt_trans lex2_trans : core.
 
   (* transitive *)
   Lemma E0_lt_trans : transitive E0_lt.
@@ -156,7 +158,7 @@ Section E0.
 
   Hint Constructors sdec : core.
 
-  Hint Resolve pos_lt_sdec lex2_sdec : core.
+  Hint Resolve ord_lt_sdec lex2_sdec : core.
 
   (* computably total *)
   Lemma E0_lt_sdec e f : sdec E0_lt e f.
@@ -178,7 +180,7 @@ Section E0.
      of the shape ω[(e₁,i₁);...;(eₙ,iₙ)] with
      0 < i₁,...,iₙ and e₁ >ε₀ ... >ε₀ eₙ *)
 
-  Definition E0_cnf_pred (l : list (E0*pos)) := ordered E0_lt⁻¹ (map fst l).
+  Definition E0_cnf_pred (l : list (E0*ord)) := ordered E0_lt⁻¹ (map fst l).
 
   Definition E0_cnf := E0_fall E0_cnf_pred.
 
@@ -198,8 +200,8 @@ Section E0.
     destruct (ordered_dec E0_lt⁻¹ (map fst l))
       as [ H1 | H1 ]; eauto.
     + destruct list_fall_choose
-        with (P := fun xi : E0*pos => ~ E0_cnf (fst xi))
-             (Q := fun xi : E0*pos => E0_cnf (fst xi))
+        with (P := fun xi : E0*ord => ~ E0_cnf (fst xi))
+             (Q := fun xi : E0*ord => E0_cnf (fst xi))
              (l := l)
       as [ ((x,i) & H2 & H3) | H2 ].
       * intros (x,i) []%IHl; auto.
@@ -264,6 +266,27 @@ Section E0.
     intros [ H | H ]; [ left | right ].
     + now apply E0_lt_app_head.
     + inversion H; subst; auto.
+  Qed.
+
+  Fact E0_lt_cons_iff xi yj l m :
+    [xi::l]₀ <E₀ [yj::m]₀ ↔ fst xi <E₀ fst yj ∨ fst xi = fst yj ∧ (snd xi <ₒ snd yj ∨ snd xi = snd yj ∧ [l]₀ <E₀ [m]₀).
+  Proof.
+    split.
+    + intros [ ? [] | ]%E0_lt_inv%lex_list_inv; simpl; auto.
+      right; split; auto.
+    + revert xi yj; intros (x,i) (y,j); simpl.
+      intros [ H | ( <- & [ H | (<- & H%E0_lt_inv) ] ) ]; constructor.
+      * constructor 2; now left.
+      * constructor 2; now right.
+      * now constructor 3.
+  Qed.
+  
+  Fact E0_le_cons x i j l m : [l]₀ ≤E₀ [m]₀ → i ≤ₒ j → [(x,i)::l]₀ ≤E₀ [(x,j)::m]₀.
+  Proof.
+    intros H1 [<- | H2]%ord_le_lt_iff.
+    + destruct H1 as [ H1%E0_lt_inv | <-%E0_eq_inv ]; auto.
+      left; constructor; now constructor 3.
+    + left; constructor; constructor 2; now right.
   Qed.
 
   (** Now we squash E0_cnf into a proof irrelevant predicate *)
@@ -335,10 +358,10 @@ Section E0.
 
     (** We show that <E₀ is wf on cnf *)
 
-    Hint Resolve lt_wf : core.
+    Hint Resolve ord_lt_wf : core.
 
     Let R x y := cnf x ∧ x <E₀ y.
-    Let T := lex2 R lt.
+    Let T := lex2 R ord_lt.
  
     Local Fact HRT x i : Acc R x → Acc T (x,i).
     Proof. intros; apply Acc_lex2; auto. Qed.
@@ -382,7 +405,7 @@ Section E0.
     Proof. constructor; intros ? []; now apply cnf_Acc_R. Qed.
 
   End wf_lt_cnf.
-
+  
   (** Now we build arithmetic *)
 
   Definition E0_zero := [[]]₀.
@@ -409,7 +432,7 @@ Section E0.
   (* Notation for ωᵉ.i *)
   Notation "ω^⟨ e , i ⟩" := [[(e,i)]]₀.
 
-  Definition E0_one := ω^⟨0₀,1ₚ⟩.
+  Definition E0_one := ω^⟨0₀,0ₒ⟩.
   Notation "1₀" := E0_one.
 
   Fact cnf_one : cnf E0_one.
@@ -429,13 +452,15 @@ Section E0.
 
   Fact E0_zero_not_gt : ∀e, ¬ e <E₀ 0₀.
   Proof. now intros [ l ] ?%E0_lt_inv%lex_list_inv. Qed.
+  
+  Hint Resolve ord_zero_lt_1add : core.
 
   Fact E0_one_ge e : e ≠ 0₀ → cnf e → 1₀ ≤E₀ e.
   Proof.
     destruct e as [[ | (x,i) r ]]; [ easy | intros _ Hr ].
     destruct (E0_zero_le x) as [ Hx | <- ].
     + left; constructor; constructor; now left.
-    + destruct i as [ | i ].
+    + destruct (ord_zero_or_1add i) as [ -> | (j & ->) ].
       * apply E0_le_app_head with (l := [_]).
         destruct r.
         - now right.
@@ -445,7 +470,7 @@ Section E0.
   
   Fact E0_lt_one : ∀e, e <E₀ 1₀ → e = 0₀.
   Proof.
-    intros [l] [ | (x,i) ? [ []%E0_zero_not_gt | [_ H%pos_not_lt_one] ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right; 
+    intros [l] [ | (x,i) ? [ []%E0_zero_not_gt | [_ H%ord_not_lt_zero] ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right; 
       now auto.
   Qed.
 
@@ -499,6 +524,8 @@ Section E0.
     intros [] [] []; unfold E0_add; f_equal.
     apply wlist_add_assoc; auto.
   Qed.
+  
+  Hint Resolve pos_add_incr_left E0_le_cons ord_add_mono_le ord_lt_le_weak : core.
 
   (** We show  ω[l] +₀ e ≤E₀ ω[m] +₀ e by induction on lex_list _ l m *)
   Lemma E0_add_mono_left u v e : cnf u → cnf v → cnf e → u ≤E₀ v → u +₀ e ≤E₀ v +₀ e.
@@ -513,7 +540,6 @@ Section E0.
       destruct (E0_lt_sdec x y).
       * rewrite wlist_add_lt; auto.
       * rewrite wlist_add_eq; auto.
-        left; constructor; constructor 2; right; auto.
       * rewrite wlist_add_gt; auto.
         left; constructor; constructor 2; now left.
     + destruct (@E0_lt_sdec2 a b y)
@@ -525,12 +551,10 @@ Section E0.
       * rewrite wlist_add_lt, wlist_add_gt; auto.
         left; constructor; constructor 2; now left.
       * rewrite wlist_add_lt, wlist_add_eq; auto.
-        left; constructor; constructor 2; right; auto.
       * rewrite !wlist_add_lt; eauto.
     + destruct (E0_lt_sdec a y).
       * rewrite !wlist_add_lt; auto.
       * rewrite !wlist_add_eq; auto.
-        left; constructor; constructor 2; right; auto.
       * rewrite !wlist_add_gt; auto.
         left; constructor; constructor 2; now right.
     + destruct (E0_lt_sdec x y).
@@ -542,6 +566,8 @@ Section E0.
         - left; constructor; now constructor 3.
         - right; do 2 f_equal; auto.
   Qed.
+  
+  Hint Resolve pos_add_sincr_right : core.
 
   Lemma E0_add_incr : ∀ e f, 0₀ <E₀ f → e <E₀ e +₀ f.
   Proof.
@@ -562,6 +588,8 @@ Section E0.
       constructor; apply lex_list_app_head.
       constructor 2; now left.
   Qed.
+  
+  Hint Resolve ord_add_mono_lt_right : core.
 
   Lemma E0_add_mono_right : ∀ e u v, cnf e → cnf u → cnf v → u <E₀ v → e +₀ u <E₀ e +₀ v.
   Proof.
@@ -593,7 +621,7 @@ Section E0.
     + destruct (wlist_add_common E0_lt_sdec l y) as (l' & i & H).
       rewrite !H.
       apply lex_list_app_head.
-      constructor 2; right; lia.
+      constructor 2; right; auto.
     + rewrite !wlist_add_cons_right. 
       now apply lex_list_app_head.
   Qed.
@@ -637,7 +665,7 @@ Section E0.
         intros u v [ [=] | G ]; subst; eapply Hf; eauto.
   Qed.
 
-  Fact E0_add_exp e i j : ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i +ₚ j⟩.
+  Fact E0_add_exp e i j : ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i +ₒ 1ₒ +ₒ j⟩.
   Proof. simpl; rewrite wlist_add_eq; auto. Qed.
 
   Definition E0_succ e := e +₀ 1₀.
@@ -647,8 +675,8 @@ Section E0.
   Fact E0_succ_zero : S₀ 0₀ = 1₀.
   Proof. reflexivity. Qed.
 
-  Fact E0_succ_pos n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,n +ₚ 1ₚ⟩.
-  Proof. unfold E0_succ, E0_one; now rewrite E0_add_exp. Qed.
+  Fact E0_succ_pos n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,n +ₒ 1ₒ⟩.
+  Proof. unfold E0_succ, E0_one; now rewrite E0_add_exp, ord_add_zero_right. Qed.
 
   Hint Resolve E0_succ_zero : core.
 
@@ -667,54 +695,68 @@ Section E0.
   Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f ∧ cnf f.
 
   Lemma E0_is_succ_iff e :
-    cnf e → E0_is_succ e ↔ ∃ l i, e = [l++[(0₀,i)]]₀.
+    cnf e → E0_is_succ e ↔ ∃ l i j, e = [l++[(0₀,i)]]₀ ∧ 1ₒ +ₒ i = j + 1ₒ.
   Proof.
     intros He; split.
     + intros ([l] & -> & Hf).
       destruct l as [ | l (x,i) _ ] using rev_rect.
-      * exists [], 1ₚ; simpl.
-        now rewrite wlist_add_nil_left.
+      * exists [], 0ₒ, 0ₒ; simpl.
+        now rewrite wlist_add_nil_left, ord_add_zero_left, ord_add_zero_right.
       * destruct (E0_zero_or_pos x) as [ -> | Hx ].
-        - exists l, (i +ₚ 1ₚ).
+        - exists l, (i +ₒ 1ₒ), (1 +ₒ i).
           unfold E0_succ; simpl; f_equal.
-          rewrite wlist_add_gt_list, wlist_add_eq; auto.
+          rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right, ord_add_assoc; auto.
           apply Forall_forall.
           apply cnf_fix, proj1 in Hf.
           rewrite map_app in Hf; simpl in Hf.
           rewrite ordered_snoc_iff in Hf; auto.
           intros [] ?; apply Hf; eauto.
-        - exists (l++[(x, i)]), 1ₚ.
+        - exists (l++[(x, i)]), 0ₒ, 0ₒ.
           unfold E0_succ; simpl; f_equal.
           rewrite wlist_add_gt_list, wlist_add_gt,
-                  wlist_add_nil_left, <- app_assoc; auto.
+                  wlist_add_nil_left, <- app_assoc,
+                  ord_add_zero_left, ord_add_zero_right; auto.
           apply Forall_forall.
           apply cnf_fix, proj1 in Hf.
           rewrite map_app in Hf; simpl in Hf.
           rewrite ordered_snoc_iff in Hf; auto.
           intros [] H; simpl.
           apply E0_lt_trans with (1 := Hx), Hf; eauto.
-          apply in_map_iff; exists (e,p); auto.
-    + intros (l & i & ->).
+          apply in_map_iff; eexists (_,_); simpl; eauto.
+    + intros (l & i & j & -> & H2).
       assert (Forall (fun x => 0₀ <E₀ fst x) l) as Hl.
       1:{ apply Forall_forall.
           apply cnf_fix, proj1 in He.
           rewrite map_app in He; simpl in He.
           rewrite ordered_snoc_iff in He; auto.
           intros [] H; apply He; auto. }
-      destruct (pos_one_or_succ i) as [ -> | (j & ->) ].
+      destruct (ord_zero_or_1add j) as [ -> | (k & ->) ].
       * exists [l]₀; split; eauto.
         unfold E0_succ; simpl; f_equal.
         rewrite wlist_add_spec_1; auto.
-      * exists [l++[(0₀,j)]]₀; split; auto.
+        rewrite ord_add_zero_left in H2.
+        rewrite <- (ord_add_zero_right 1ₒ) in H2 at 2.
+        now apply ord_add_cancel_right in H2 as ->.
+      * rewrite ord_add_assoc in H2.
+        apply ord_add_cancel_right in H2 as ->.
+        exists [l++[(0₀,k)]]₀; split; auto.
         - unfold E0_succ; simpl; f_equal.
-          rewrite wlist_add_gt_list, wlist_add_eq; auto.
+          rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right; auto.
         - rewrite cnf_fix, map_app in He |- *.
           destruct He as [ H2 H3 ]; split; auto.
           intros ? ? [| [ [=] | []]]%in_app_iff; subst; eauto.
   Qed.
+  
+  Fact cnf_snoc_Forall l e i : cnf [l++[(e,i)]]₀ → Forall (fun x => e <E₀ fst x) l.
+  Proof.
+    rewrite cnf_fix, map_app, Forall_forall.
+    intros ((_ & H)%ordered_snoc_iff & _); auto.
+  Qed.
+  
+  Hint Resolve cnf_snoc_Forall E0_le_lt_trans E0_zero_le : core.
 
   Lemma E0_is_limit_iff e :
-    cnf e → E0_is_limit e ↔ ∃ l b i, b ≠ 0₀ ∧ e = [l++[(b,i)]]₀.
+    cnf e → E0_is_limit e ↔ ∃ l b i, e = [l++[(b,i)]]₀ ∧ (b ≠ 0₀ ∨ b = 0₀ ∧ i ≠ 0ₒ ∧ ¬ ∃j, i = j +ₒ 1ₒ).
   Proof.
     intros He.
     split.
@@ -722,15 +764,47 @@ Section E0.
       destruct l as [ | l (b,i) _ ] using rev_rect.
       1: easy.
       exists l, b, i; repeat split; auto.
-      intros ->; apply H2.
-      apply E0_is_succ_iff; eauto.
-    + intros (l & b & i & H1 & ->).
+      destruct (E0_zero_or_pos b) as [ -> | Hb ].
+      * right; repeat split; auto.
+        - intros ->.
+          apply H2.
+          exists [l]₀; split; eauto.
+          unfold E0_succ; simpl.
+          rewrite wlist_add_spec_1; eauto.
+        - intros (j & ->).
+          apply H2.
+          exists [l ++ [(0₀, j)]]₀; split; auto.
+          ++ unfold E0_succ; simpl; f_equal.
+             rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right; eauto.
+          ++ rewrite cnf_fix, map_app in He |- *.
+             simpl in He |- *.
+            destruct He as (He1 & He2); split; auto.
+            intros ? ? [ | [[=] | [] ] ]%in_app_iff; subst; eauto.
+      * left; intros ->; revert Hb; apply E0_lt_irrefl.
+    + intros (l & b & i & H1 & H2).
       split.
-      * contradict H1.
-        apply E0_eq_inv in H1; now destruct l.
-      * intros (m & j & H3)%E0_is_succ_iff; auto.
-        injection H3; clear H3.
-        intros (_ & [=])%app_inj_tail; now subst.
+      * intros ->; now destruct l.
+      * intros ([m] & -> & Hf).
+        unfold E0_succ in H1; simpl in H1.
+        destruct m as [ | m (c,j) _ ] using rev_rect.
+        - rewrite wlist_add_nil_left in H1.
+          apply E0_eq_inv in H1.
+          rewrite <- (app_nil_l [_]) in H1 at 1.
+          apply app_inj_tail in H1 as (<- & [=]); subst.
+          destruct H2 as [ [] | (_ & [] & _) ]; auto.
+        - rewrite wlist_add_gt_list in H1; eauto.
+          2: generalize (cnf_snoc_Forall _ _ _ Hf); apply Forall_impl; eauto.
+          destruct (E0_zero_or_pos c) as [ -> | Hc ].
+          ++ rewrite wlist_add_eq in H1; auto.
+             apply E0_eq_inv, app_inj_tail in H1 as (<- & [=]); subst.
+             destruct H2 as [ [] | (_ & _ & []) ]; auto. 
+             exists j; now rewrite ord_add_zero_right.
+          ++ rewrite wlist_add_gt, wlist_add_nil_left in H1; auto.
+             apply E0_eq_inv in H1.
+             change [(c, j);(0₀, 0ₒ)] with ([(c, j)]++[(0₀, 0ₒ)]) in H1.
+             rewrite app_assoc in H1.
+             apply app_inj_tail in H1 as (_ & [=]); subst.
+             destruct H2 as [ [] | (_ & [] & _) ]; auto.
   Qed.
 
   Hint Resolve E0_add_cnf : core.
@@ -739,28 +813,45 @@ Section E0.
   Lemma E0_add_is_limit a e : 
     cnf a → cnf e → E0_is_limit e → E0_is_limit (a +₀ e).
   Proof.
-    intros Ha He (m & b & i & Hb & ->)%E0_is_limit_iff; auto.
+    intros Ha He (m & b & i & -> & Hb)%E0_is_limit_iff; auto.
     apply E0_is_limit_iff; eauto.
     destruct a as [l].
     unfold E0_add.
     destruct (wlist_add_last E0_lt_sdec l m b i)
-      as (r & j & ? & ?).
+      as (r & j & H1 & H2).
     exists r, b, j; split; auto; f_equal; auto.
+    destruct H2 as [ <- | (k & ->) ]; auto.
+    destruct Hb as [ Hb | (-> & Hi & H) ]; auto.
+    right; repeat split; auto.
+    + contradict Hi.
+      now apply ord_add_zero_inv, proj2 in Hi. 
+    + contradict H; revert H.
+      intros [ | (-> & _) ]%ord_add_is_succ_inv; now auto.
   Qed.
 
   Lemma E0_add_is_limit_inv a e : 
     cnf a → cnf e → E0_is_limit (a +₀ e) → e = 0₀ ∨ E0_is_limit e.
   Proof.
-    intros Ha He (m & b & i & Hb & E)%E0_is_limit_iff; auto.
+    intros Ha He (m & b & i & E & Hb)%E0_is_limit_iff; auto.
     destruct a as [l]; destruct e as [k].
     destruct k as [|k (c,j) _] using rev_rect; auto; right.
     unfold E0_add in E; apply E0_eq_inv in E.
     destruct (wlist_add_last E0_lt_sdec l k c j)
       as (r & p & Hp & H).
-    unfold pos in E, H; rewrite H in E.
+    rewrite Hp in E.
     apply app_inj_tail in E as (<- & [=]); subst p c.
     apply E0_is_limit_iff; auto.
     exists k, b, j; split; auto.
+    destruct Hb as [ Hb | (-> & Hi1 & Hi2) ]; auto.
+    destruct H as [ <- | (q & ->) ]; auto.
+    right; repeat split; auto.
+    + intros ->.
+      apply Hi2; exists q.
+      now rewrite ord_add_zero_right.
+    + intros (j' & ->).
+      apply Hi2.
+      exists (q +ₒ 1ₒ +ₒ j').
+      now rewrite <- ord_add_assoc.
   Qed.
 
   Fact E0_exp_is_limit e i :
@@ -778,7 +869,7 @@ Section E0.
     cnf a → cnf e → e ≠ 0₀ → E0_is_limit (a +₀ ω^⟨e,i⟩).
   Proof. eauto. Qed.
 
-  Definition E0_omega e := ω^⟨e,1ₚ⟩.
+  Definition E0_omega e := ω^⟨e,0ₒ⟩.
 
   Notation "ω^ e" := (E0_omega e).
   
@@ -797,7 +888,7 @@ Section E0.
   Proof.
     destruct a as [ l ]; intros Ha He H.
     revert H Ha He.
-    intros [ | (x,i) m [ H | (_ & []%pos_not_lt_one) ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right Ha He; unfold E0_add, E0_omega; f_equal.
+    intros [ | (x,i) m [ H | (_ & []%ord_not_lt_zero) ]%lex2_inv ]%E0_lt_inv%lex_list_sg_inv_right Ha He; unfold E0_add, E0_omega; f_equal.
     rewrite wlist_add_lt; eauto.
   Qed.
 
@@ -805,14 +896,13 @@ Section E0.
   Proof.
     revert a b e f.
     intros [a] [b] e f; unfold E0_omega, E0_add.
-    destruct (wlist_add_last E0_lt_sdec a [] e 1ₚ)
+    destruct (wlist_add_last E0_lt_sdec a [] e 0ₒ)
       as (l & i & H1 & H2).
-    destruct (wlist_add_last E0_lt_sdec b [] f 1ₚ)
+    destruct (wlist_add_last E0_lt_sdec b [] f 0ₒ)
       as (m & j & H3 & H4).
-    simpl app in H2, H4.
-    rewrite H2, H4.
-    injection 1.
-    intros (_ & [=])%app_inj_tail; now subst.
+    simpl app in H1, H3.
+    rewrite H1, H3.
+    now intros (_ & [=])%E0_eq_inv%app_inj_tail.
   Qed.
   
   (* a +₀ ω^e is the limit decomposition of that ordinal
@@ -834,6 +924,8 @@ Section E0.
     1: now apply E0_add_omega_fun_right in E.
     split; auto.
   Qed.
+  
+  Hint Resolve ord_lt_succ : core.
 
   (** inversion for f < ω^b:
       - either f is 0 (and b is also 0)
@@ -848,12 +940,12 @@ Section E0.
     destruct f as [l].
     (* we analyse ω[l] <E₀ ω[(b,1)] *)
     intros ?%E0_lt_inv%lex_list_sg_inv_right.
-    destruct H as [ | (x,i) ? [ | (_ & []%pos_not_lt_one) ]%lex2_inv ].
+    destruct H as [ | (x,i) ? [ | (_ & []%ord_not_lt_zero) ]%lex2_inv ].
     + (* l = [] *)
       now left.
     + (* l = (x,_)::... with x <E₀ b *)
       right.
-      exists (i +ₚ 1ₚ), x; repeat split; eauto.
+      exists (i +ₒ 1ₒ), x; repeat split; eauto.
       constructor 2; right; auto.
   Qed.
 
@@ -875,7 +967,7 @@ Section E0.
   Proof.
     intros G H%E0_lt_inv; unfold E0_add; f_equal.
     revert H G.
-    intros [ | (y,j) m [ H | (_ & []%pos_not_lt_one) ]%lex2_inv ]%lex_list_sg_inv_right G; auto.
+    intros [ | (y,j) m [ H | (_ & []%ord_not_lt_zero) ]%lex2_inv ]%lex_list_sg_inv_right G; auto.
     rewrite wlist_add_gt; auto.
   Qed.
 
@@ -897,7 +989,7 @@ Section E0.
       constructor 2.
       apply lex2_inv in H1 as [ H1 | (-> & H1) ].
       1: now constructor 1.
-      apply lex2_inv in H2 as [ H2 | (_ & []%pos_not_lt_one) ].
+      apply lex2_inv in H2 as [ H2 | (_ & []%ord_not_lt_zero) ].
       now apply E0_lt_irrefl in H2.
     + rewrite wlist_add_gt; auto.
       now constructor 2.
@@ -906,7 +998,7 @@ Section E0.
   Fact E0_add_head_lt e i f j l m : e <E₀ f → [(e,i)::l]₀ +₀ [(f,j)::m]₀ = [(f,j)::m]₀.
   Proof. simpl; intro; rewrite wlist_add_lt; auto. Qed.
 
-  Fact E0_add_head_eq e i j l m : [(e,i)::l]₀ +₀ [(e,j)::m]₀ = [(e,i +ₚ j)::m]₀.
+  Fact E0_add_head_eq e i j l m : [(e,i)::l]₀ +₀ [(e,j)::m]₀ = [(e,i +ₒ 1ₒ +ₒ j)::m]₀.
   Proof. simpl; rewrite wlist_add_eq; auto. Qed.
 
   Fact E0_add_head_gt e i f j l m :
@@ -1030,7 +1122,7 @@ Section E0_lpo.
       intros [] [] ? ? [| (<- & ?)]%lex2_inv; eauto.
   Qed.
 
-  Hint Resolve lt_wf Acc_lex2 : core.
+  Hint Resolve ord_lt_wf Acc_lex2 : core.
 
   (* Nested list ordering (or list path ordering) is well_founded,
      the critical lemma being Acc_lo_iff !! *) 
