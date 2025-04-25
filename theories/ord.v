@@ -193,6 +193,13 @@ Section ord.
       rewrite H at 1; now apply ord_add_mono_lt_right.
   Qed.
   
+  Fact ord_succ_not_zero i : i +ₒ 1ₒ ≠ 0ₒ.
+  Proof.
+    intros H.
+    generalize (ord_lt_succ i).
+    rewrite H; apply ord_not_lt_zero.
+  Qed.
+  
   Fact ord_add_mono_lt_inv i j k : k +ₒ i <ₒ k +ₒ j → i <ₒ j.
   Proof.
     intros H.
@@ -264,6 +271,14 @@ Section ord.
     + now rewrite ord_lt_succ__le_iff, ord_lt__succ_le_iff.
     + intros H%ord_lt__succ_le_iff; eauto.
   Qed.
+  
+  Fact ord_eq_succ_iff i j : i +ₒ 1ₒ = j +ₒ 1ₒ ↔ i = j. 
+  Proof.
+    split; auto.
+    intros H.
+    destruct (ord_lt_sdec i j) as [ i j C | | i j C ]; auto.
+    all: exfalso; apply ord_lt_succ_mono_iff in C; revert C; rewrite H; apply ord_lt_irrefl.
+  Qed.
 
   Fact ord_le_succ_mono_iff i j : i +ₒ 1ₒ ≤ₒ j +ₒ 1ₒ ↔ i ≤ₒ j.
   Proof.
@@ -274,8 +289,14 @@ Section ord.
     + intros [ -> | ]%ord_le_lt_iff; auto.
   Qed.
   
-  Fact ord_add_is_succ_inv a i : (∃j, a +ₒ i = j +ₒ 1ₒ) → (∃j, i = j +ₒ 1ₒ) ∨ i = 0ₒ ∧ ∃j, a = j +ₒ 1ₒ.
+  Definition ord_is_succ n := (∃j, n = j +ₒ 1ₒ).
+  
+  Fact ord_is_succ_succ n : ord_is_succ (n +ₒ 1ₒ).
+  Proof. now exists n. Qed.
+  
+  Fact ord_add_is_succ_inv a i : ord_is_succ (a +ₒ i) → ord_is_succ i ∨ i = 0ₒ ∧ ord_is_succ a.
   Proof.
+    unfold ord_is_succ.
     intros (j & Hj).
     destruct (ord_zero_or_1add i) as [ -> | (p & ->) ].
     + rewrite ord_add_zero_right in Hj; eauto.
@@ -287,6 +308,22 @@ Section ord.
         apply ord_add_cancel_right in Hj; eauto.
   Qed.
   
+  Fact ord_is_succ_1 : ord_is_succ 1ₒ.
+  Proof. exists 0ₒ; now rewrite ord_add_zero_left. Qed.
+  
+  Hint Resolve ord_is_succ_1 : core. 
+  
+  Fact ord_is_succ_10 : ord_is_succ (1ₒ +ₒ 0ₒ).
+  Proof. now rewrite ord_add_zero_right. Qed.
+  
+  Fact ord_is_succ_1add n : ord_is_succ n → ord_is_succ (1ₒ +ₒ n).
+  Proof. intros (j & ->); exists (1ₒ +ₒ j); now rewrite ord_add_assoc. Qed.
+  
+  Hint Resolve ord_is_succ_1add : core.
+  
+  Fact ord_is_succ_1add_inv n : ord_is_succ (1ₒ +ₒ n) → n = 0ₒ ∨ ord_is_succ n.
+  Proof. intros [ | [] ]%ord_add_is_succ_inv; auto. Qed.
+
   Fact ord_add_zero_inv i j : i +ₒ j = 0ₒ → i = 0ₒ ∧ j = 0ₒ.
   Proof.
     intros H.

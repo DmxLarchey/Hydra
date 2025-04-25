@@ -693,59 +693,6 @@ Section E0.
  
   Definition E0_is_succ e := ∃f, e = E0_succ f ∧ cnf f.
   Definition E0_is_limit e := e ≠ 0₀ ∧ ¬ ∃f, e = E0_succ f ∧ cnf f.
-
-  Lemma E0_is_succ_iff e :
-    cnf e → E0_is_succ e ↔ ∃ l i j, e = [l++[(0₀,i)]]₀ ∧ 1ₒ +ₒ i = j + 1ₒ.
-  Proof.
-    intros He; split.
-    + intros ([l] & -> & Hf).
-      destruct l as [ | l (x,i) _ ] using rev_rect.
-      * exists [], 0ₒ, 0ₒ; simpl.
-        now rewrite wlist_add_nil_left, ord_add_zero_left, ord_add_zero_right.
-      * destruct (E0_zero_or_pos x) as [ -> | Hx ].
-        - exists l, (i +ₒ 1ₒ), (1 +ₒ i).
-          unfold E0_succ; simpl; f_equal.
-          rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right, ord_add_assoc; auto.
-          apply Forall_forall.
-          apply cnf_fix, proj1 in Hf.
-          rewrite map_app in Hf; simpl in Hf.
-          rewrite ordered_snoc_iff in Hf; auto.
-          intros [] ?; apply Hf; eauto.
-        - exists (l++[(x, i)]), 0ₒ, 0ₒ.
-          unfold E0_succ; simpl; f_equal.
-          rewrite wlist_add_gt_list, wlist_add_gt,
-                  wlist_add_nil_left, <- app_assoc,
-                  ord_add_zero_left, ord_add_zero_right; auto.
-          apply Forall_forall.
-          apply cnf_fix, proj1 in Hf.
-          rewrite map_app in Hf; simpl in Hf.
-          rewrite ordered_snoc_iff in Hf; auto.
-          intros [] H; simpl.
-          apply E0_lt_trans with (1 := Hx), Hf; eauto.
-          apply in_map_iff; eexists (_,_); simpl; eauto.
-    + intros (l & i & j & -> & H2).
-      assert (Forall (fun x => 0₀ <E₀ fst x) l) as Hl.
-      1:{ apply Forall_forall.
-          apply cnf_fix, proj1 in He.
-          rewrite map_app in He; simpl in He.
-          rewrite ordered_snoc_iff in He; auto.
-          intros [] H; apply He; auto. }
-      destruct (ord_zero_or_1add j) as [ -> | (k & ->) ].
-      * exists [l]₀; split; eauto.
-        unfold E0_succ; simpl; f_equal.
-        rewrite wlist_add_spec_1; auto.
-        rewrite ord_add_zero_left in H2.
-        rewrite <- (ord_add_zero_right 1ₒ) in H2 at 2.
-        now apply ord_add_cancel_right in H2 as ->.
-      * rewrite ord_add_assoc in H2.
-        apply ord_add_cancel_right in H2 as ->.
-        exists [l++[(0₀,k)]]₀; split; auto.
-        - unfold E0_succ; simpl; f_equal.
-          rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right; auto.
-        - rewrite cnf_fix, map_app in He |- *.
-          destruct He as [ H2 H3 ]; split; auto.
-          intros ? ? [| [ [=] | []]]%in_app_iff; subst; eauto.
-  Qed.
   
   Fact cnf_snoc_Forall l e i : cnf [l++[(e,i)]]₀ → Forall (fun x => e <E₀ fst x) l.
   Proof.
@@ -753,10 +700,53 @@ Section E0.
     intros ((_ & H)%ordered_snoc_iff & _); auto.
   Qed.
   
-  Hint Resolve cnf_snoc_Forall E0_le_lt_trans E0_zero_le : core.
+  Hint Resolve cnf_snoc_Forall E0_le_lt_trans E0_zero_le 
+               ord_is_succ_succ ord_is_succ_10 ord_is_succ_1add : core.
+
+  Lemma E0_is_succ_iff e :
+    cnf e → E0_is_succ e ↔ ∃ l i, e = [l++[(0₀,i)]]₀ ∧ ord_is_succ (1ₒ +ₒ i).
+  Proof.
+    intros He; split.
+    + intros ([l] & -> & Hf).
+      destruct l as [ | l (x,i) _ ] using rev_rect.
+      * exists [], 0ₒ; simpl.
+        rewrite wlist_add_nil_left; split; auto.
+      * destruct (E0_zero_or_pos x) as [ -> | Hx ].
+        - exists l, (i +ₒ 1ₒ).
+          unfold E0_succ; simpl; split; auto. 
+          f_equal; rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right; eauto.
+        - exists (l++[(x, i)]), 0ₒ.
+          unfold E0_succ; simpl.
+          rewrite wlist_add_gt_list, wlist_add_gt,
+                  wlist_add_nil_left, <- app_assoc; eauto.
+          generalize (cnf_snoc_Forall _ _ _ Hf); apply Forall_impl; eauto.
+    + intros (l & i & -> & j & Hj).
+      destruct (ord_zero_or_1add j) as [ -> | (k & ->) ].
+      * exists [l]₀; split; eauto.
+        unfold E0_succ; simpl; f_equal.
+        rewrite wlist_add_spec_1; eauto.
+        rewrite ord_add_zero_left in Hj.
+        rewrite <- (ord_add_zero_right 1ₒ) in Hj at 2.
+        now apply ord_add_cancel_right in Hj as ->.
+      * rewrite ord_add_assoc in Hj.
+        apply ord_add_cancel_right in Hj as ->.
+        exists [l++[(0₀,k)]]₀; split; auto.
+        - unfold E0_succ; simpl; f_equal.
+          rewrite wlist_add_gt_list, wlist_add_eq, ord_add_zero_right; eauto.
+        - rewrite cnf_fix, map_app in He |- *.
+          destruct He as [ H2 H3 ]; split; auto.
+          intros ? ? [| [ [=] | []]]%in_app_iff; subst; eauto.
+  Qed.
+  
+  Fact E0_cnf_add_snoc l b i : cnf [l++[(b,i)]]₀ → [l++[(b,i)]]₀ = [l]₀ +₀ [[(b,i)]]₀.
+  Proof.
+    intros H; unfold E0_add; f_equal.
+    rewrite <- (app_nil_r l) at 2. 
+    rewrite wlist_add_gt_list; eauto.
+  Qed.
 
   Lemma E0_is_limit_iff e :
-    cnf e → E0_is_limit e ↔ ∃ l b i, e = [l++[(b,i)]]₀ ∧ (b ≠ 0₀ ∨ b = 0₀ ∧ i ≠ 0ₒ ∧ ¬ ∃j, i = j +ₒ 1ₒ).
+    cnf e → E0_is_limit e ↔ ∃ l b i, e = [l++[(b,i)]]₀ ∧ (b ≠ 0₀ ∨ b = 0₀ ∧ i ≠ 0ₒ ∧ ¬ ord_is_succ i).
   Proof.
     intros He.
     split.

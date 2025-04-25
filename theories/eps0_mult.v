@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos ordered eps0.
+From Hydra Require Import utils ord ordered eps0.
 
 Import ListNotations.
 
@@ -29,6 +29,60 @@ Set Implicit Arguments.
                       eps0_add_incr_left
                       eps0_add_incr_right
 : core.
+
+(** Multiplication rules for j < ε₀
+
+    0._ = 0
+    j.ε₀ = ε₀ if 0 < j (indeed ε₀ <= j.ε₀ = lub {j.k | k < ε₀} <= ε₀)
+    
+    j.ε₀^0 = j
+    j.ε₀^(1+k) = j.ε₀.ε₀^k = ε₀.ε₀^k = ε₀^(1+k)
+    
+    a.(b+c) = a.b+a.c
+    
+    Decomp 
+    
+    0 < j then (ε₀^0.j + 0).ε₀ = ε₀
+      (indeed ε₀ <= 1.ε₀ <= (ε₀^0.j).ε₀ = j.lub {k | k < ε₀} <= ε₀)
+    
+    Now we decomp ε₀^e.j + u with j < ε₀ and u < ε₀^e and 0 < e
+    
+    establish (ε₀^e.j+u).ε₀ = ε₀^(e+1)
+
+    proof:    
+      ε₀^e.j+f <= ε₀^e.j+ε₀^e.1 = ε₀^e.(j+1)
+      (ε₀^e.j+f).ε₀ <= (ε₀^e.(j+1)).ε₀ = ε₀^e.((j+1).ε₀) = ε₀^(e+1)
+      ε₀^(e+1) <= ε₀^e.ε₀ <= (ε₀^e.j+f).ε₀
+    
+    hence for f = 1+g,  (ε₀^e.i+u).ε₀^f = ε₀^(e+f)
+    
+    proof:
+      (ε₀^e.i+u).ε₀^f = ((ε₀^e.i+u).ε₀).ε₀^g = ε₀^(e+1).ε₀^g = ε₀^(e+1+g) = ε₀^(e+f)
+    
+    for f = 0, (ε₀^e.i+u).ε₀^0 = ε₀^e.i+u
+    
+    hence
+    for f₁ > ... > fₙ > 0, and j₁,...,jₙ all < ε₀
+    
+    (ε₀^e.i+u).(ε₀^f₁.j₁+...+ε₀^fₙ.jₙ) = ε₀^(e+f₁).j₁+...+ ε₀^(e+fₙ).jₙ
+    
+    for f₁ > ... > fₙ = 0, and j₁,...,jₙ all < ε₀
+    
+    (ε₀^e.i+u).(ε₀^f₁.j₁+...+ε₀^fₙ.jₙ) = ε₀^(e+f₁).j₁+...+ (ε₀^e.i+u).jₙ
+    
+    Missing is (ε₀^e.i+u).j where u < ε₀^e and i,j < ε₀
+    
+    if j = 0 then 0
+    else j = n (nat) then (ε₀^e.i+u).n = ε₀^e.i.n + u
+    
+    Last remaining equation:
+    
+       (ε₀^e.i+u).j =? ε₀^e.i.j for a limit ordinal j ?
+       
+       example (ε₀^e.i+f).ω = lub {k | ε₀^e.i.k+f.k } ?= ε₀^e.i.ω
+    
+    
+*)
 
 Section eps0_mpos.
 

@@ -16,8 +16,8 @@ Set Implicit Arguments.
 (** Notations with global scope *)
 
 #[global] Notation "x ∈ l" := (In x l) (at level 70, no associativity, format "x  ∈  l").
-#[global] Notation "P '⊆₁' Q" := (forall x, P x -> Q x) (at level 70, no associativity, format "P  ⊆₁  Q").
-#[global] Notation "P '⊆₂' Q" := (forall x y, P x y -> Q x y) (at level 70, no associativity, format "P  ⊆₂  Q").
+#[global] Notation "P '⊆₁' Q" := (∀x, P x → Q x) (at level 70, no associativity, format "P  ⊆₁  Q").
+#[global] Notation "P '⊆₂' Q" := (∀ x y, P x y → Q x y) (at level 70, no associativity, format "P  ⊆₂  Q").
 #[global] Notation "R ⁻¹" := (λ x y, R y x) (at level 1, left associativity, format "R ⁻¹").
 
 Arguments clos_trans {_}.

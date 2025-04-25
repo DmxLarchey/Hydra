@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos eps0.
+From Hydra Require Import utils ord eps0.
 
 Import ListNotations.
 
@@ -20,7 +20,23 @@ Set Implicit Arguments.
     Hence for instance:
      - 0 + ω is a ltf
      - ω³ + ω is a ltf
-     - but (ω³+ω) + ω² is not a ltf  *)
+     - but (ω³+ω) + ω² is not a ltf  
+     
+    This does not work when using ε₀ as a basis instead of ω
+    because ω is not of the form a + ε₀^_ 
+    
+    So the fundemental sequence needs to be computed otherwise
+    for ε₀. Btw, we will need the fundemental sequence of for
+    limit ordinals in ord to get that of those of basis ε₀
+    
+    Fund sequence possible for limit ordinal a + ε₀^(e,1+n)
+      - 1+n = 0 is not possible
+      - if 1+n = m+1 then a + ε₀^(e,m) + ε₀^e
+        - ε₀^e is limit so e <> 0
+        - if e = f+1 then λ(i) := a + ε₀^(e,m) + ε₀^f.(1+i)
+        - if e is limit λₑ then λ(i) := a + ε₀^(e,m) + ε₀^(λₑ(i))
+      - if 1+n is limit λₙ then λ(i) := a + ε₀^(e,λₙ(i))
+    *)
 
 Definition eps0_ltf a e := ∀b, a +₀ ω^e = b +₀ ω^e → a ≤ε₀ b.
 
@@ -78,13 +94,14 @@ Proof.
   rewrite eps0_add_exp_omega in Hb.
   destruct b as [ | g i f Hf _ ] using eps0_hnf_rect.
   + rewrite eps0_add_zero_left in Hb.
-    now apply eps0_exp_inj, proj2, pos_succ_neq_one in Hb.
+    now apply eps0_exp_inj, proj2, ord_succ_not_zero in Hb.
   + rewrite <- (eps0_add_zero_right ω^e) in Hb; unfold eps0_omega in Hb.
     destruct (eps0_lt_sdec g e) as [ g e C | e | g e C ].
     * rewrite eps0_add_hnf_lt, eps0_add_zero_right in Hb; auto.
-      now apply eps0_exp_inj, proj2, pos_succ_neq_one in Hb.
+      now apply eps0_exp_inj, proj2, ord_succ_not_zero in Hb.
     * rewrite eps0_add_hnf_eq, eps0_add_zero_right in Hb; auto.
-      apply eps0_exp_inj, proj2, pos_succ_inj in Hb as <-; auto.
+      apply eps0_exp_inj, proj2 in Hb.
+      rewrite ord_add_zero_right, ord_eq_succ_iff in Hb; subst; auto.
     * apply eps0_le_trans with ω^⟨g,i⟩; auto.
       apply eps0_le_iff_lt.
       left; now apply eps0_exp_mono_left.
