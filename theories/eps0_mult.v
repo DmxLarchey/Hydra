@@ -111,156 +111,333 @@ Set Implicit Arguments.
 
 *)
 
-Section eps0_mpos.
+Section eps0_m1add.
 
-  (** pos := nat viewed as 1, 2, ... and not 0, 1, ... *)
+  Notation "i '+ₚ' j" := (i +ₒ 1ₒ +ₒ j) (at level 31, left associativity).
+  Notation "i '*ₚ' j" := (i +ₒ (1ₒ +ₒ i) *ₒ j) (at level 29, left associativity).
 
-  (** The operation (θ : ε₀) (n : pos) => θ.(1+n) *)
-  Inductive eps0_mpos_gr n : ε₀ → ε₀ → Prop :=
-    | eps0_mpos_gr_0 : eps0_mpos_gr n 0₀ 0₀
-    | eps0_mpos_gr_1 α i β : β <ε₀ ω^α → eps0_mpos_gr n (ω^⟨α,i⟩ +₀ β) (ω^⟨α,i *ₚ n⟩ +₀ β).
+  (** The operation (θ : ε₀) (j : ord) => θ.(1+j)
+      remember (1+i)*(1+j) = 1+(i+(1+i)*j) *)
+  Inductive eps0_m1add_gr j : ε₀ → ε₀ → Prop :=
+    | eps0_m1add_gr_0 :       eps0_m1add_gr j 0₀ 0₀
+    | eps0_m1add_gr_1 α i β : ord_is_succ (1 +ₒ j)
+                            → β <ε₀ ω^α
+                            → eps0_m1add_gr j (ω^⟨α,i⟩ +₀ β) (ω^⟨α,i *ₚ j⟩ +₀ β)
+    | eps0_m1add_gr_2 α i β : ord_is_limit j
+                            → β <ε₀ ω^α
+                            → eps0_m1add_gr j (ω^⟨α,i⟩ +₀ β) ω^⟨α,i *ₚ j⟩.
 
-  Fact eps0_mpos_fun n e1 f1 e2 f2 : eps0_mpos_gr n e1 f1 → eps0_mpos_gr n e2 f2 → e1 = e2 → f1 = f2.
+  Fact ord_not_is_succ_is_limit j : ord_is_succ (1 +ₒ j) → ord_is_limit j → False.
+  Proof. intros H G%ord_is_limit_1add; now apply G in H. Qed.
+
+  Fact eps0_m1add_fun j e1 f1 e2 f2 : eps0_m1add_gr j e1 f1 → eps0_m1add_gr j e2 f2 → e1 = e2 → f1 = f2.
   Proof.
     do 2 destruct 1; auto.
-    + now intros ?%eps0_zero_neq_hnf.
-    + symm; now intros ?%eps0_zero_neq_hnf.
+    1,2: now intros ?%eps0_zero_neq_hnf.
+    1,4: symm; now intros ?%eps0_zero_neq_hnf.
+    + intros (? & [])%eps0_eq_hnf_inv; subst; auto.
+    + intros (? & [])%eps0_eq_hnf_inv; subst; auto.
+      edestruct ord_not_is_succ_is_limit; eauto.
+    + intros (? & [])%eps0_eq_hnf_inv; subst; auto.
+      edestruct ord_not_is_succ_is_limit; eauto.
     + intros (? & [])%eps0_eq_hnf_inv; subst; auto.
   Qed.
 
-  Definition eps0_mpos_pwc e n : sig (eps0_mpos_gr n e).
+  Fact ord_1add_choose j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
   Proof.
-    destruct e as [ | e i f ] using eps0_hnf_rect.
+    destruct (ord_zero_succ_limit_dec j) as [ [ -> | ] | ]; auto; left.
+    + apply ord_is_succ_10.
+    + now apply ord_is_succ_1add.
+  Qed. 
+
+  Definition eps0_m1add_pwc e j : sig (eps0_m1add_gr j e).
+  Proof.
+    destruct e as [ | e i f H _ _ ] using eps0_hnf_rect.
     + exists 0₀; constructor.
-    + exists (ω^⟨e,i *ₚ n⟩ +₀ f); now constructor.
+    + destruct (ord_1add_choose j) as [ G | G ].
+      * exists (ω^⟨e,i *ₚ j⟩ +₀ f); now constructor.
+      * exists (ω^⟨e,i *ₚ j⟩); now constructor.
   Qed.
 
-  Definition eps0_mpos e n := π₁ (eps0_mpos_pwc e n).
+  Definition eps0_m1add e j := π₁ (eps0_m1add_pwc e j).
 
-  Fact eps0_mpos_spec e n : eps0_mpos_gr n e (eps0_mpos e n).
+  Fact eps0_m1add_spec e j : eps0_m1add_gr j e (eps0_m1add e j).
   Proof. apply (proj2_sig _). Qed.
 
-  Fact eps0_mpos_fix_0 n : eps0_mpos 0₀ n = 0₀.
-  Proof. apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); constructor. Qed.
+  Tactic Notation "solve" "m1add" :=
+    intros; apply eps0_m1add_fun with (1 := eps0_m1add_spec _ _) (3 := eq_refl); constructor; auto.
 
-  Fact eps0_mpos_fix_1 n α i β : β <ε₀ ω^α → eps0_mpos (ω^⟨α,i⟩ +₀ β) n = ω^⟨α,i *ₚ n⟩ +₀ β.
-  Proof. intros; apply eps0_mpos_fun with (1 := eps0_mpos_spec _ _) (3 := eq_refl); now constructor. Qed.
+  Fact eps0_m1add_fix_0 j : eps0_m1add 0₀ j = 0₀.
+  Proof. solve m1add. Qed.
 
-  Fact eps0_mpos_exp n α i : eps0_mpos ω^⟨α,i⟩ n = ω^⟨α,i *ₚ n⟩.
+  Fact eps0_m1add_fix_1 j α i β :
+    ord_is_succ (1 +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^⟨α,i⟩ +₀ β) j = ω^⟨α,i *ₚ j⟩ +₀ β.
+  Proof. solve m1add. Qed.
+
+  Fact eps0_m1add_fix_2 j α i β :
+    ord_is_limit j → β <ε₀ ω^α → eps0_m1add (ω^⟨α,i⟩ +₀ β) j = ω^⟨α,i *ₚ j⟩.
+  Proof. solve m1add. Qed. 
+
+  Fact eps0_m1add_exp j α i : eps0_m1add ω^⟨α,i⟩ j = ω^⟨α,i *ₚ j⟩.
   Proof. 
-    rewrite <- (eps0_add_zero_right ω^⟨_,i⟩), eps0_mpos_fix_1; auto.
-    now rewrite eps0_add_zero_right.
+    rewrite <- (eps0_add_zero_right ω^⟨_,i⟩).
+    destruct (ord_1add_choose j).
+    + rewrite eps0_m1add_fix_1, eps0_add_zero_right; auto.
+    + rewrite eps0_m1add_fix_2; auto.
   Qed.
 
-  Fact eps0_mpos_one e : eps0_mpos e 1ₚ = e.
+  Hint Resolve ord_is_succ_10 : core.
+
+  Fact eps0_m1add_one e : eps0_m1add e 0ₒ = e.
   Proof.
     destruct e using eps0_hnf_rect.
-    + now rewrite eps0_mpos_fix_0.
-    + rewrite eps0_mpos_fix_1, pos_mul_one_right; auto.
+    + now rewrite eps0_m1add_fix_0.
+    + rewrite eps0_m1add_fix_1; auto.
+      now rewrite ord_mul_zero_right, ord_add_zero_right.
   Qed.
 
-  Fact eps0_mpos_omega_add n α β : β <ε₀ ω^α → eps0_mpos (ω^α +₀ β) n = ω^⟨α,n⟩ +₀ β.
+  Fact eps0_m1add_omega_add_succ j α β : 
+    ord_is_succ (1 +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^α +₀ β) j = ω^⟨α,j⟩ +₀ β.
   Proof.
     intros; unfold eps0_omega.
-    rewrite eps0_mpos_fix_1; auto.
+    rewrite eps0_m1add_fix_1; auto; f_equal; trivial.
+    now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left.
   Qed.
 
-  Fact eps0_mpos_omega n α : eps0_mpos ω^α n = ω^⟨α,n⟩.
+  Fact eps0_m1add_omega_add_limit j α β : 
+    ord_is_limit j → β <ε₀ ω^α → eps0_m1add (ω^α +₀ β) j = ω^⟨α,j⟩.
   Proof.
-    rewrite <- (eps0_add_zero_right ω^α), eps0_mpos_omega_add; auto.
-    now rewrite eps0_add_zero_right.
+    intros; unfold eps0_omega.
+    rewrite eps0_m1add_fix_2; trivial.
+    now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left.
   Qed.
 
-  Fact eps0_mpos_add e i j : eps0_mpos e i +₀ eps0_mpos e j = eps0_mpos e (i +ₚ j).
+  Fact eps0_m1add_omega j α : eps0_m1add ω^α j = ω^⟨α,j⟩.
+  Proof.
+    unfold eps0_omega.
+    rewrite eps0_m1add_exp.
+    now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left.
+  Qed.
+
+  Fact ord_mulp_distr k i j : k *ₚ (i +ₚ j) = (k *ₚ i) +ₚ (k *ₚ j).
+  Proof.
+    rewrite !ord_add_assoc, <-(ord_add_assoc 1ₒ).
+    rewrite <-(ord_mul_one_right (1ₒ +ₒ k)) at 3.
+    now rewrite <- !ord_mul_distr.
+  Qed.
+
+  Fact eps0_m1add_add e i j : eps0_m1add e i +₀ eps0_m1add e j = eps0_m1add e (i +ₚ j).
   Proof.
     destruct e using eps0_hnf_rect.
-    + now rewrite !eps0_mpos_fix_0, eps0_add_zero_left.
-    + rewrite !eps0_mpos_fix_1; auto.
-      rewrite eps0_add_hnf_eq, pos_mul_distr_right; auto.
+    + now rewrite !eps0_m1add_fix_0, eps0_add_zero_left.
+    + destruct (ord_1add_choose j) as [ Gj | Gj ];
+      destruct (ord_1add_choose i) as [ Gi | Gi ].
+      * do 3 (rewrite eps0_m1add_fix_1; auto).
+        - rewrite eps0_add_hnf_eq, ord_mulp_distr; auto.
+        - rewrite !ord_add_assoc, <- ord_add_assoc.
+          apply ord_is_succ_add; auto.
+      * rewrite eps0_m1add_fix_2; auto.
+        do 2 (rewrite eps0_m1add_fix_1; auto).
+        - rewrite eps0_add_exp_hnf_eq, ord_mulp_distr; auto.
+        - rewrite !ord_add_assoc, <- ord_add_assoc.
+          apply ord_is_succ_add; auto.
+      * rewrite eps0_m1add_fix_1 with (j := i); auto.
+        do 2 (rewrite eps0_m1add_fix_2; auto).
+        - rewrite eps0_add_hnf_exp_eq, ord_mulp_distr; auto.
+        - apply ord_is_limit_add; auto.
+      * do 3 (rewrite eps0_m1add_fix_2; auto).
+        - rewrite eps0_add_exp, ord_mulp_distr; auto.
+        - apply ord_is_limit_add; auto.
   Qed.
 
-  Fact eps0_mpos_comp e i j : eps0_mpos (eps0_mpos e i) j = eps0_mpos e (i *ₚ j).
+  (* (i+1)*(j+1) = (i+1)*j+i+1 is succ
+     l*(j+1) = l*j+l is limit
+     l is limit then _*l is limit when _ <> 0 
+ 
+     a*l = 0 -> a = 0 \/ l = 0
+     a*l = k+1.
+
+     a*l is succ then l is succ ? 
+
+  *)
+
+  Fact ord_mulp_1add i j : 1ₒ +ₒ i *ₚ j = (1ₒ +ₒ i) *ₒ (1ₒ +ₒ j).
+  Proof. now rewrite <- ord_add_assoc, ord_mul_distr, ord_mul_one_right. Qed.
+
+  Fact ord_mulp_is_succ i j : ord_is_succ (1ₒ +ₒ i)
+                           -> ord_is_succ (1ₒ +ₒ j)
+                           -> ord_is_succ (1ₒ +ₒ i *ₚ j).
+  Proof. rewrite ord_mulp_1add; apply ord_mul_is_succ. Qed.
+
+  Fact ord_mulp_assoc i j k : (i *ₚ j) *ₚ k = i *ₚ (j *ₚ k).
+  Proof.
+    rewrite ord_mul_distr, <- ord_mul_assoc, ord_mul_distr. 
+    now rewrite <- !ord_add_assoc, ord_mul_one_right.
+  Qed.
+ 
+  Fact ord_mulp_is_limit_left i j : ord_is_limit i -> ord_is_limit (i *ₚ j).
+  Proof.
+    intros H.
+    apply ord_is_limit_1add.
+    rewrite ord_mulp_1add.
+    apply ord_mul_is_limit_left.
+    1,2: apply ord_1add_not_zero.
+    now apply ord_is_limit_1add.
+  Qed.
+
+  Fact ord_mulp_is_limit_right i j : ord_is_limit j -> ord_is_limit (i *ₚ j).
+  Proof.
+   intros H.
+   apply ord_is_limit_1add.
+   rewrite ord_mulp_1add.
+   apply ord_mul_is_limit_right.
+   + apply ord_1add_not_zero.
+   + now apply ord_is_limit_1add.
+  Qed.
+
+  Hint Resolve ord_mulp_is_succ
+               ord_mulp_is_limit_left
+               ord_mulp_is_limit_right : core.
+
+  Fact eps0_m1add_comp e i j : eps0_m1add (eps0_m1add e i) j = eps0_m1add e (i *ₚ j).
   Proof.
     destruct e using eps0_hnf_rect.
-    + now rewrite !eps0_mpos_fix_0.
-    + rewrite !eps0_mpos_fix_1, pos_mul_assoc; auto.
+    + now rewrite !eps0_m1add_fix_0.
+    + destruct (ord_1add_choose j) as [ Gj | Gj ];
+      destruct (ord_1add_choose i) as [ Gi | Gi ].
+      * do 3 (rewrite eps0_m1add_fix_1; auto).
+        now rewrite ord_mulp_assoc.
+      * rewrite eps0_m1add_fix_2 with (j := i); auto.
+        rewrite eps0_m1add_exp.
+        rewrite eps0_m1add_fix_2; auto.
+        now rewrite ord_mulp_assoc.
+      * rewrite eps0_m1add_fix_1 with (j := i); auto.
+        do 2 (rewrite eps0_m1add_fix_2; auto).
+        now rewrite ord_mulp_assoc.
+      * do 2 (rewrite eps0_m1add_fix_2; auto).
+        rewrite eps0_m1add_exp, ord_mulp_assoc; auto.
   Qed.
 
-  Fact eps0_mpos_mono_left a b m n : a <ε₀ b → m ≤ n → eps0_mpos a m <ε₀ eps0_mpos b n.
+(*
+  Fact ord_mulp_mono_left i j n : i <ₒ j → i *ₚ n <ₒ j *ₚ n.
   Proof.
-    intros Hab Hmn.
+    intros H.
+    apply ord_lt_le_trans with (j +ₒ (1ₒ +ₒ i) *ₒ n).
+    +
+*)
+
+  Hint Resolve ord_add_mono_le ord_mul_mono ord_le_refl ord_lt_le_weak 
+               ord_add_mono_lt_right : core.
+
+  (* This is incorrect for limit ordinals : 3.ω = 2.ω but not 3 < 2 *) 
+  Fact eps0_m1add_mono_left_eq_succ a b n : 
+    ord_is_succ (1ₒ +ₒ n) → a <ε₀ b → eps0_m1add a n <ε₀ eps0_m1add b n.
+  Proof.
+    intros Hn Hab.
     destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
       destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Hab.
-    + rewrite eps0_mpos_fix_0, eps0_mpos_fix_1; auto.
+    + rewrite eps0_m1add_fix_0.
+      destruct (ord_1add_choose n).
+      * rewrite eps0_m1add_fix_1; auto.
+      * rewrite eps0_m1add_fix_2; auto.
     + now apply eps0_zero_not_gt in Hab.
     + apply eps0_lt_hnf_inv in Hab; auto.
-      rewrite !eps0_mpos_fix_1; auto.
+      rewrite !eps0_m1add_fix_1; auto.
       apply eps0_lt_hnf_inv; auto.
       destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
-      * right; split; auto; left.
-        now apply pos_mul_mono_left.
-      * apply pos_le_lt_iff in Hmn as [ -> | Hmn ]; auto.
-        right; split; auto; left.
-        now apply pos_mul_mono_right.
+      right; split; auto; left.
+      apply ord_add_mono_lt_inv with 1ₒ.
+      rewrite !ord_mulp_1add.
+      destruct Hn as (k & ->).
+      rewrite !ord_mul_distr, !ord_mul_one_right.
+      apply ord_le_lt_trans with ((1ₒ +ₒ j) *ₒ k +ₒ (1ₒ +ₒ i)); auto.
   Qed.
 
-  Fact eps0_mpos_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_mpos a n.
+  Fact eps0_m1add_mono_left_eq_limit a b n : 
+    ord_is_limit n → a <ε₀ b → eps0_m1add a n ≤ε₀ eps0_m1add b n.
+  Proof.
+    intros Hn Hab.
+    destruct a as [ | e i f H1 _ _ ] using eps0_hnf_rect;
+      destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
+    + now apply eps0_lt_irrefl in Hab.
+    + rewrite eps0_m1add_fix_0.
+      destruct (ord_1add_choose n).
+      * rewrite eps0_m1add_fix_1; auto.
+      * rewrite eps0_m1add_fix_2; auto.
+    + now apply eps0_zero_not_gt in Hab.
+    + apply eps0_lt_hnf_inv in Hab; auto.
+      rewrite !eps0_m1add_fix_2; auto.
+      apply eps0_le_exp_inv; auto.
+      destruct Hab as [ | (<- & [ | (<- & ?) ]) ]; auto.
+      right; split; auto.
+  Qed.
+
+  Fact eps0_m1add_mono_left a b n : 
+    a ≤ε₀ b → eps0_m1add a n ≤ε₀ eps0_m1add b n.
+  Proof.
+    intros [ | -> ]%eps0_le_iff_lt; auto.
+    destruct (ord_1add_choose n).
+    + apply eps0_le_iff_lt; left; apply eps0_m1add_mono_left_eq_succ; auto.
+    + apply eps0_m1add_mono_left_eq_limit; auto.
+  Qed.
+
+  Fact eps0_m1add_mono_right_le a n m : n ≤ₒ m → eps0_m1add a n ≤ε₀ eps0_m1add a m.
+  Proof.
+    intros (k& ->)%ord_sub.
+    destruct (ord_zero_or_1add k) as [ -> | (j & ->) ].
+    + rewrite ord_add_zero_right; auto.
+    + rewrite <- ord_add_assoc, <- eps0_m1add_add; auto.
+  Qed.
+
+  Hint Resolve ord_le_zero_least : core.
+
+  Fact eps0_m1add_gt_zero a n : 0₀ <ε₀ a → 0₀ <ε₀ eps0_m1add a n.
   Proof.
     intros H.
-    apply eps0_mpos_mono_left with (n := n) (m := n) in H; auto.
-    now rewrite eps0_mpos_fix_0 in H.
+    apply eps0_lt_le_trans with (1 := H).
+    rewrite <- (eps0_m1add_one a) at 1.
+    apply eps0_m1add_mono_right_le; auto.
   Qed.
 
-  Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+  Hint Resolve eps0_m1add_mono_left eps0_m1add_gt_zero : core.
 
-  Fact eps0_mpos_mono_right a n m : 0₀ <ε₀ a → n < m → eps0_mpos a n <ε₀ eps0_mpos a m.
+  Fact eps0_m1add_mono_right_lt a n m : 0₀ <ε₀ a → n <ₒ m → eps0_m1add a n <ε₀ eps0_m1add a m.
   Proof.
-    intros H1 H2.
-    destruct a as [ | e i f H _ _ ] using eps0_hnf_rect.
-    + now apply eps0_lt_irrefl in H1.
-    + rewrite !eps0_mpos_fix_1; auto.
-      apply eps0_lt_hnf_inv; auto.
-      right; split; auto; left.
-      now apply pos_mul_mono_right.
+    intros H1 H2%ord_lt__succ_le_iff.
+    apply eps0_lt_le_trans with (eps0_m1add a (n +ₒ 1ₒ)).
+    2: apply eps0_m1add_mono_right_le; auto.
+    replace (n +ₒ 1ₒ) with (n +ₚ 0ₒ).
+    2: now rewrite ord_add_zero_right.
+    rewrite <- eps0_m1add_add.
+    rewrite <- (eps0_add_zero_right (eps0_m1add a n)) at 1.
+    apply eps0_add_mono_right; auto.
   Qed.
 
-  Fact eps0_mpos_mono_right_le a n m : n ≤ m → eps0_mpos a n ≤ε₀ eps0_mpos a m.
-  Proof.
-    destruct (eq_nat_dec n m) as [ <- | ]; auto; intro.
-    destruct (eps0_zero_or_pos a) as [ -> | ].
-    + rewrite !eps0_mpos_fix_0; auto.
-    + apply eps0_le_iff_lt.
-      left; apply eps0_mpos_mono_right; auto; lia.
-  Qed.
+  Hint Resolve eps0_m1add_mono_right_le : core.
 
-  Fact eps0_mpos_mono a b m n : a ≤ε₀ b → m ≤ n → eps0_mpos a m ≤ε₀ eps0_mpos b n.
-  Proof.
-    rewrite eps0_le_iff_lt.
-    intros [ H1 | -> ].
-    + rewrite eps0_le_iff_lt; left; now apply eps0_mpos_mono_left.
-    + apply eps0_mpos_mono_right_le.
-  Qed.
+  Fact eps0_m1add_mono a b m n : a ≤ε₀ b → m ≤ₒ n → eps0_m1add a m ≤ε₀ eps0_m1add b n.
+  Proof. intros; apply eps0_le_trans with (eps0_m1add a n); auto. Qed.
 
-  Fact eps0_mpos_below_omega a n e : a <ε₀ ω^e → eps0_mpos a n <ε₀ ω^e.
+  Fact eps0_m1add_below_omega a n e : a <ε₀ ω^e → eps0_m1add a n <ε₀ ω^e.
   Proof.
     intros [ -> | (f & i & H1 & H2) ]%eps0_below_omega_inv.
-    + rewrite eps0_mpos_fix_0; auto.
-    + apply eps0_mpos_mono_left with (n := n) (m := n) in H1; auto.
-      apply eps0_lt_trans with (1 := H1).
-      rewrite eps0_mpos_exp.
+    + rewrite eps0_m1add_fix_0; auto.
+    + apply eps0_lt_le_weak, eps0_m1add_mono_left with (n := n) in H1.
+      apply eps0_le_lt_trans with (1 := H1).
+      rewrite eps0_m1add_exp.
       apply eps0_lt_exp_inv; auto.
   Qed.
 
-  Fact eps0_mpos_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_mpos a n <ε₀ ω^(S₀ e).
+  Fact eps0_m1add_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_m1add a n <ε₀ ω^(S₀ e).
   Proof.
     intros H.
-    apply eps0_mpos_below_omega,
+    apply eps0_m1add_below_omega,
           eps0_lt_trans with (1 := H),
           eps0_exp_mono_left; auto.
   Qed.
 
-End eps0_mpos.
+End eps0_m1add.
 
 #[local] Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
 

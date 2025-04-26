@@ -720,6 +720,17 @@ Section eps0_omega.
     apply eps0_lt_hnf_exp_inv; auto.
   Qed.
 
+  Hint Resolve ord_lt_le_weak : core.
+
+  Fact eps0_le_exp_inv e₁ i₁ e₂ i₂ :
+      ω^⟨e₁,i₁⟩ ≤ε₀ ω^⟨e₂,i₂⟩
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ ≤ₒ i₂.
+  Proof.
+    rewrite eps0_le_iff_lt, eps0_lt_exp_inv; split.
+    + intros [ [ | [] ] | (-> & ->)%eps0_exp_inj ]; auto.
+    + intros [ | (-> & []%ord_le_lt_iff) ]; auto.
+  Qed.
+
   Fact eps0_lt_zero_hnf e i f : 0₀ <ε₀ ω^⟨e,i⟩ +₀ f.
   Proof. apply eps0_lt_le_trans with ω^⟨e,i⟩; auto. Qed.
 
@@ -763,6 +774,15 @@ Section eps0_omega.
     intro.
     rewrite <- (eps0_add_zero_right ω^⟨e,i₁⟩).
     rewrite eps0_add_hnf_eq; auto.
+  Qed.
+
+  Fact eps0_add_hnf_exp_eq e i₁ i₂ f₁ :
+      f₁ <ε₀ ω^e
+    → (ω^⟨e,i₁⟩ +₀ f₁) +₀ ω^⟨e,i₂⟩ = ω^⟨e,i₁ +ₒ 1 +ₒ i₂⟩.
+  Proof.
+    intro.
+    rewrite <- (eps0_add_zero_right ω^⟨e,i₂⟩).
+    rewrite eps0_add_hnf_eq, eps0_add_zero_right; auto.
   Qed.
 
   (* Ordinals below ω^e.n are of the form
