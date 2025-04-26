@@ -73,15 +73,42 @@ Set Implicit Arguments.
     Missing is (ε₀^e.i+u).j where u < ε₀^e and i,j < ε₀
     
     if j = 0 then 0
-    else j = n (nat) then (ε₀^e.i+u).n = ε₀^e.i.n + u
-    
-    Last remaining equation:
-    
-       (ε₀^e.i+u).j =? ε₀^e.i.j for a limit ordinal j ?
-       
-       example (ε₀^e.i+f).ω = lub {k | ε₀^e.i.k+f.k } ?= ε₀^e.i.ω
-    
-    
+    else j = n (nat) then   (ε₀^e.i+u).n = ε₀^e.(i.n) + u
+    else j = λ (limit) then (ε₀^e.i+u).λ = ε₀^e.(i.λ) for a limit ordinal λ
+
+    Proof:
+    assume e and f with f <= e and f + e = e
+    then for a nat n > 0 we have (e+f).n = e.n + f (by induction)
+       -> (e+f).(n+1) = (e+f).n+e+f = e.n+(f+e)+f = e.n+e+f = e.(n+1)+f
+    now considering the value of (e+f).ω, we have the bounds
+        e.n <= (e+f).n = e.n.+f <= e.n+e = e.(n+1) <= e.ω
+    hence (e+f).ω = e.ω (because lub { e.n | n < ω } = e.ω)
+
+    Now let λ be a limit ordinal. Then there is α such that λ = ω.α
+    (by euclidean division, λ = ω.α + r with r < ω hence r = 0 
+    otherwise λ would be a successor)
+
+    Then (e+f).λ = (e+f).(ω.α) = ((e+f).ω).α = (e.ω).α = e.(ω.α) = e.λ
+
+    Qed.
+
+    We now cover the case j = λ+n with n > 0 (case of successor ordinals)
+
+    Then (ε₀^e.i+u).j = (ε₀^e.i+u).(λ+n)
+                      = (ε₀^e.i+u).λ + (ε₀^e.i+u).n
+                      = ε₀^e.i.λ + ε₀^e.i.n + u
+                      = ε₀^e.i.(λ+n) + u
+                      = ε₀^e.i.j + u
+
+    So the computation rules for right multiplication with an ord:
+
+         (ε₀^e.i+u).j = 0                if j = 0
+         (ε₀^e.i+u).j = ε₀^e.(i.j) + u   if j is a successor ordinal
+         (ε₀^e.i+u).j = ε₀^e.(i.j)       if j is a limit ordinal
+
+    Hence we have all the rule to compute multiplication by an ord j
+    provided we can discriminate whether j is 0, successor or limit.
+
 *)
 
 Section eps0_mpos.
