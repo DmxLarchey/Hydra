@@ -111,10 +111,73 @@ Set Implicit Arguments.
 
 *)
 
+#[local] Notation "i '+ₚ' j" := (i +ₒ 1ₒ +ₒ j) (at level 31, left associativity).
+#[local] Notation "i '*ₚ' j" := (i +ₒ (1ₒ +ₒ i) *ₒ j) (at level 29, left associativity).
+
+Section ord_extra.
+
+  Fact ord_not_is_succ_is_limit j : ord_is_succ (1 +ₒ j) → ord_is_limit j → False.
+  Proof. intros H G%ord_is_limit_1add; now apply G in H. Qed.
+
+  Fact ord_1add_choose j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
+  Proof.
+    destruct (ord_zero_succ_limit_dec j) as [ [ -> | ] | ]; auto; left.
+    + apply ord_is_succ_10.
+    + now apply ord_is_succ_1add.
+  Qed. 
+
+  Fact ord_mulp_distr k i j : k *ₚ (i +ₚ j) = (k *ₚ i) +ₚ (k *ₚ j).
+  Proof.
+    rewrite !ord_add_assoc, <-(ord_add_assoc 1ₒ).
+    rewrite <-(ord_mul_one_right (1ₒ +ₒ k)) at 3.
+    now rewrite <- !ord_mul_distr.
+  Qed.
+
+  Fact ord_mulp_1add i j : 1ₒ +ₒ i *ₚ j = (1ₒ +ₒ i) *ₒ (1ₒ +ₒ j).
+  Proof. now rewrite <- ord_add_assoc, ord_mul_distr, ord_mul_one_right. Qed.
+
+  Fact ord_mulp_is_succ i j : ord_is_succ (1ₒ +ₒ i)
+                           -> ord_is_succ (1ₒ +ₒ j)
+                           -> ord_is_succ (1ₒ +ₒ i *ₚ j).
+  Proof. rewrite ord_mulp_1add; apply ord_mul_is_succ. Qed.
+
+  Fact ord_mulp_assoc i j k : (i *ₚ j) *ₚ k = i *ₚ (j *ₚ k).
+  Proof.
+    rewrite ord_mul_distr, <- ord_mul_assoc, ord_mul_distr. 
+    now rewrite <- !ord_add_assoc, ord_mul_one_right.
+  Qed.
+ 
+  Fact ord_mulp_is_limit_left i j : ord_is_limit i -> ord_is_limit (i *ₚ j).
+  Proof.
+    intros H.
+    apply ord_is_limit_1add.
+    rewrite ord_mulp_1add.
+    apply ord_mul_is_limit_left.
+    1,2: apply ord_1add_not_zero.
+    now apply ord_is_limit_1add.
+  Qed.
+
+  Fact ord_mulp_is_limit_right i j : ord_is_limit j -> ord_is_limit (i *ₚ j).
+  Proof.
+   intros H.
+   apply ord_is_limit_1add.
+   rewrite ord_mulp_1add.
+   apply ord_mul_is_limit_right.
+   + apply ord_1add_not_zero.
+   + now apply ord_is_limit_1add.
+  Qed.
+
+  Fact ord_mulp_zero_left n : 0ₒ *ₚ n = n.
+  Proof. now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left. Qed.
+
+End ord_extra.
+
+#[local] Hint Resolve ord_mulp_is_succ
+               ord_mulp_is_limit_left
+               ord_mulp_is_limit_right : core.
+
 Section eps0_m1add.
 
-  Notation "i '+ₚ' j" := (i +ₒ 1ₒ +ₒ j) (at level 31, left associativity).
-  Notation "i '*ₚ' j" := (i +ₒ (1ₒ +ₒ i) *ₒ j) (at level 29, left associativity).
 
   (** The operation (θ : ε₀) (j : ord) => θ.(1+j)
       remember (1+i)*(1+j) = 1+(i+(1+i)*j) *)
@@ -127,8 +190,6 @@ Section eps0_m1add.
                             → β <ε₀ ω^α
                             → eps0_m1add_gr j (ω^⟨α,i⟩ +₀ β) ω^⟨α,i *ₚ j⟩.
 
-  Fact ord_not_is_succ_is_limit j : ord_is_succ (1 +ₒ j) → ord_is_limit j → False.
-  Proof. intros H G%ord_is_limit_1add; now apply G in H. Qed.
 
   Fact eps0_m1add_fun j e1 f1 e2 f2 : eps0_m1add_gr j e1 f1 → eps0_m1add_gr j e2 f2 → e1 = e2 → f1 = f2.
   Proof.
@@ -142,13 +203,6 @@ Section eps0_m1add.
       edestruct ord_not_is_succ_is_limit; eauto.
     + intros (? & [])%eps0_eq_hnf_inv; subst; auto.
   Qed.
-
-  Fact ord_1add_choose j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
-  Proof.
-    destruct (ord_zero_succ_limit_dec j) as [ [ -> | ] | ]; auto; left.
-    + apply ord_is_succ_10.
-    + now apply ord_is_succ_1add.
-  Qed. 
 
   Definition eps0_m1add_pwc e j : sig (eps0_m1add_gr j e).
   Proof.
@@ -219,13 +273,6 @@ Section eps0_m1add.
     now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left.
   Qed.
 
-  Fact ord_mulp_distr k i j : k *ₚ (i +ₚ j) = (k *ₚ i) +ₚ (k *ₚ j).
-  Proof.
-    rewrite !ord_add_assoc, <-(ord_add_assoc 1ₒ).
-    rewrite <-(ord_mul_one_right (1ₒ +ₒ k)) at 3.
-    now rewrite <- !ord_mul_distr.
-  Qed.
-
   Fact eps0_m1add_add e i j : eps0_m1add e i +₀ eps0_m1add e j = eps0_m1add e (i +ₚ j).
   Proof.
     destruct e using eps0_hnf_rect.
@@ -250,55 +297,6 @@ Section eps0_m1add.
         - apply ord_is_limit_add; auto.
   Qed.
 
-  (* (i+1)*(j+1) = (i+1)*j+i+1 is succ
-     l*(j+1) = l*j+l is limit
-     l is limit then _*l is limit when _ <> 0 
- 
-     a*l = 0 -> a = 0 \/ l = 0
-     a*l = k+1.
-
-     a*l is succ then l is succ ? 
-
-  *)
-
-  Fact ord_mulp_1add i j : 1ₒ +ₒ i *ₚ j = (1ₒ +ₒ i) *ₒ (1ₒ +ₒ j).
-  Proof. now rewrite <- ord_add_assoc, ord_mul_distr, ord_mul_one_right. Qed.
-
-  Fact ord_mulp_is_succ i j : ord_is_succ (1ₒ +ₒ i)
-                           -> ord_is_succ (1ₒ +ₒ j)
-                           -> ord_is_succ (1ₒ +ₒ i *ₚ j).
-  Proof. rewrite ord_mulp_1add; apply ord_mul_is_succ. Qed.
-
-  Fact ord_mulp_assoc i j k : (i *ₚ j) *ₚ k = i *ₚ (j *ₚ k).
-  Proof.
-    rewrite ord_mul_distr, <- ord_mul_assoc, ord_mul_distr. 
-    now rewrite <- !ord_add_assoc, ord_mul_one_right.
-  Qed.
- 
-  Fact ord_mulp_is_limit_left i j : ord_is_limit i -> ord_is_limit (i *ₚ j).
-  Proof.
-    intros H.
-    apply ord_is_limit_1add.
-    rewrite ord_mulp_1add.
-    apply ord_mul_is_limit_left.
-    1,2: apply ord_1add_not_zero.
-    now apply ord_is_limit_1add.
-  Qed.
-
-  Fact ord_mulp_is_limit_right i j : ord_is_limit j -> ord_is_limit (i *ₚ j).
-  Proof.
-   intros H.
-   apply ord_is_limit_1add.
-   rewrite ord_mulp_1add.
-   apply ord_mul_is_limit_right.
-   + apply ord_1add_not_zero.
-   + now apply ord_is_limit_1add.
-  Qed.
-
-  Hint Resolve ord_mulp_is_succ
-               ord_mulp_is_limit_left
-               ord_mulp_is_limit_right : core.
-
   Fact eps0_m1add_comp e i j : eps0_m1add (eps0_m1add e i) j = eps0_m1add e (i *ₚ j).
   Proof.
     destruct e using eps0_hnf_rect.
@@ -317,14 +315,6 @@ Section eps0_m1add.
       * do 2 (rewrite eps0_m1add_fix_2; auto).
         rewrite eps0_m1add_exp, ord_mulp_assoc; auto.
   Qed.
-
-(*
-  Fact ord_mulp_mono_left i j n : i <ₒ j → i *ₚ n <ₒ j *ₚ n.
-  Proof.
-    intros H.
-    apply ord_lt_le_trans with (j +ₒ (1ₒ +ₒ i) *ₒ n).
-    +
-*)
 
   Hint Resolve ord_add_mono_le ord_mul_mono ord_le_refl ord_lt_le_weak 
                ord_add_mono_lt_right : core.
@@ -439,7 +429,7 @@ Section eps0_m1add.
 
 End eps0_m1add.
 
-#[local] Hint Resolve eps0_mpos_mono_left eps0_mpos_gt_zero : core.
+#[local] Hint Resolve eps0_m1add_mono_left eps0_m1add_gt_zero : core.
 
 Section eps0_momega.
 
@@ -477,41 +467,47 @@ Section eps0_momega.
   Fact eps0_momega_exp γ n α : eps0_momega ω^⟨γ,n⟩ α = ω^(γ+₀α).
   Proof. rewrite <- (eps0_add_zero_right ω^⟨_,_⟩), eps0_momega_fix_1; auto. Qed.
 
-  Fact eps0_momega_mpos a i e :
-      0₀ <ε₀ e → eps0_momega (eps0_mpos a i) e = eps0_momega a e.
+  Fact eps0_momega_m1add a i e :
+      0₀ <ε₀ e → eps0_momega (eps0_m1add a i) e = eps0_momega a e.
   Proof.
     intros He.
     destruct a using eps0_hnf_rect.
-    + now rewrite eps0_mpos_fix_0.
-    + rewrite eps0_mpos_fix_1; auto.
-      rewrite !eps0_momega_fix_1; auto.
+    + now rewrite eps0_m1add_fix_0.
+    + destruct (ord_1add_choose i).
+      * rewrite eps0_m1add_fix_1; auto.
+        rewrite !eps0_momega_fix_1; auto.
+      * rewrite eps0_m1add_fix_2; auto.
+        rewrite eps0_momega_fix_1, eps0_momega_exp; auto.
   Qed.
 
-  Fact eps0_add_mpos_momega n k e f :
+  Fact eps0_add_m1add_momega n k e f :
       0₀ <ε₀ f
-    → eps0_mpos e n +₀ eps0_mpos (eps0_momega e f) k
-    = eps0_mpos (eps0_momega e f) k.
+    → eps0_m1add e n +₀ eps0_m1add (eps0_momega e f) k
+    = eps0_m1add (eps0_momega e f) k.
   Proof.
     intros Hf.
     destruct e using eps0_hnf_rect.
-    + now rewrite !eps0_mpos_fix_0, eps0_add_zero_left.
-    + rewrite !eps0_mpos_fix_1; auto.
-      rewrite eps0_momega_fix_1; auto.
-      rewrite !eps0_mpos_omega.
-      rewrite <- (eps0_add_zero_right ω^⟨_,k⟩).
-      rewrite eps0_add_hnf_lt; auto.
+    + now rewrite !eps0_m1add_fix_0, eps0_add_zero_left.
+    + rewrite eps0_momega_fix_1; auto.
+      rewrite eps0_m1add_omega.
+      destruct (ord_1add_choose n).
+      * rewrite eps0_m1add_fix_1; auto.
+        rewrite <- (eps0_add_zero_right ω^⟨_,k⟩).
+        rewrite eps0_add_hnf_lt; auto.
+      * rewrite eps0_m1add_fix_2; auto.
+        rewrite eps0_add_exp_lt; auto.
   Qed.
 
-  Fact eps0_mpos_add_momega a e f i j :
+  Fact eps0_m1add_add_momega a e f i j :
       e <ε₀ f
-    → eps0_mpos (eps0_momega a e) i +₀ eps0_mpos (eps0_momega a f) j
-    = eps0_mpos (eps0_momega a f) j.
+    → eps0_m1add (eps0_momega a e) i +₀ eps0_m1add (eps0_momega a f) j
+    = eps0_m1add (eps0_momega a f) j.
   Proof.
     intros Hef.
     destruct a using eps0_hnf_rect.
-    + now rewrite !eps0_momega_fix_0, !eps0_mpos_fix_0, eps0_add_zero_left.
+    + now rewrite !eps0_momega_fix_0, !eps0_m1add_fix_0, eps0_add_zero_left.
     + rewrite !eps0_momega_fix_1; auto.
-      rewrite !eps0_mpos_omega, eps0_add_exp_lt; auto.
+      rewrite !eps0_m1add_omega, eps0_add_exp_lt; auto.
   Qed.
 
   Fact eps0_momega_mono_left a b c :
@@ -554,16 +550,20 @@ Section eps0_momega.
       apply eps0_omega_mono_le; auto.
   Qed.
 
-  Fact eps0_lt_mpos_momega a n f :
+  Fact eps0_lt_m1add_momega a n f :
       0₀ <ε₀ a
     → 0₀ <ε₀ f
-    → eps0_mpos a n <ε₀ eps0_momega a f.
+    → eps0_m1add a n <ε₀ eps0_momega a f.
   Proof.
     intros Ha Hf.
     destruct a using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Ha.
-    + rewrite eps0_mpos_fix_1, eps0_momega_fix_1; auto.
-      apply eps0_lt_hnf_exp_inv; auto.
+    + rewrite eps0_momega_fix_1; auto.
+      destruct (ord_1add_choose n).
+      * rewrite eps0_m1add_fix_1; auto.
+        apply eps0_lt_hnf_exp_inv; auto.
+      * rewrite eps0_m1add_fix_2; auto.
+        apply eps0_exp_mono_left; auto.
   Qed.
 
   Fact eps0_momega_below_omega a b e f :
@@ -603,11 +603,11 @@ Section eps0_mult.
   (* now the operation (γ α : ε₀) => γ.α *)
   Inductive eps0_mult_gr γ : ε₀ → ε₀ → Prop :=
     | eps0_mult_gr_0         : eps0_mult_gr γ 0₀ 0₀ 
-    | eps0_mult_gr_1 n       : eps0_mult_gr γ ω^⟨0₀,n⟩ (eps0_mpos γ n)
+    | eps0_mult_gr_1 n       : eps0_mult_gr γ ω^⟨0₀,n⟩ (eps0_m1add γ n)
     | eps0_mult_gr_2 α n β r : 0₀ <ε₀ α
                              → β <ε₀ ω^α
                              → eps0_mult_gr γ β r
-                             → eps0_mult_gr γ (ω^⟨α,n⟩ +₀ β) (eps0_mpos (eps0_momega γ α) n +₀ r).
+                             → eps0_mult_gr γ (ω^⟨α,n⟩ +₀ β) (eps0_m1add (eps0_momega γ α) n +₀ r).
 
   Fact eps0_mult_fun a e1 f1 e2 f2 :
       eps0_mult_gr a e1 f1
@@ -637,8 +637,8 @@ Section eps0_mult.
   Proof.
     induction e as [ | n | e n f He Hf _ (r & Hr) ] using eps0_hnf_pos_rect.
     + exists 0₀; auto.
-    + exists (eps0_mpos γ n); auto.
-    + exists (eps0_mpos (eps0_momega γ e) n +₀ r); auto.
+    + exists (eps0_m1add γ n); auto.
+    + exists (eps0_m1add (eps0_momega γ e) n +₀ r); auto.
   Qed.
 
   Definition eps0_mult e f := π₁ (eps0_mult_pwc e f).
@@ -656,36 +656,36 @@ Section eps0_mult.
   Fact eps0_mult_zero_right a : a *₀ 0₀ = 0₀.
   Proof. solve mult. Qed.
 
-  Fact eps0_mult_pos_right a n : a *₀ ω^⟨0₀,n⟩ = eps0_mpos a n.
+  Fact eps0_mult_1add_right a n : a *₀ ω^⟨0₀,n⟩ = eps0_m1add a n.
   Proof. solve mult. Qed.
 
-  Corollary eps0_mpos_eq a n : eps0_mpos a n = a *₀ ω^⟨0₀,n⟩.
-  Proof. now rewrite eps0_mult_pos_right. Qed.
+  Corollary eps0_m1add_eq a n : eps0_m1add a n = a *₀ ω^⟨0₀,n⟩.
+  Proof. now rewrite eps0_mult_1add_right. Qed.
 
   Fact eps0_mult_hnf_right a e n f :
       0₀ <ε₀ e
     → f <ε₀ ω^e
     → a *₀ (ω^⟨e,n⟩ +₀ f)
-    = eps0_mpos (eps0_momega a e) n +₀ a *₀ f.
+    = eps0_m1add (eps0_momega a e) n +₀ a *₀ f.
   Proof. solve mult. Qed.
 
   (** This one is stronger because it does not need any relation between e and f *)
   Fact eps0_mult_right a e n f :
       0₀ <ε₀ e
     → a *₀ (ω^⟨e,n⟩ +₀ f)
-    = eps0_mpos (eps0_momega a e) n +₀ a *₀ f.
+    = eps0_m1add (eps0_momega a e) n +₀ a *₀ f.
   Proof.
     intros He.
     destruct f as [ | f i g H _ _ ] using eps0_hnf_rect.
     + rewrite eps0_mult_hnf_right; auto.
     + destruct (eps0_lt_sdec e f).
       * rewrite eps0_add_exp_hnf_lt, eps0_mult_hnf_right,
-             <- eps0_add_assoc, eps0_mpos_add_momega; auto.
+             <- eps0_add_assoc, eps0_m1add_add_momega; auto.
         eapply eps0_lt_trans; eassumption.
       * rewrite eps0_add_exp_hnf_eq, 
                !eps0_mult_hnf_right,
              <- eps0_add_assoc,
-                eps0_mpos_add; auto.
+                eps0_m1add_add; auto.
       * rewrite eps0_mult_hnf_right; auto.
         apply eps0_add_below_omega.
         - now apply eps0_exp_mono_left.
@@ -693,8 +693,8 @@ Section eps0_mult.
                 eps0_omega_mono_lt; auto.
   Qed.
 
-  Fact eps0_mpos_momega_eq a n e :
-    0₀ <ε₀ e → eps0_mpos (eps0_momega a e) n = a *₀ ω^⟨e,n⟩.
+  Fact eps0_m1add_momega_eq a n e :
+    0₀ <ε₀ e → eps0_m1add (eps0_momega a e) n = a *₀ ω^⟨e,n⟩.
   Proof.
     intro.
     rewrite <- (eps0_add_zero_right ω^⟨_,_⟩),
@@ -707,16 +707,16 @@ Section eps0_mult.
     0₀ <ε₀ e → eps0_momega a e = a *₀ ω^e.
   Proof.
     intro; unfold eps0_omega.
-    rewrite <- eps0_mpos_momega_eq, eps0_mpos_one; auto.
+    rewrite <- eps0_m1add_momega_eq, eps0_m1add_one; auto.
   Qed.
 
   Fact eps0_mult_zero_left e : 0₀ *₀ e = 0₀.
   Proof.
     induction e as [ | n | e n f He Hf _ IHf ] using eps0_hnf_pos_rect.
     + now rewrite eps0_mult_zero_right.
-    + now rewrite eps0_mult_pos_right, eps0_mpos_fix_0.
+    + now rewrite eps0_mult_1add_right, eps0_m1add_fix_0.
     + rewrite eps0_mult_hnf_right, IHf; auto.
-      now rewrite eps0_momega_fix_0, eps0_mpos_fix_0, eps0_add_zero_left.
+      now rewrite eps0_momega_fix_0, eps0_m1add_fix_0, eps0_add_zero_left.
   Qed.
 
   Fact eps0_mult_distr a b c : a *₀ (b +₀ c) = a *₀ b +₀ a *₀ c.
@@ -726,12 +726,12 @@ Section eps0_mult.
     + now rewrite eps0_mult_zero_right, !eps0_add_zero_left.
     + destruct c as [ | k | c k g ? ? _ _ ] using eps0_hnf_pos_rect.
       * now rewrite eps0_mult_zero_right, !eps0_add_zero_right.
-      * now rewrite eps0_add_exp, !eps0_mult_pos_right, eps0_mpos_add.
+      * now rewrite eps0_add_exp, !eps0_mult_1add_right, eps0_m1add_add.
       * rewrite eps0_add_exp_hnf_lt,
                 eps0_mult_hnf_right,
-                eps0_mult_pos_right,
+                eps0_mult_1add_right,
              <- eps0_add_assoc,
-                eps0_add_mpos_momega; auto.
+                eps0_add_m1add_momega; auto.
     + rewrite eps0_mult_right,
              !eps0_add_assoc,
            <- IHf, eps0_mult_right; auto.
@@ -742,11 +742,11 @@ Section eps0_mult.
     intros Ha He.
     induction e as [ | n | e n f H1 H2 IH1 IH2 ] using eps0_hnf_pos_rect.
     + now apply eps0_lt_irrefl in He.
-    + rewrite eps0_mult_pos_right; now apply eps0_mpos_gt_zero.
+    + rewrite eps0_mult_1add_right; auto.
     + rewrite eps0_mult_right; auto.
       destruct (eps0_zero_or_pos f) as [ -> | Hf ].
       * rewrite eps0_mult_zero_right, eps0_add_zero_right.
-        apply eps0_mpos_gt_zero; auto.
+        apply eps0_m1add_gt_zero; auto.
         apply eps0_lt_le_trans with (2 := eps0_momega_lt_pos _ _ Ha H1); auto.
       * apply eps0_lt_le_trans with (1 := IH2 Hf); auto.
   Qed.
@@ -766,11 +766,10 @@ Section eps0_mult.
     intros Hab.
     induction e as [ | n | e n g H1 IH1 IH2 ] using eps0_hnf_pos_rect.
     + rewrite !eps0_mult_zero_right; auto.
-    + rewrite !eps0_mult_pos_right, eps0_le_iff_lt.
-      left; apply eps0_mpos_mono_left; auto.
+    + rewrite !eps0_mult_1add_right; auto.
     + rewrite !eps0_mult_right; auto.
       apply eps0_add_mono; auto.
-      apply eps0_mpos_mono; auto.
+      apply eps0_m1add_mono; auto.
       apply eps0_momega_mono_left; auto.
   Qed.
 
@@ -794,7 +793,7 @@ Section eps0_mult.
     → f <ε₀ ω^e
     → (ω^⟨a,i⟩ +₀ b) *₀ (ω^⟨e,j⟩ +₀ f)
      = ω^⟨a+₀e,j⟩ +₀ (ω^⟨a,i⟩ +₀ b) *₀ f.
-  Proof. intros; rewrite eps0_mult_right, eps0_momega_fix_1, eps0_mpos_omega; auto. Qed.
+  Proof. intros; rewrite eps0_mult_right, eps0_momega_fix_1, eps0_m1add_omega; auto. Qed.
 
   Fact eps0_mult_hnf_exp a i b e j :
       0₀ <ε₀ e → b <ε₀ ω^a → (ω^⟨a,i⟩ +₀ b) *₀ ω^⟨e,j⟩ = ω^⟨a+₀e,j⟩.
@@ -819,7 +818,7 @@ Section eps0_mult.
   Proof. apply eps0_mult_exp_hnf. Qed.
 
   Fact eps0_mult_exp_pos e i j : ω^⟨e,i⟩ *₀ ω^⟨0₀,j⟩ = ω^⟨e,i *ₚ j⟩.
-  Proof. now rewrite eps0_mult_pos_right, eps0_mpos_exp. Qed.
+  Proof. now rewrite eps0_mult_1add_right, eps0_m1add_exp. Qed.
 
   Fact eps0_mult_exp e i f j : 0₀ <ε₀ f → ω^⟨e,i⟩ *₀ ω^⟨f,j⟩ = ω^⟨e+₀f,j⟩.
   Proof. intro; rewrite <- (eps0_add_zero_right ω^⟨e,i⟩), eps0_mult_hnf_exp; auto. Qed.
@@ -831,7 +830,7 @@ Section eps0_mult.
   Proof.
     unfold eps0_omega.
     destruct (eps0_zero_or_pos f) as [ -> | ].
-    + now rewrite eps0_mult_exp_pos, eps0_add_zero_right.
+    + now rewrite eps0_mult_exp_pos, eps0_add_zero_right, ord_mulp_zero_left.
     + rewrite eps0_mult_exp; auto.
   Qed.
 
@@ -859,18 +858,24 @@ Section eps0_mult.
       a <ε₀ ω^e → b <ε₀ ω^f → a *₀ b <ε₀ ω^(e+₀f).
   Proof. apply eps0_mult_below_omega. Qed.
 
-  Fact eps0_mult_mpos a b n : eps0_mpos (a *₀ b) n = a *₀ eps0_mpos b n. 
+  Fact eps0_mult_m1add a b n : eps0_m1add (a *₀ b) n = a *₀ eps0_m1add b n. 
   Proof.
-    induction b using eps0_hnf_pos_rect in a, n |- *.
-    + now rewrite eps0_mult_zero_right, eps0_mpos_fix_0, eps0_mult_zero_right.
-    + now rewrite eps0_mpos_exp, !eps0_mult_pos_right, eps0_mpos_comp.
+    induction b as [ | | b1 i b2 ] using eps0_hnf_pos_rect in a, n |- *.
+    + now rewrite eps0_mult_zero_right, eps0_m1add_fix_0, eps0_mult_zero_right.
+    + now rewrite eps0_m1add_exp, !eps0_mult_1add_right, eps0_m1add_comp.
     + rewrite eps0_mult_distr.
-      destruct a as [ | ] using eps0_hnf_rect.
-      * now rewrite !eps0_mult_zero_left, eps0_add_zero_left, eps0_mpos_fix_0.
-      * rewrite eps0_mult_hnf_exp, !eps0_mpos_fix_1; auto.
-        - rewrite eps0_mult_distr, eps0_mult_hnf_exp; auto.
-        - apply eps0_mult_below_omega with (n := i0 +ₚ 1ₚ); auto.
-          rewrite <- eps0_add_exp; auto.
+      destruct a as [ | a1 j a2 ] using eps0_hnf_rect.
+      * now rewrite !eps0_mult_zero_left, eps0_add_zero_left, eps0_m1add_fix_0.
+      * rewrite eps0_mult_hnf_exp; auto.
+        destruct (ord_1add_choose n).
+        - rewrite !eps0_m1add_fix_1; auto.
+          ++ rewrite eps0_mult_distr, eps0_mult_hnf_exp; auto.
+          ++ apply eps0_mult_below_omega with (n := j +ₚ 0ₒ); auto.
+             rewrite <- eps0_add_exp; auto.
+        - rewrite !eps0_m1add_fix_2; auto.
+          ++ rewrite eps0_mult_hnf_exp; auto.
+          ++ apply eps0_mult_below_omega with (n := j +ₚ 0ₒ); auto.
+             rewrite <- eps0_add_exp; auto.
   Qed.
 
   (** This one was a long shot !! 
@@ -880,7 +885,7 @@ Section eps0_mult.
     induction c as [ | n | e n f He Hf IHe IHf ]
       in a, b |- * using eps0_hnf_pos_rect.
     + now rewrite !eps0_mult_zero_right.
-    + now rewrite !eps0_mult_pos_right, eps0_mult_mpos.
+    + now rewrite !eps0_mult_1add_right, eps0_mult_m1add.
     + destruct b as [ | i | g i h Hg Hh _ ] using eps0_hnf_pos_rect.
       * rewrite eps0_mult_zero_left,
                !eps0_mult_zero_right,
@@ -889,16 +894,16 @@ Section eps0_mult.
                 eps0_add_zero_left, 
                !eps0_mult_distr,
                 IHf,
-                eps0_mult_pos_right,
-            <- !eps0_mpos_momega_eq,
-                eps0_momega_mpos; auto.
+                eps0_mult_1add_right,
+            <- !eps0_m1add_momega_eq,
+                eps0_momega_m1add; auto.
       * rewrite eps0_mult_hnf, eps0_mult_distr, IHf; auto.
         destruct a as [ | u j v Hu _ _ ] using eps0_hnf_rect.
         - now rewrite !eps0_mult_zero_left, eps0_add_zero_left.
         - rewrite eps0_mult_hnf_exp; auto.
           2: apply eps0_lt_le_trans with (1 := He); auto.
           rewrite !eps0_mult_hnf, eps0_add_assoc; auto.
-          apply eps0_mult_below_omega with (n := j +ₚ 1ₚ); auto.
+          apply eps0_mult_below_omega with (n := j +ₚ 0ₒ); auto.
           apply eps0_lt_le_trans with (ω^⟨u,j⟩ +₀ ω^u); auto.
           unfold eps0_omega; rewrite eps0_add_exp; auto.
   Qed.
@@ -908,7 +913,7 @@ Section eps0_mult.
     rewrite <- eps0_omega_zero.
     induction e using eps0_hnf_pos_rect.
     + now rewrite eps0_mult_zero_right.
-    + now rewrite eps0_mult_pos_right, eps0_mpos_omega.
+    + now rewrite eps0_mult_1add_right, eps0_m1add_omega.
     + unfold eps0_omega.
       rewrite eps0_mult_exp_hnf, eps0_add_zero_left; auto.
       f_equal; auto.
@@ -917,7 +922,7 @@ Section eps0_mult.
   Fact eps0_mult_one_right e : e *₀ 1₀ = e.
   Proof.
     rewrite <- eps0_omega_zero; unfold eps0_omega.
-    now rewrite eps0_mult_pos_right, eps0_mpos_one.
+    now rewrite eps0_mult_1add_right, eps0_m1add_one.
   Qed.
 
   Fact eps0_mult_zero_inv a e : a *₀ e = 0₀ → a = 0₀ ∨ e = 0₀.
@@ -945,6 +950,8 @@ Section eps0_mult.
   (** See comment here for an algo. 
   
             https://math.stackexchange.com/a/4133983   *)
+
+  (*
   
   Fact eps0_euclid a d : 0₀ <ε₀ d → ∃ q r, a = d *₀ q +₀ r ∧ r <ε₀ d.
   Proof.
@@ -984,6 +991,8 @@ Section eps0_mult.
     
     Search eps0_lt eps0_add.
 
+  *)
+
 End eps0_mult.
 
 Infix "*₀" := eps0_mult.
@@ -1017,6 +1026,8 @@ Qed.
 
 Check eps0_omega_zero.
 Check eps0_omega_succ.
+
+(*
 
 Section eps0_exponentiation.
 
@@ -1080,5 +1091,7 @@ Section eps0_exponentiation.
   (** Need to check more equations *)
 
 End eps0_exponentiation.
+
+*)
 
 
