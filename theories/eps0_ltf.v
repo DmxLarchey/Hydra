@@ -16,7 +16,36 @@ Set Implicit Arguments.
 
 (** The least tail form (ltf) of an ordinal is a decomposition
     of the form a + ω^e for with a is the least possible 
- 
+
+    least tail form is either
+       0
+       a + ε₀^e  with 0 < e
+       a + 1
+       a + λ     with λ < ε₀ limit ord
+
+    ε₀ + ω³ + ω² can be decomposed
+    into (ε₀ + ω³) + ω² or ε₀ + (ω³ + ω²)
+    so how to choose uniquely ?
+
+    a + ε₀^e + λ where 0 < e and λ < ε₀ and a minimal 
+    is unique ?
+
+    Limit ordinals are 
+
+      1) a + ε₀^e with 0 < e
+      2) a + λ    with λ < ε₀ limit ord
+
+    In case of 1) with analyse e as
+       - e = f + 1,  then λ(n) := a + ε₀^f.λ₀(n) (where λ₀(n) ~> ε₀ in ord)
+       - λ'(n) ~> e  then λ(n) := a + λ'(n) (recursive call on e)
+    In case of 2) we get
+       - λ'(n) ~> λ  then λ(n) := a + λ'(n) (where λ'(n) ~> λ < ε₀ is ord)
+
+    This gives us a fundemental sequence for base ε₀ !!
+
+    For instance ε₀^ε₀ + ε₀^ω² has fundemental sequence
+          λ(n) := ε₀^ε₀ + ε₀^(ω.n)
+
     Hence for instance:
      - 0 + ω is a ltf
      - ω³ + ω is a ltf
@@ -24,6 +53,9 @@ Set Implicit Arguments.
      
     This does not work when using ε₀ as a basis instead of ω
     because ω is not of the form a + ε₀^_ 
+
+    Fund sequence for a + λ where λ < ε₀ and is a limit
+    ordinal
     
     So the fundemental sequence needs to be computed otherwise
     for ε₀. Btw, we will need the fundemental sequence of for
@@ -36,6 +68,26 @@ Set Implicit Arguments.
         - if e = f+1 then λ(i) := a + ε₀^(e,m) + ε₀^f.(1+i)
         - if e is limit λₑ then λ(i) := a + ε₀^(e,m) + ε₀^(λₑ(i))
       - if 1+n is limit λₙ then λ(i) := a + ε₀^(e,λₙ(i))
+
+    Or fseq by hnf induction ?
+    
+    0 is not limit
+    ε₀^e.g + f and f < ε₀^e and g < ε₀
+     - e = 0, then f = 0 then g is limit
+     - f = 0
+       - e = 0
+       - g = n+1
+       - g is limit
+     - f <> 0 then f is limit
+
+    cases is_limit
+      - ε₀^0.g + 0 with g is limit
+      - ε₀^e.g + f with 0 < e and g < ε₀ and f < ε₀^e
+        - f = 0 
+           - g = n + 1
+           - g is limit
+        - 0 < f then f is limit
+
     *)
 
 Definition eps0_ltf a e := ∀b, a +₀ ω^e = b +₀ ω^e → a ≤ε₀ b.
