@@ -942,7 +942,7 @@ Section E0.
   Lemma E0_lt_exp a i b j : a <E₀ b → ω^⟨a,i⟩ <E₀ ω^⟨b,j⟩.
   Proof. constructor; constructor 2; now left. Qed.
   
-  Fact E0_cnf_lt_omega e n l j : cnf [(e,n)::l]₀ → [l]₀ <E₀ [[(e,j)]]₀.
+  Fact E0_cnf_lt_omega e n l j : cnf [(e,n)::l]₀ → [l]₀ <E₀ ω^⟨e,j⟩.
   Proof.
     intros (H1 & H2)%cnf_fix; constructor.
     destruct l as [ | (x,i) l ].
@@ -959,6 +959,51 @@ Section E0.
     revert H G.
     intros [ | (y,j) m [ H | (_ & []%ord_not_lt_zero) ]%lex2_inv ]%lex_list_sg_inv_right G; auto.
     rewrite wlist_add_gt; auto.
+  Qed.
+
+  Lemma E0_lt_substract e f : cnf e → cnf f → e <E₀ f → { a | f = e +₀ a ∧ 0₀ <E₀ a ∧ cnf a }.
+  Proof.
+    intros He Hf H; revert e f H He Hf.
+    intros [l] [m] H%E0_lt_inv; revert m H.
+    induction l as [ | (x,i) l IHl ].
+    + intros m Hlm _ Hm.
+      exists [m]₀; repeat split; auto.
+      simpl; now rewrite wlist_add_nil_left.
+    + intros [ | (y,j) m ] C%lex_list_inv Hl Hm; [ easy | ].
+      destruct (E0_lt_sdec x y) as [ x y Hxy | x | x y Hxy ].
+      * exists [(y, j) :: m]₀; repeat split; auto.
+        2: constructor 1.
+        simpl; rewrite wlist_add_lt; auto.
+      * destruct (ord_le_lt_dec j i) as [ Hji | Hji ].
+        2:{ apply pos_lt_sub in Hji as (k & Hk).
+            exists [(x,k)::m]₀; repeat split; auto.
+            + simpl; rewrite wlist_add_eq; subst; auto.
+            + constructor 1.
+            + rewrite cnf_fix in Hm |- *; simpl in Hm |- *.
+              destruct Hm as [ ? Hm ]; split; auto.
+              intros ? ? [ [=] | ]; subst; eauto. }
+        assert (i = j /\ lex_list (lex2 E0_lt ord_lt) l m) as (<- & Hlm).
+        1:{ change (i = j) with (snd (x,i) = snd (x,j)).
+            cut (snd (x,j) ≤ₒ snd (x,i)); auto.
+            cut (fst (x,j) = fst (x,i)); auto.
+            revert C; generalize (x,j) (x,i).
+            destruct 1 as [ ? [ ? ? ? ? H | ? a b  H ] | ]; simpl; auto.
+            + intros <-; now apply E0_lt_irrefl in H.
+            + intros _ G; destruct (ord_lt_irrefl a).
+              now apply ord_lt_le_trans with (1 := H). }
+        destruct (IHl m) as (a & Ha1 & Ha2 & Ha3); eauto.
+        exists a; repeat split; auto.
+        rewrite <- E0_add_head_normal with (l := l),
+                   E0_add_assoc, <- Ha1, 
+                   E0_add_head_normal; eauto.
+        - apply E0_cnf_lt_omega with (1 := Hm).
+        - apply E0_cnf_lt_omega with (1 := Hl).
+      * exfalso.
+        cut (fst (y,j) <E₀ fst (x,i)); auto.
+        revert C; generalize (y,j) (x,i).
+        destruct 1 as [ ? [ ? ? ? ? H | ? a b  H ] | ]; simpl; auto.
+        2,3: apply E0_lt_irrefl.
+        intros C; generalize (E0_lt_trans C H); apply E0_lt_irrefl.
   Qed.
 
   Fact E0_add_below_omega e l m :

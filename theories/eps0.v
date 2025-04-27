@@ -318,6 +318,19 @@ Section eps0_add_base.
     exists (exist _ a Ha); rewrite eps0_eq_iff, eps0_lt_iff; simpl; auto.
   Qed.
 
+  Fact eps0_le_sub e f : e ≤ε₀ f → { a | f = e +₀ a }.
+  Proof.
+    intros H1.
+    destruct (eps0_le_lt_dec f e) as [ H2 | H2 ].
+    + exists 0₀; rewrite eps0_add_zero_right; now apply eps0_le_antisym.
+    + rewrite eps0_lt_iff in H2.
+      clear H1; revert e f H2.
+      intros [e] [f]; simpl.
+      intros (a & H1 & H2 & H3)%E0_lt_substract; auto.
+      exists (exist _ a H3).
+      now apply eps0_eq_iff.
+  Qed.
+
   Fact eps0_add_mono_left : ∀ e f g, e ≤ε₀ f → e +₀ g ≤ε₀ f +₀ g.
   Proof. intros [] [] []; rewrite !eps0_le_iff; simpl; apply E0_add_mono_left; auto. Qed.
 
