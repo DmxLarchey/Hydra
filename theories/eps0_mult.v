@@ -153,8 +153,8 @@ Section ord_extra.
     apply ord_is_limit_1add.
     rewrite ord_mulp_1add.
     apply ord_mul_is_limit_left.
-    1,2: apply ord_1add_not_zero.
-    now apply ord_is_limit_1add.
+    + apply ord_1add_not_zero.
+    + now apply ord_is_limit_1add.
   Qed.
 
   Fact ord_mulp_is_limit_right i j : ord_is_limit j -> ord_is_limit (i *ₚ j).

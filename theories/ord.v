@@ -49,12 +49,9 @@ Section ord.
 
   Implicit Type (i j k p n : ord).
 
-  Local Fact ord_rect (P : ord → Type) :
-      P 0ₒ
-    → (∀n, P n → P (1ₒ + n ))
-    → ∀n, P n.
-  Proof. apply nat_rect. Qed.
-  
+  (** We start with axioms that are of course realized for ordinal ω
+      but they must also be satisfied for ε₀ !! *)
+
   Fact ord_lt_wf : well_founded ord_lt.
   Proof. apply lt_wf. Qed.
   
@@ -70,9 +67,6 @@ Section ord.
   Fact ord_lt_sdec i j : sdec ord_lt i j.
   Proof. apply lt_sdec. Qed.
   
-  Fact ord_zero_or_1add i : (i = 0ₒ) + { j | i = 1ₒ +ₒ j }.
-  Proof. induction i using ord_rect; eauto. Qed.
-
   Definition ord_is_succ n := (∃j, n = j +ₒ 1ₒ).
   Definition ord_is_limit n := n ≠ 0ₒ ∧ ¬ ord_is_succ n.
 
@@ -138,25 +132,26 @@ Section ord.
   Fact ord_mul_distr i j k : k *ₒ (i +ₒ j) = k *ₒ i +ₒ k *ₒ j.
   Proof. solve ord. Qed.
 
+  (* Strict monotony on the right can be derived !! *)
   Fact ord_mul_mono i j k l : i ≤ₒ j → k ≤ₒ l → i *ₒ k ≤ₒ j *ₒ l.
   Proof. solve ord; apply Nat.mul_le_mono. Qed.
 
   Fact ord_mul_is_zero_inv i j : i *ₒ j = 0 → i = 0 ∨ j = 0.
   Proof. solve ord. Qed.
 
+  (* if _.i is a successor then i must be a successor *)
+  Fact ord_mul_is_succ_inv a i : ord_is_succ (a *ₒ i) → ord_is_succ i.
+  Proof.
+    destruct i as [ | i ].
+    + intros (j & H); exfalso; revert H; solve ord.
+    + exists i; solve ord.
+  Qed.
+
   Fact ord_euclid a d : 0ₒ <ₒ d → { q : ord & { r | a = d *ₒ q +ₒ r ∧ r <ₒ d } }.
   Proof.
     intro Hd.
     destruct (eucl_dev d Hd a) as [ q r ].
     exists q, r; split; subst; solve ord.
-  Qed.
-
-  (* if a is limit then a._ is a limit as well ?? *)
-  Fact ord_mul_is_succ_inv a i : a ≠ 0ₒ → ord_is_succ (a *ₒ i) → ord_is_succ i.
-  Proof.
-    destruct i as [ | i ].
-    + intros _ (j & H); exfalso; revert H; solve ord.
-    + exists i; solve ord.
   Qed.
 
   (*************************************************************************************)
@@ -180,6 +175,12 @@ Section ord.
   
   Fact ord_le_lt_dec i j : { i ≤ₒ j } + { j <ₒ i }.
   Proof. destruct (ord_lt_sdec i j); eauto. Qed.
+
+  Fact ord_zero_or_1add i : (i = 0ₒ) + { j | i = 1ₒ +ₒ j }.
+  Proof. 
+    destruct (ord_le_lt_dec 1ₒ i) as [ ?%ord_sub | H ]; auto.
+    left; revert H; apply ord_lt_one_is_zero.
+  Qed.
 
   Fact ord_eq_dec i j : { i = j } + { i ≠ j }.
   Proof.
@@ -454,17 +455,18 @@ Section ord.
   Proof.
     intros H1 (H2 & H3); split.
     + now intros [-> | ->]%ord_mul_is_zero_inv.
-    + contradict H3; revert H1 H3; apply ord_mul_is_succ_inv.
+    + contradict H3; revert H3; apply ord_mul_is_succ_inv.
   Qed.
 
-  Fact ord_mul_is_limit_left a i : a ≠ 0ₒ → i ≠ 0ₒ → ord_is_limit a → ord_is_limit (a *ₒ i).
+  Fact ord_mul_is_limit_left a i : i ≠ 0ₒ → ord_is_limit a → ord_is_limit (a *ₒ i).
   Proof.
-    intros Ha Hi H.
+    intros Hi H.
     destruct (ord_zero_succ_limit_dec i) as [ [ -> | (k & ->) ] | ].
     + easy.
     + rewrite ord_mul_distr, ord_mul_one_right.
       apply ord_is_limit_add; auto.
     + apply ord_mul_is_limit_right; auto.
+      apply H.
   Qed.
 
   Fact ord_mul_mono_lt i j k l : 0 <ₒ i → k <ₒ l → i *ₒ k <ₒ i *ₒ l.
