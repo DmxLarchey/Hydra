@@ -41,15 +41,46 @@ End eps0_limit_rect.
 
 Section eps0_fseq_rect.
 
+  (* cases:
+        ω^e.j         -> ω^e.λ              where λ ~> j
+        ω^(e+1).(j+1) -> ω^(e+1).j + ω^e.λ  where λ ~> ω
+        ω^e.(j+1)     -> ω^e.j + ω^e        where λ ~> e *)
+
   Variables (P : ∀e, eps0_is_limit e → Type)
-            (HP0 : ∀ j l, ord_is_limit j → @P ω^⟨0₀,j⟩ l)
-            (HP1 : ∀ e l, @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
+            (HP0 : ∀ e j l, ord_is_limit j → @P ω^⟨e,j⟩ l)
+
+            (HP1 : ∀ e l,   @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
             (HP2 : ∀ e j l, @P ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ l)
-            
-            (HP2 : ∀ e l l', @P e l → @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
+
+            (HP3 : ∀ e l l', @P e l → @P ω^⟨e,0ₒ⟩ l')
+            (HP4 : ∀ e j l l', @P e l → @P ω^⟨e,j +ₒ 1ₒ⟩ l')
              
-            (HP1 : ∀ e j l, e ≠ 0₀ → @P ω^⟨e,j⟩ l)
-            (HP2 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
+            (HP5 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
+
+  Hint Resolve ord_is_succ_succ : core.
+
+  Theorem eps0_fseq_rect e l : @P e l.
+  Proof.
+    induction e as [ | e j f H IH1 IH2 ] in l |- * using eps0_hnf_rect.
+    + now destruct (proj1 l).
+    + destruct (eps0_is_limit_dec f) as [ Hf | Hf ].
+      * now apply HP5 with (2 := IH2 Hf).
+      * assert (f = 0₀) as ->.
+        1: apply eps0_hnf_is_limit in l as [ | [] ]; tauto.
+        revert l; rewrite eps0_add_zero_right; clear H Hf; intros l.
+        destruct (ord_zero_succ_limit_dec j) as [ [ -> | (i & ->) ] | lj ].
+        - destruct (eps0_zero_succ_limit_dec e) as [ [ -> | (g & ->) ] | le ].
+          ++ exfalso; apply eps0_is_limit_exp_iff in l as [ [] | (_ & []) ]; auto.
+          ++ apply HP1.
+          ++ apply HP3 with le, IH1.
+        - destruct (eps0_zero_succ_limit_dec e) as [ [ -> | (g & ->) ] | le ].
+          ++ exfalso; apply eps0_is_limit_exp_iff in l as [ [] | (_ & [_ []]) ]; auto.
+          ++ apply HP2.
+          ++ apply HP4 with le, IH1.
+        - now apply HP0.
+  Qed.
+
+End eps0_fseq_rect.
 
 (*
 
@@ -85,26 +116,35 @@ Section eps0_fseq_rect.
 Section eps0_fseq.
 
   Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
-    | eps0_fseq_gr_0 j l     : eps0_fseq_gr ω^⟨0₀,j⟩ (λ n, ω^⟨0₀,@ord_fseq j l n⟩)
+    | eps0_fseq_gr_0 e j l   : eps0_fseq_gr ω^⟨e,j⟩ (λ n, ω^⟨e,@ord_fseq j l n⟩)
     | eps0_fseq_gr_1 e       : eps0_fseq_gr ω^⟨e +₀ 1₀,0ₒ⟩ (λ n, ω^⟨e,ord_mseq n⟩)
     | eps0_fseq_gr_2 e j     : eps0_fseq_gr ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩)
-    | eps0_fseq_gr_3 e r     : e ≠ 0₀
+    | eps0_fseq_gr_3 e r     : eps0_is_limit e
                              → eps0_fseq_gr e r
                              → eps0_fseq_gr ω^⟨e,0ₒ⟩ (λ n, ω^⟨r n,0ₒ⟩)
-    | eps0_fseq_gr_4 e j r   : e ≠ 0₀
+    | eps0_fseq_gr_4 e j r   : eps0_is_limit e
                              → eps0_fseq_gr e r
                              → eps0_fseq_gr ω^⟨e,j +ₒ 1ₒ⟩ (λ n, ω^⟨e,j⟩ +₀ ω^⟨r n,0ₒ⟩)
-    | eps0_fseq_gr_5 e j l   : e ≠ 0₀
-                             → eps0_fseq_gr ω^⟨e,j⟩ (λ n, ω^⟨e,@ord_fseq j l n⟩)
     | eps0_fseq_gr_6 e j f r : f <ε₀ ω^e
                              → eps0_fseq_gr f r
                              → eps0_fseq_gr (ω^⟨e,j⟩ +₀ f) (λ n, ω^⟨e,j⟩ +₀ r n).
                              
   Theorem eps0fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
   Proof.
-    induction 1 as [ j _ l | e j l H | e j f l l' H IH ] using eps0_limit_rect.
-    + exists (λ n, ω^⟨0₀,@ord_fseq j l n⟩); constructor.
-    + destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | Hj ].
+    induction 1 as [ e j _ l | e | e j | e l l' (r & Hr) | e j l l' (r & Hr) 
+                   | e j f l l' H (r & Hr)] using eps0_fseq_rect.
+    + exists (λ n, ω^⟨e,@ord_fseq j l n⟩); constructor.
+    + exists (λ n, ω^⟨e,ord_mseq n⟩); constructor.
+    + exists (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩); constructor.
+    + exists (λ n, ω^⟨r n,0ₒ⟩); now constructor.
+    + exists (λ n, ω^⟨e,j⟩ +₀ ω^⟨r n,0ₒ⟩); now constructor.
+    + exists (λ n, ω^⟨e,j⟩ +₀ r n); now constructor.
+  Qed.
+
+
+
+
+destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | Hj ].
       * exists 
       
     Search ord_is_limit.
