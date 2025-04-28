@@ -15,14 +15,14 @@ Set Implicit Arguments.
 #[local] Notation π₁ := proj1_sig.
 #[local] Notation π₂ := proj2_sig.
 
-Section eps0_limit_rect.
+Section eps0_limit_dep_rect.
 
   Variables (P : ∀e, eps0_is_limit e → Type)
             (HP0 : ∀ j l, ord_is_limit j → @P ω^⟨0₀,j⟩ l)
             (HP1 : ∀ e j l, e ≠ 0₀ → @P ω^⟨e,j⟩ l)
             (HP2 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
 
-  Theorem eps0_limit_rect e l : @P e l.
+  Theorem eps0_limit_dep_rect e l : @P e l.
   Proof.
     induction e as [ | e j f H IH1 IH2 ] in l |- * using eps0_hnf_rect.
     + exfalso; now destruct l.
@@ -36,10 +36,10 @@ Section eps0_limit_rect.
           apply eps0_is_limit_exp_iff in l; tauto.
         - now apply HP1.
   Qed.
-  
-End eps0_limit_rect.
 
-Section eps0_fseq_rect.
+End eps0_limit_dep_rect.
+
+Section eps0_fseq_dep_rect.
 
   (* cases:
         ω^e.j         -> ω^e.λ              where λ ~> j
@@ -59,7 +59,7 @@ Section eps0_fseq_rect.
 
   Hint Resolve ord_is_succ_succ : core.
 
-  Theorem eps0_fseq_rect e l : @P e l.
+  Theorem eps0_fseq_dep_rect e l : @P e l.
   Proof.
     induction e as [ | e j f H IH1 IH2 ] in l |- * using eps0_hnf_rect.
     + now destruct (proj1 l).
@@ -80,7 +80,7 @@ Section eps0_fseq_rect.
         - now apply HP0.
   Qed.
 
-End eps0_fseq_rect.
+End eps0_fseq_dep_rect.
 
 (*
 
@@ -132,7 +132,7 @@ Section eps0_fseq.
   Theorem eps0fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
   Proof.
     induction 1 as [ e j _ l | e | e j | e l l' (r & Hr) | e j l l' (r & Hr) 
-                   | e j f l l' H (r & Hr)] using eps0_fseq_rect.
+                   | e j f l l' H (r & Hr)] using eps0_fseq_dep_rect.
     + exists (λ n, ω^⟨e,@ord_fseq j l n⟩); constructor.
     + exists (λ n, ω^⟨e,ord_mseq n⟩); constructor.
     + exists (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩); constructor.
@@ -141,7 +141,21 @@ Section eps0_fseq.
     + exists (λ n, ω^⟨e,j⟩ +₀ r n); now constructor.
   Qed.
 
-
+  Local Lemma eps0_fseq_fun_rec e se f sf :
+    eps0_fseq_gr e se → eps0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  Proof.
+    intros H; revert H f sf.
+    induction 1 as [ g b Hs | g b r H0 Hs H1 IH1 ].
+    + induction 1 as [ g' b' Hs' | g' b' r' H0' Hs' H2 IH2 ].
+      * intros (<- & <-%eps0_succ_inj)%eps0_eq_ltf_inv; auto.
+      * intros <-%eps0_tf_fun_right; eauto.
+        destruct H0' as (_ & []); eauto.
+    + induction 1 as [ g' b' Hs' | g' b' r' H0' Hs' H2 IH2 ].
+      * intros ->%eps0_tf_fun_right; eauto.
+        destruct H0 as (_ & []); eauto.
+      * intros (<- & <-)%eps0_eq_ltf_inv; auto.
+        intro; now rewrite IH1 with (1 := H2).
+  Qed.
 
 
 destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | Hj ].
