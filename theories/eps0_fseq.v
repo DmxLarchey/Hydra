@@ -8,12 +8,108 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils pos eps0 eps0_ltf eps0_mult.
+From Hydra Require Import utils ord eps0 eps0_mult.
 
 Set Implicit Arguments.
 
 #[local] Notation π₁ := proj1_sig.
 #[local] Notation π₂ := proj2_sig.
+
+Section eps0_limit_rect.
+
+  Variables (P : ∀e, eps0_is_limit e → Type)
+            (HP0 : ∀ j l, ord_is_limit j → @P ω^⟨0₀,j⟩ l)
+            (HP1 : ∀ e j l, e ≠ 0₀ → @P ω^⟨e,j⟩ l)
+            (HP2 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
+
+  Theorem eps0_limit_rect e l : @P e l.
+  Proof.
+    induction e as [ | e j f H IH1 IH2 ] in l |- * using eps0_hnf_rect.
+    + exfalso; now destruct l.
+    + destruct (eps0_is_limit_dec f) as [ Hf | Hf ].
+      * now apply HP2 with (2 := IH2 Hf).
+      * assert (f = 0₀) as ->
+          by (rewrite eps0_hnf_is_limit in l; tauto).
+        revert l; rewrite eps0_add_zero_right; intros l.
+        destruct (eps0_eq_dec e 0₀) as [ -> | He ].
+        - apply HP0.
+          apply eps0_is_limit_exp_iff in l; tauto.
+        - now apply HP1.
+  Qed.
+  
+End eps0_limit_rect.
+
+Section eps0_fseq_rect.
+
+  Variables (P : ∀e, eps0_is_limit e → Type)
+            (HP0 : ∀ j l, ord_is_limit j → @P ω^⟨0₀,j⟩ l)
+            (HP1 : ∀ e l, @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
+            (HP2 : ∀ e j l, @P ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ l)
+            
+            (HP2 : ∀ e l l', @P e l → @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
+             
+            (HP1 : ∀ e j l, e ≠ 0₀ → @P ω^⟨e,j⟩ l)
+            (HP2 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
+
+(*
+
+   Fund sequence possible for limit ordinal a + ε₀^(e,1+n)
+      - 1+n = 0 is not possible
+      - if 1+n = m+1 then a + ε₀^(e,m) + ε₀^e
+        - ε₀^e is limit so e <> 0
+        - if e = f+1 then λ(i) := a + ε₀^(e,m) + ε₀^f.(1+i)
+        - if e is limit λₑ then λ(i) := a + ε₀^(e,m) + ε₀^(λₑ(i))
+      - if 1+n is limit λₙ then λ(i) := a + ε₀^(e,λₙ(i))
+
+   Or fseq by hnf induction ?
+    
+    0 is not limit
+    ε₀^e.g + f and f < ε₀^e and g < ε₀
+     - e = 0, then f = 0 then g is limit
+     - f = 0
+       - e = 0
+       - g = n+1
+       - g is limit
+     - f <> 0 then f is limit
+
+    cases is_limit
+      - ε₀^0.g + 0 with g is limit
+      - ε₀^e.g + f with 0 < e and g < ε₀ and f < ε₀^e
+        - f = 0 
+           - g = n + 1
+           - g is limit
+        - 0 < f then f is limit
+
+    *)
+
+Section eps0_fseq.
+
+  Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
+    | eps0_fseq_gr_0 j l     : eps0_fseq_gr ω^⟨0₀,j⟩ (λ n, ω^⟨0₀,@ord_fseq j l n⟩)
+    | eps0_fseq_gr_1 e       : eps0_fseq_gr ω^⟨e +₀ 1₀,0ₒ⟩ (λ n, ω^⟨e,ord_mseq n⟩)
+    | eps0_fseq_gr_2 e j     : eps0_fseq_gr ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩)
+    | eps0_fseq_gr_3 e r     : e ≠ 0₀
+                             → eps0_fseq_gr e r
+                             → eps0_fseq_gr ω^⟨e,0ₒ⟩ (λ n, ω^⟨r n,0ₒ⟩)
+    | eps0_fseq_gr_4 e j r   : e ≠ 0₀
+                             → eps0_fseq_gr e r
+                             → eps0_fseq_gr ω^⟨e,j +ₒ 1ₒ⟩ (λ n, ω^⟨e,j⟩ +₀ ω^⟨r n,0ₒ⟩)
+    | eps0_fseq_gr_5 e j l   : e ≠ 0₀
+                             → eps0_fseq_gr ω^⟨e,j⟩ (λ n, ω^⟨e,@ord_fseq j l n⟩)
+    | eps0_fseq_gr_6 e j f r : f <ε₀ ω^e
+                             → eps0_fseq_gr f r
+                             → eps0_fseq_gr (ω^⟨e,j⟩ +₀ f) (λ n, ω^⟨e,j⟩ +₀ r n).
+                             
+  Theorem eps0fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
+  Proof.
+    induction 1 as [ j _ l | e j l H | e j f l l' H IH ] using eps0_limit_rect.
+    + exists (λ n, ω^⟨0₀,@ord_fseq j l n⟩); constructor.
+    + destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | Hj ].
+      * exists 
+      
+    Search ord_is_limit.
+    destruct (eps0_eq
+            ∀e i f, ord_is_limit n → 
 
 Section eps0_ltf_pos_rect.
 

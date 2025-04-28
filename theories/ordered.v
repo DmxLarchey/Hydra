@@ -92,10 +92,6 @@ Section sdec.
 
 End sdec.
 
-Check sdec_lt_inv.
-Check sdec_eq_inv.
-Check sdec_gt_inv.
-
 #[local] Hint Constructors sdec : core.
 
 Lemma lt_sdec i j : sdec lt i j.

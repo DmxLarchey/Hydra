@@ -121,9 +121,9 @@ Section ord_extra.
 
   Fact ord_1add_choose j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
   Proof.
-    destruct (ord_zero_succ_limit_dec j) as [ [ -> | ] | ]; auto; left.
+    destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | ]; auto; left.
     + apply ord_is_succ_10.
-    + now apply ord_is_succ_1add.
+    + apply ord_is_succ_1add, ord_is_succ_succ.
   Qed. 
 
   Fact ord_mulp_distr k i j : k *ₚ (i +ₚ j) = (k *ₚ i) +ₚ (k *ₚ j).

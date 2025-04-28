@@ -70,7 +70,7 @@ Section ord.
   Definition ord_is_succ n := (∃j, n = j +ₒ 1ₒ).
   Definition ord_is_limit n := n ≠ 0ₒ ∧ ¬ ord_is_succ n.
 
-  Fact ord_is_succ_dec i : { ord_is_succ i } + { ¬ ord_is_succ i }.
+  Fact ord_is_succ_dec i : { j | i = j +ₒ 1ₒ } + { ¬ ord_is_succ i }.
   Proof.
     destruct i as [ | i ].
     + right; intros (? & H); revert H; solve ord.
@@ -103,6 +103,9 @@ Section ord.
   Proof. solve ord. Qed.
   
   Fact ord_lt_one_is_zero i : i <ₒ 1ₒ → i = 0ₒ.
+  Proof. solve ord. Qed.
+  
+  Fact ord_1add_le_succ_comm i j : 1 +ₒ i ≤ₒ i + 1.
   Proof. solve ord. Qed.
   
   Fact ord_add_mono_le_left i j k : i ≤ₒ j → i +ₒ k ≤ₒ j +ₒ k.
@@ -146,6 +149,35 @@ Section ord.
     + intros (j & H); exfalso; revert H; solve ord.
     + exists i; solve ord.
   Qed.
+  
+  Local Fact ord_nat_no_limit n : ord_is_limit n → False.
+  Proof.
+    destruct n; intros (? & H); [ easy | ].
+    apply H; exists n; solve ord.
+  Qed.
+  
+  Definition ord_fseq {i} : ord_is_limit i → nat → ord.
+  Proof. intros []%ord_nat_no_limit. Qed.
+  
+  Fact ord_fseq_pirr i (l₁ l₂ : ord_is_limit i) n : ord_fseq l₁ n = ord_fseq l₂ n.
+  Proof. exfalso; now apply ord_nat_no_limit in l₁. Qed.
+  
+  Fact ord_fseq_incr i l n : @ord_fseq i l n <ₒ ord_fseq l (S n).
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+ 
+  Fact ord_fseq_lt i l n : @ord_fseq i l n <ₒ i.
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+  
+  Fact ord_fseq_limit i l j : j <ₒ i → ∃n, j <ₒ @ord_fseq i l n.
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+  
+  Definition ord_mseq (n : nat) : ord := n.
+  
+  Fact ord_mseq_incr n : ord_mseq n <ₒ ord_mseq (S n).
+  Proof. unfold ord_mseq; solve ord. Qed.
+ 
+  Fact ord_mseq_limit j : ∃n, j <ₒ ord_mseq n.
+  Proof. exists (S j); unfold ord_mseq; solve ord. Qed.
 
   Fact ord_euclid a d : 0ₒ <ₒ d → { q : ord & { r | a = d *ₒ q +ₒ r ∧ r <ₒ d } }.
   Proof.
@@ -345,20 +377,22 @@ Section ord.
   Fact ord_le_succ_mono_iff i j : i +ₒ 1ₒ ≤ₒ j +ₒ 1ₒ ↔ i ≤ₒ j.
   Proof. now rewrite !ord_le_lt_iff, ord_eq_succ_iff, ord_lt_succ_mono_iff. Qed.
 
-  Fact ord_zero_succ_limit_dec n : { n = 0ₒ } + { ord_is_succ n } + { ord_is_limit n }.
+  Fact ord_zero_succ_limit_dec n : (n = 0ₒ) + { p | n = p +ₒ 1ₒ } + (ord_is_limit n).
   Proof.
     destruct (ord_eq_dec n 0ₒ) as [ -> | H1 ]; auto.
     destruct (ord_is_succ_dec n) as [ | H2 ]; auto.
     right; now split.
   Qed.
 
-  Fact ord_is_limit_dec n : { ord_is_limit n } + { ¬ ord_is_limit n }.
-  Proof.
-    destruct (ord_zero_succ_limit_dec n) as [ [] | ]; auto; right; intros []; auto.
-  Qed.
-
   Fact ord_is_succ_succ n : ord_is_succ (n +ₒ 1ₒ).
   Proof. now exists n. Qed.
+  
+  Hint Resolve ord_is_succ_succ : core.
+  
+  Fact ord_is_limit_dec n : { ord_is_limit n } + { ¬ ord_is_limit n }.
+  Proof.
+    destruct (ord_zero_succ_limit_dec n) as [ [ | (? & ->)] | ]; auto; right; intros []; auto.
+  Qed.
 
   Fact ord_add_is_succ_inv a i : ord_is_succ (a +ₒ i) → ord_is_succ i ∨ i = 0ₒ ∧ ord_is_succ a.
   Proof.

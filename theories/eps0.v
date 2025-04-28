@@ -921,6 +921,9 @@ Proof. now exists e. Qed.
 
 #[local] Hint Resolve eps0_is_succ_S : core.
 
+Fact eps0_is_succ_add1 e : eps0_is_succ (e +₀ 1₀).
+Proof. rewrite eps0_add_one_right; apply eps0_is_succ_S. Qed.
+
 Fact eps0_is_succ_iff e : eps0_is_succ e ↔ E0_is_succ (π₁ e).
 Proof.
   split.
@@ -1012,7 +1015,7 @@ Proof.
 Qed.
 
 Fact eps0_is_limit_iff e :
-  eps0_is_limit e ↔ ∃ a b i, e = a +₀ ω^⟨b,i⟩ ∧ (b ≠ 0₀ ∨ b = 0₀ ∧ i ≠ 0ₒ ∧ ¬ ord_is_succ i).
+  eps0_is_limit e ↔ ∃ a b i, e = a +₀ ω^⟨b,i⟩ ∧ (b ≠ 0₀ ∨ b = 0₀ ∧ ord_is_limit i).
 Proof.
   split.
   + destruct e as (e & He); rewrite eps0_is_limit_iff_E0; simpl.
@@ -1043,25 +1046,62 @@ Proof.
     contradict H2; now apply ord_is_succ_1add.
 Qed.
 
-Fact eps0_is_limit_exp_iff e n : eps0_is_limit ω^⟨e,n⟩ ↔ e ≠ 0₀ ∨ e = 0₀ ∧ n ≠ 0ₒ ∧ ~ ord_is_succ (1ₒ +ₒ n).
+Fact eps0_is_limit_exp_iff e n : eps0_is_limit ω^⟨e,n⟩ ↔ e ≠ 0₀ ∨ e = 0₀ ∧ ord_is_limit n.
 Proof.
   split.
   + intros [ H1 H2 ].
     destruct (eps0_zero_or_pos e) as [ -> | He ].
     * rewrite eps0_is_succ_exp_zero in H2.
       right; repeat split; auto.
-      intros ->; apply H2, ord_is_succ_10.
+      - intros ->; apply H2, ord_is_succ_10.
+      - contradict H2; now apply ord_is_succ_1add. 
     * left; intros ->; revert He; apply eps0_lt_irrefl.
   + rewrite eps0_is_limit_iff.
     intros C; exists 0₀, e, n; split.
     * now rewrite eps0_add_zero_left.
     * destruct C as [ | (-> & ? & H) ]; auto.
       right; repeat split; auto.
-      contradict H; now apply ord_is_succ_1add.
 Qed.
+
+Fact eps0_hnf_is_limit e n f : eps0_is_limit (ω^⟨e,n⟩ +₀ f) ↔ eps0_is_limit f ∨ f = 0₀ ∧ (e ≠ 0₀ ∨ e = 0₀ ∧ ord_is_limit n).
+Proof. rewrite eps0_add_is_limit_iff, eps0_is_limit_exp_iff; tauto. Qed.
 
 Fact eps0_is_limit_omega e : e ≠ 0₀ → eps0_is_limit ω^e.
 Proof. intros; apply eps0_is_limit_exp_iff; auto. Qed.
+
+Fact eps0_zero_succ_limit_dec e : (e = 0₀) + { p | e = p +₀ 1₀ } + (eps0_is_limit e).
+Proof.
+  induction e as [ | e j f H IH1 IH2 ] using eps0_hnf_rect; auto.
+  destruct IH2 as [ [ -> | Hf ] | Hf ].
+  + rewrite eps0_add_zero_right.
+    destruct IH1 as [ [ -> | He ] | He ].
+    * destruct (ord_zero_succ_limit_dec j) as [ [ -> | Hj ] | Hj ].
+      - left; right; exists 0₀; now rewrite <- eps0_omega_zero, eps0_add_zero_left.
+      - left; right.
+        destruct Hj as (q & ->).
+        exists ω^⟨0₀,q⟩; now rewrite <- eps0_add_exp_omega, eps0_omega_zero.
+      - right; rewrite eps0_is_limit_exp_iff; auto.
+    * right; rewrite eps0_is_limit_exp_iff.
+      destruct He as (p & ->); left.
+      intros [_ C]%eps0_add_eq_zero.
+      revert C; rewrite <- eps0_succ_zero_is_one.
+      symm; apply eps0_zero_not_succ.
+    * right; rewrite eps0_is_limit_exp_iff.
+      left; intros ->; now apply (proj1 He).
+  + left; right.
+    destruct Hf as (p & ->).
+    exists (ω^⟨e,j⟩ +₀ p).
+    now rewrite eps0_add_assoc.
+  + right; rewrite eps0_add_is_limit_iff; auto.
+Qed.
+
+Fact eps0_is_limit_dec e : { eps0_is_limit e } + { ~ eps0_is_limit e }.
+Proof.
+  destruct (eps0_zero_succ_limit_dec e) as [ [ He | He ] | ]; auto.
+  + right; subst; now intros [ [] ].
+  + right; destruct He as (p & ->).
+    intros [_ H]; apply H, eps0_is_succ_add1.
+Qed.
 
 Fact eps0_is_limit_tf a e : e ≠ 0₀ → eps0_is_limit (a +₀ ω^e).
 Proof. intro; apply eps0_add_is_limit, eps0_is_limit_omega; auto. Qed.
