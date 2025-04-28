@@ -318,6 +318,158 @@ Section eps0_fseq.
         exists n; rewrite eps0_fseq_fix_5 with (l' := l); auto.
   Qed.
 
+  Hint Resolve eps0_le_refl eps0_lt_le_weak : core.
+
+  Fact eps0_max u v b : u <ε₀ b → v <ε₀ b → { w | u ≤ε₀ w ∧ v ≤ε₀ w ∧ w <ε₀ b }.
+  Proof. intros ? ?; destruct (eps0_le_lt_dec u v); eauto. Qed.
+
+  Fact eps0_mult_exp_is_limit a e n :
+    0₀ <ε₀ a → 0₀ <ε₀ e → eps0_is_limit (a *₀ ω^⟨e,n⟩).
+  Proof.
+    intros Ha He.
+    destruct a as [ | b i c H1 H2 ] using eps0_hnf_rect.
+    + contradict Ha; apply eps0_lt_irrefl.
+    + rewrite eps0_mult_hnf_exp; auto.
+      apply eps0_is_limit_exp_iff; left.
+      intros (-> & ->)%eps0_add_eq_zero.
+      revert He; apply eps0_lt_irrefl.
+  Qed.
+
+  Hint Resolve eps0_is_succ_exp_zero : core.
+
+  (* Of course, if a is 0 then a*e = 0 is not a limit ordinal
+     is the sense we use for the fundemental sequence *)
+  Fact eps0_mult_is_limit a e :
+    0₀ <ε₀ a → eps0_is_limit e → eps0_is_limit (a *₀ e).
+  Proof.
+    intros Ha.
+    induction e as [ | | e n f He Hf IHe IHf ] using eps0_hnf_pos_rect.
+    + now rewrite eps0_mult_zero_right.
+    + intros [ [] | (_ & l) ]%eps0_is_limit_exp_iff; auto.
+      rewrite eps0_mult_1add_right.
+      destruct (eps0_m1add_is_limit a l) as [ -> | ]; auto.
+      now apply eps0_lt_irrefl in Ha.
+    + intros [ (-> & H) | H ]%eps0_add_is_limit_inv.
+      * rewrite eps0_add_zero_right; apply eps0_mult_exp_is_limit; auto.
+      * rewrite eps0_mult_distr; apply eps0_add_is_limit; auto.
+  Qed.
+
+  Local Fact eps0_not_zero_lt e : e ≠ 0₀ -> 0₀ <ε₀ e.
+  Proof. intros; destruct (eps0_zero_or_pos e); now auto. Qed.
+
+  Hint Resolve eps0_not_zero_lt : core.
+
+  Fact eps0_mult_limit_limit a i b n :
+      b <ε₀ ω^a
+    → ord_is_limit n
+    → (ω^⟨a,i⟩ +₀ b) *₀ ω^⟨0₀,n⟩ = ω^⟨a,i +ₒ (1ₒ +ₒ i) *ₒ n⟩.
+  Proof.
+    intros Hb Hn.
+    rewrite <- eps0_m1add_eq, eps0_m1add_fix_2; auto.
+  Qed.
+
+  Fact eps0_mult_hnf_limit a i b e n f :
+      b <ε₀ ω^a
+    → f <ε₀ ω^e
+    → e ≠ 0₀
+    → eps0_is_limit (ω^⟨e,n⟩ +₀ f)
+    → (ω^⟨a,i⟩ +₀ b) *₀ (ω^⟨e,n⟩ +₀ f) = ω^a *₀ (ω^⟨e,n⟩ +₀ f).
+  Proof.
+    intros Hab Hf He1.
+    intros [ (He & H) | (-> & [He | (-> & Hn) ]) ]%eps0_is_limit_hnf; auto.
+    + rewrite eps0_mult_hnf; auto.
+        now rewrite eps0_mult_distr, eps0_mult_omega_exp.
+      * rewrite eps0_mult_hnf, eps0_mult_zero_right, !eps0_add_zero_right, eps0_mult_omega_exp; auto.
+      * (* case  (ω^a.i).n where n is limit 
+            this would give ω^a.(i.n) *)
+        rewrite eps0_add_zero_right, !eps0_mult_1add_right, eps0_m1add_fix_2, eps0_m1add_omega; auto.
+        (* if n is limit then (1+i).(1+n) = n ?? No ... *)
+        admit.
+  Admitted.
+
+  Hint Resolve eps0_add_incr_left 
+     eps0_add_incr_right 
+     eps0_lt_succ 
+     eps0_add_is_limit eps0_is_limit_omega
+     eps0_add_mono eps0_add_mono_right : core.
+
+  (** Notice that there are examples where fseq (a+e) n < a + fseq e n
+      for instance a = ω³+ω and e = ω²
+
+      a+e = ω³+ω+ω² = ω³+ω²
+      fseq e n = fseq ω² n = ω.(n+1)
+      fseq (a+e) n = fseq (ω³+ω²) n = ω³+ω.(n+1)
+      a+(fseq e n) = ω³+ω+ω.(n+1) = ω³+ω.(n+2)
+      and hence fseq (a+e) n < fseq (a+e) n + ω = a+(fseq e n) *)
+
+  Theorem eps0_fseq_add a e (le : eps0_is_limit e) (lae : eps0_is_limit (a+₀e)) :
+     ∀n, eps0_fseq lae n ≤ε₀ a +₀ eps0_fseq le n.
+  Proof.
+    revert e le lae.
+    induction a as [ | b i c Hc _ IH ] using eps0_hnf_rect.
+    + intro e; rewrite (eps0_add_zero_left e).
+      intros; rewrite eps0_add_zero_left; auto.
+      apply eps0_le_iff_lt.
+      right; apply eps0_fseq_pirr.
+    + intros e; destruct e as [ | f n g Hg _ _ ] using eps0_hnf_rect.
+      1: intros l; exfalso; now apply (proj1 l).
+      intros le.
+      destruct (eps0_lt_sdec b f) as [ b f Hbf | f | b f Hbf ].
+      * rewrite eps0_add_hnf_lt; auto.
+        intros lae j.
+        rewrite (eps0_fseq_pirr le lae); auto.
+      * rewrite eps0_add_hnf_eq; auto.
+        generalize le.
+        apply eps0_add_is_limit_iff in le
+          as [ (-> & Hf%eps0_is_limit_exp_iff) | Hg' ].
+        - rewrite !eps0_add_zero_right.
+          destruct (pos_add_is_succ i n) as (k & Hk).
+          rewrite Hk.
+          intros le lae m.
+          destruct f as [ | f | f Hf' ] using eps0_discriminate.
+          ++ easy.
+          ++ rewrite eps0_fseq_exp_S_succ.
+             destruct (pos_one_or_succ n) as [ -> | (z & ->) ].
+             ** apply pos_succ_inj in Hk as <-.
+                rewrite eps0_fseq_exp_S_one; auto.
+             ** rewrite <- pos_add_assoc in Hk.
+                apply pos_succ_inj in Hk as <-.
+                rewrite eps0_fseq_exp_S_succ, eps0_add_hnf_eq; auto.
+                apply eps0_exp_mono_left; auto.
+          ++ rewrite eps0_fseq_exp_succ_is_limit with (l' := Hf').
+             destruct (pos_one_or_succ n) as [ -> | (z & ->) ].
+             ** apply pos_succ_inj in Hk as <-.
+                rewrite eps0_fseq_exp_one_is_limit with (l' := Hf'); auto.
+             ** rewrite <- pos_add_assoc in Hk.
+                apply pos_succ_inj in Hk as <-.
+                rewrite <- eps0_add_exp,
+                           eps0_fseq_exp_succ_is_limit with (l' := Hf'),
+                          !eps0_add_assoc; auto.
+        - intros le lae m.
+          rewrite !eps0_fseq_hnf with (l' := Hg'); auto.
+          rewrite <- eps0_add_exp, !eps0_add_assoc; auto.
+      * rewrite eps0_add_assoc.
+        intros lae m.
+        generalize (eps0_add_is_limit_inv _ _ le); intros [ (-> & Hf) | Hg' ].
+        - revert le lae; rewrite !eps0_add_zero_right; intros le lae.
+          assert (eps0_is_limit (c+₀ω^⟨f,n⟩)) as l' by auto.
+          rewrite eps0_fseq_hnf with (l' := l'), eps0_add_assoc; auto.
+          apply eps0_add_below_omega; auto; apply eps0_exp_mono_left; auto.
+        - revert lae; rewrite <- (eps0_add_assoc c); intros lae.
+          assert (eps0_is_limit (c+₀ω^⟨f,n⟩+₀g)) as l' by auto.
+          rewrite eps0_fseq_hnf with (l' := l'); auto.
+          ++ rewrite eps0_add_assoc.
+             apply eps0_add_mono; auto.
+             revert l'; rewrite eps0_add_assoc; auto.
+          ++ apply eps0_add_below_omega.
+             ** apply eps0_add_below_omega; auto.
+                apply eps0_exp_mono_left; auto.
+             ** now apply eps0_lt_trans with (1 := Hg), eps0_omega_mono_lt.
+  Qed.
+
+  Hint Resolve eps0_zero_lt_succ eps0_is_limit_pos : core.
+
+
 End eps0_fseq.
 
 Check eps0_fseq.

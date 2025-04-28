@@ -190,7 +190,6 @@ Section eps0_m1add.
                             → β <ε₀ ω^α
                             → eps0_m1add_gr j (ω^⟨α,i⟩ +₀ β) ω^⟨α,i *ₚ j⟩.
 
-
   Fact eps0_m1add_fun j e1 f1 e2 f2 : eps0_m1add_gr j e1 f1 → eps0_m1add_gr j e2 f2 → e1 = e2 → f1 = f2.
   Proof.
     do 2 destruct 1; auto.
@@ -426,6 +425,16 @@ Section eps0_m1add.
           eps0_lt_trans with (1 := H),
           eps0_exp_mono_left; auto.
   Qed.
+
+  Fact eps0_m1add_is_limit a j : ord_is_limit j → a = 0₀ ∨ eps0_is_limit (eps0_m1add a j).
+  Proof.
+    destruct a as [ | e n f H _ _ ] using eps0_hnf_rect; intros Hj.
+    + rewrite eps0_m1add_fix_0; auto.
+    + right.
+      rewrite eps0_m1add_fix_2; auto.
+      apply eps0_is_limit_exp_iff.
+      destruct (eps0_eq_dec e 0₀); auto.
+  Qed. 
 
 End eps0_m1add.
 

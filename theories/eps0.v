@@ -1075,6 +1075,19 @@ Qed.
 Fact eps0_hnf_is_limit e n f : eps0_is_limit (ω^⟨e,n⟩ +₀ f) ↔ eps0_is_limit f ∨ f = 0₀ ∧ (e ≠ 0₀ ∨ e = 0₀ ∧ ord_is_limit n).
 Proof. rewrite eps0_add_is_limit_iff, eps0_is_limit_exp_iff; tauto. Qed.
 
+Fact eps0_is_limit_hnf e n f : 
+    f <ε₀ ω^e
+  → eps0_is_limit (ω^⟨e,n⟩ +₀ f) 
+  ↔ e ≠ 0₀ ∧ eps0_is_limit f ∨ f = 0₀ ∧ (e ≠ 0₀ ∨ e = 0₀ ∧ ord_is_limit n).
+Proof.
+  intros H; rewrite eps0_hnf_is_limit; split; try tauto.
+  intros [ C | ]; auto; left; split; auto.
+  intros ->.
+  rewrite eps0_omega_zero in H.
+  apply eps0_lt_one in H as ->.
+  now apply (proj1 C).
+Qed.
+
 Fact eps0_is_limit_omega e : e ≠ 0₀ → eps0_is_limit ω^e.
 Proof. intros; apply eps0_is_limit_exp_iff; auto. Qed.
 
