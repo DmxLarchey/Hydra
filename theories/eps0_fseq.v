@@ -49,10 +49,10 @@ Section eps0_fseq_dep_rect.
   Variables (P : ∀e, eps0_is_limit e → Type)
             (HP0 : ∀ e j l, ord_is_limit j → @P ω^⟨e,j⟩ l)
 
-            (HP1 : ∀ e l,   @P ω^⟨e +₀ 1₀,0ₒ⟩ l)
+            (HP1 : ∀ e l,   @P ω^(e +₀ 1₀) l)
             (HP2 : ∀ e j l, @P ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ l)
 
-            (HP3 : ∀ e l l', @P e l → @P ω^⟨e,0ₒ⟩ l')
+            (HP3 : ∀ e l l', @P e l → @P ω^e l')
             (HP4 : ∀ e j l l', @P e l → @P ω^⟨e,j +ₒ 1ₒ⟩ l')
              
             (HP5 : ∀ e j f l l', f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
@@ -117,53 +117,218 @@ Section eps0_fseq.
 
   Inductive eps0_fseq_gr : ε₀ → (nat → ε₀) → Prop :=
     | eps0_fseq_gr_0 e j l   : eps0_fseq_gr ω^⟨e,j⟩ (λ n, ω^⟨e,@ord_fseq j l n⟩)
-    | eps0_fseq_gr_1 e       : eps0_fseq_gr ω^⟨e +₀ 1₀,0ₒ⟩ (λ n, ω^⟨e,ord_mseq n⟩)
+    | eps0_fseq_gr_1 e       : eps0_fseq_gr ω^(e +₀ 1₀) (λ n, ω^⟨e,ord_mseq n⟩)
     | eps0_fseq_gr_2 e j     : eps0_fseq_gr ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩)
     | eps0_fseq_gr_3 e r     : eps0_is_limit e
                              → eps0_fseq_gr e r
-                             → eps0_fseq_gr ω^⟨e,0ₒ⟩ (λ n, ω^⟨r n,0ₒ⟩)
+                             → eps0_fseq_gr ω^e (λ n, ω^(r n))
     | eps0_fseq_gr_4 e j r   : eps0_is_limit e
                              → eps0_fseq_gr e r
-                             → eps0_fseq_gr ω^⟨e,j +ₒ 1ₒ⟩ (λ n, ω^⟨e,j⟩ +₀ ω^⟨r n,0ₒ⟩)
+                             → eps0_fseq_gr ω^⟨e,j +ₒ 1ₒ⟩ (λ n, ω^⟨e,j⟩ +₀ ω^(r n))
     | eps0_fseq_gr_6 e j f r : f <ε₀ ω^e
+                             → eps0_is_limit f
                              → eps0_fseq_gr f r
                              → eps0_fseq_gr (ω^⟨e,j⟩ +₀ f) (λ n, ω^⟨e,j⟩ +₀ r n).
-                             
-  Theorem eps0fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
+
+  Hint Resolve ord_is_succ_succ eps0_is_succ_add1 : core.
+
+  Local Fact eps0_eq_absurd_1 e f i : ord_is_limit i → ω^⟨e,i⟩ = ω^f → False.
+  Proof. intros H (_ & ->)%eps0_exp_inj; now destruct H. Qed.
+
+  Local Fact eps0_eq_absurd_2 e f i j : ord_is_limit i → ω^⟨e,i⟩ = ω^⟨f,j +ₒ 1ₒ⟩ → False.
+  Proof. intros H (_ & ->)%eps0_exp_inj; destruct H as [ ? [] ]; auto. Qed.
+
+  Local Fact eps0_eq_absurd_3 e f i j g : g <ε₀ ω^f → eps0_is_limit g → ω^⟨e,i⟩ = ω^⟨f,j⟩ +₀ g → False.
+  Proof. intros H1 H2 (-> & -> & ->)%eps0_eq_exp_hnf_inv; auto; now destruct H2. Qed.
+
+  Local Fact eps0_eq_absurd_4 e f i : ω^e = ω^⟨f,i +ₒ 1ₒ⟩ → False.
+  Proof. intros [_ H]%eps0_exp_inj; revert H; symm; apply ord_succ_not_zero. Qed.
+
+  Local Fact eps0_eq_absurd_5 e f i j : eps0_is_limit f → ω^⟨e +₀ 1₀,i⟩ = ω^⟨f,j⟩ → False.
+  Proof. intros H (<- & _)%eps0_exp_inj; destruct H as [ ? [] ]; auto. Qed. 
+
+  Tactic Notation "elim" "one" :=
+       (now intros ?%eps0_eq_absurd_1) 
+    || (now intros ?%eps0_eq_absurd_2) 
+    || (now intros ?%eps0_eq_absurd_3) 
+    || (now intros ?%eps0_eq_absurd_4) 
+    || (now intros ?%eps0_eq_absurd_5) 
+    || (now intros ?%eps0_eq_absurd_5).
+
+  Tactic Notation "elim" "absurd" := (elim one) || (symm; elim one) || idtac. 
+
+  Local Lemma eps0_fseq_fun_rec e se f sf :
+    eps0_fseq_gr e se → eps0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  Proof.
+    intros H; revert H f sf.
+    induction 1 as [ e i l | e | e i | e r l H IH | e i r l H IH | e i f r H1 H2 ? IH ];
+      induction 1 as [ g j m | g | g j | g s m G ? | g j s m G _ | g j h s G1 G2 ? _ ].
+    all: elim absurd.
+    + intros (-> & ->)%eps0_exp_inj; intro; f_equal; apply ord_fseq_pirr.
+    + now intros (->%eps0_add1_inj & _)%eps0_exp_inj.
+    + intros (->%eps0_add1_inj & ->%ord_succ_inj)%eps0_exp_inj; auto.
+    + intros (-> & _)%eps0_exp_inj.
+      intro; f_equal; now apply IH with (2 := eq_refl).
+    + intros (-> & ->%ord_succ_inj)%eps0_exp_inj.
+      intro; do 2 f_equal; now apply IH with (2 := eq_refl).
+    + intros (-> & -> & ->)%eps0_eq_hnf_inv; auto.
+      intro; f_equal; now apply IH with (2 := eq_refl).
+  Qed.
+
+  Lemma eps0_fseq_fun e r r' : eps0_fseq_gr e r → eps0_fseq_gr e r' → ∀n, r n = r' n.
+  Proof. intros H1 H2; now apply (eps0_fseq_fun_rec H1 H2). Qed.
+
+  Theorem eps0_fseq_pwc e : eps0_is_limit e → sig (eps0_fseq_gr e).
   Proof.
     induction 1 as [ e j _ l | e | e j | e l l' (r & Hr) | e j l l' (r & Hr) 
                    | e j f l l' H (r & Hr)] using eps0_fseq_dep_rect.
     + exists (λ n, ω^⟨e,@ord_fseq j l n⟩); constructor.
     + exists (λ n, ω^⟨e,ord_mseq n⟩); constructor.
     + exists (λ n, ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩); constructor.
-    + exists (λ n, ω^⟨r n,0ₒ⟩); now constructor.
-    + exists (λ n, ω^⟨e,j⟩ +₀ ω^⟨r n,0ₒ⟩); now constructor.
+    + exists (λ n, ω^(r n)); now constructor.
+    + exists (λ n, ω^⟨e,j⟩ +₀ ω^(r n)); now constructor.
     + exists (λ n, ω^⟨e,j⟩ +₀ r n); now constructor.
   Qed.
 
-  Local Lemma eps0_fseq_fun_rec e se f sf :
-    eps0_fseq_gr e se → eps0_fseq_gr f sf → e = f → ∀n, se n = sf n.
+  Definition eps0_fseq e l := π₁ (@eps0_fseq_pwc e l).
+
+  Fact eps0_fseq_spec e l : eps0_fseq_gr e (@eps0_fseq e l).
+  Proof. apply (proj2_sig _). Qed.
+
+  Hint Resolve eps0_fseq_spec : core.
+
+  Fact eps0_fseq_pirr e l1 l2 n : @eps0_fseq e l1 n = @eps0_fseq e l2 n.
+  Proof. apply eps0_fseq_fun with e; auto. Qed.
+
+  Tactic Notation "solve" "fix" :=
+    intros; match goal with n : nat |- _ => revert n end; 
+    apply eps0_fseq_fun with (1 := @eps0_fseq_spec _ _); constructor; auto.
+
+  Fact eps0_fseq_fix_0 e j l l' n : @eps0_fseq ω^⟨e,j⟩ l n = ω^⟨e,@ord_fseq j l' n⟩.
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_fix_1 e l n : @eps0_fseq ω^(e +₀ 1₀) l n = ω^⟨e,ord_mseq n⟩.
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_fix_2 e j l n : @eps0_fseq ω^⟨e +₀ 1₀,j +ₒ 1ₒ⟩ l n = ω^⟨e +₀ 1₀,j⟩ +₀ ω^⟨e,ord_mseq n⟩.
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_fix_3 e l l' n : @eps0_fseq ω^e l n = ω^(@eps0_fseq e l' n).
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_fix_4 e j l l' n : @eps0_fseq ω^⟨e,j +ₒ 1ₒ⟩ l n = ω^⟨e,j⟩ +₀ ω^(@eps0_fseq e l' n).
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_fix_5 e j f l l' n : f <ε₀ ω^e → @eps0_fseq (ω^⟨e,j⟩ +₀ f) l n = ω^⟨e,j⟩ +₀ @eps0_fseq f l' n.
+  Proof. solve fix. Qed.
+
+  Fact eps0_fseq_mono e (l : eps0_is_limit e) : ∀ n m, n < m → eps0_fseq l n <ε₀ eps0_fseq l m.
   Proof.
-    intros H; revert H f sf.
-    induction 1 as [ g b Hs | g b r H0 Hs H1 IH1 ].
-    + induction 1 as [ g' b' Hs' | g' b' r' H0' Hs' H2 IH2 ].
-      * intros (<- & <-%eps0_succ_inj)%eps0_eq_ltf_inv; auto.
-      * intros <-%eps0_tf_fun_right; eauto.
-        destruct H0' as (_ & []); eauto.
-    + induction 1 as [ g' b' Hs' | g' b' r' H0' Hs' H2 IH2 ].
-      * intros ->%eps0_tf_fun_right; eauto.
-        destruct H0 as (_ & []); eauto.
-      * intros (<- & <-)%eps0_eq_ltf_inv; auto.
-        intro; now rewrite IH1 with (1 := H2).
+    induction l as [ e j l l' | e | e j | e l l' IH | e j l l' IH 
+                   | e j f l l' H IH ] using eps0_fseq_dep_rect.
+    + intros; rewrite !eps0_fseq_fix_0 with (l' := l'); auto.
+      now apply eps0_exp_mono_right, ord_fseq_mono.
+    + intros; rewrite !eps0_fseq_fix_1.
+      now apply eps0_exp_mono_right, ord_mseq_mono.
+    + intros; rewrite !eps0_fseq_fix_2.
+      now apply eps0_add_mono_right, eps0_exp_mono_right, ord_mseq_mono.
+    + intros; rewrite !eps0_fseq_fix_3 with (l' := l).
+      now apply eps0_exp_mono_left, IH.
+    + intros; rewrite !eps0_fseq_fix_4 with (l' := l).
+      now apply eps0_add_mono_right, eps0_exp_mono_left, IH.
+    + intros; rewrite !eps0_fseq_fix_5 with (l' := l); auto.
+      now apply eps0_add_mono_right, IH.
   Qed.
 
+  Local Fact eps0_zero_lt_one : 0₀ <ε₀ 1₀.
+  Proof. rewrite <- eps0_succ_zero_is_one; apply eps0_zero_lt_succ. Qed.
 
-destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | Hj ].
-      * exists 
-      
-    Search ord_is_limit.
-    destruct (eps0_eq
-            ∀e i f, ord_is_limit n → 
+  Hint Resolve eps0_lt_zero_exp eps0_add_below_exp eps0_exp_mono_right eps0_exp_mono_left 
+               eps0_lt_trans eps0_exp_mono_le_lt eps0_exp_mono eps0_le_refl
+               eps0_add_mono_le_lt eps0_lt_le_weak 
+               eps0_add_incr_right
+               eps0_add_incr eps0_zero_lt_one 
+               eps0_omega_mono_lt : core.
+
+  Local Fact eps0_lt_add1 e : e <ε₀ e +₀ 1₀.
+  Proof. rewrite <- (eps0_add_zero_right e) at 1; auto. Qed.
+
+  Hint Resolve eps0_lt_add1 ord_lt_succ : core.
+
+  Fact eps0_lt_add1_inv e f : e <ε₀ f +₀ 1₀ → e ≤ε₀ f.
+  Proof. rewrite eps0_add_one_right; apply eps0_succ_next_inv. Qed.
+
+  Fact eps0_fseq_lt e l n : @eps0_fseq e l n <ε₀ e.
+  Proof.
+    revert n.
+    induction l as [ e j l l' | e | e j | e l l' IH | e j l l' IH 
+                   | e j g l l' H IH ] using eps0_fseq_dep_rect; intros n.
+    + generalize (ord_fseq_lt _ l' n).
+      rewrite eps0_fseq_fix_0 with (l' := l'); auto.
+    + rewrite eps0_fseq_fix_1; apply eps0_exp_mono_left; auto.
+    + rewrite eps0_fseq_fix_2; apply eps0_add_below_exp; auto.
+      apply eps0_exp_mono_left; auto.
+    + rewrite eps0_fseq_fix_3 with (l' := l); auto.
+    + rewrite eps0_fseq_fix_4 with (l' := l).
+      apply eps0_add_below_exp; auto.
+    + rewrite eps0_fseq_fix_5 with (l' := l); auto.
+  Qed.
+
+  Fact eps0_fseq_limit e (l : eps0_is_limit e) f : f <ε₀ e → ∃n, f <ε₀ eps0_fseq l n.
+  Proof.
+    induction l as [ e j l l' | e | e j | e l l' IH | e j l l' IH 
+                   | e j g l l' H IH ] in f |- * using eps0_fseq_dep_rect.
+    + intros [ [-> | (i & b & -> & H1 & H2) ] | (g & i & H1 & H2) ]%eps0_below_exp_inv.
+      * exists 0; rewrite eps0_fseq_fix_0 with (l' := l'); auto.
+      * destruct (ord_fseq_limit _ l' _ H1) as (n & Hn).
+        exists n; rewrite eps0_fseq_fix_0 with (l' := l'); auto.
+      * exists 0; rewrite eps0_fseq_fix_0 with (l' := l'); eauto.
+    + intros [ -> | (g & i & H1 & H2%eps0_lt_add1_inv) ]%eps0_below_omega_inv.
+      * exists 0; rewrite eps0_fseq_fix_1; auto.
+      * destruct (ord_mseq_limit i) as (n & Hn).
+        exists n; rewrite eps0_fseq_fix_1; eauto.
+    + intros [ [-> | (i & b & -> & H1%ord_lt_succ__le_iff & H2) ] | (g & i & H1 & H2) ]%eps0_below_exp_inv.
+      * exists 0; rewrite eps0_fseq_fix_2; auto.
+      * apply eps0_below_omega_inv in H2 as [ -> | (f & k & H3 & H4%eps0_lt_add1_inv) ].
+        - exists 0; rewrite eps0_fseq_fix_2; auto.
+        - destruct (ord_mseq_limit k) as (n & Hn).
+          exists n; rewrite eps0_fseq_fix_2; eauto.
+      * exists 0; rewrite eps0_fseq_fix_2; eauto.
+    + intros [ -> | (g & i & H1 & H2) ]%eps0_below_omega_inv.
+      * exists 0; rewrite eps0_fseq_fix_3 with (l' := l); auto.
+      * destruct (IH _ H2) as (n & Hn).
+        exists n; rewrite eps0_fseq_fix_3 with (l' := l).
+        apply eps0_lt_trans with (1 := H1), eps0_exp_mono_left; auto.
+    + intros [ [-> | (i & b & -> & H1%ord_lt_succ__le_iff & H2) ] | (g & i & H1 & H2) ]%eps0_below_exp_inv.
+      * exists 0; rewrite eps0_fseq_fix_4 with (l' := l); auto.
+      * apply eps0_below_omega_inv in H2 as [ -> | (f & k & H3 & H4) ].
+        - exists 0; rewrite eps0_fseq_fix_4 with (l' := l); auto.
+        - destruct (IH _ H4) as (n & Hn).
+          exists n; rewrite eps0_fseq_fix_4 with (l' := l); auto.
+          apply eps0_add_mono_le_lt; auto.
+          now apply eps0_lt_trans with (1 := H3), eps0_exp_mono_left.
+      * destruct (IH _ H2) as (n & Hn).
+        exists n; rewrite eps0_fseq_fix_4 with (l' := l); auto.
+        apply eps0_lt_le_trans with (1 := H1).
+        rewrite <- (eps0_add_zero_right ω^⟨_,_⟩) at 1; auto.
+    + intros [ H1 | (h & -> & H1) ]%eps0_lt_add_inv_add.
+      * exists 0; rewrite eps0_fseq_fix_5 with (l' := l); auto.
+        apply eps0_lt_le_trans with (1 := H1); auto.
+      * destruct (IH _ H1) as (n & Hn).
+        exists n; rewrite eps0_fseq_fix_5 with (l' := l); auto.
+  Qed.
+
+End eps0_fseq.
+
+Check eps0_fseq.
+Check eps0_fseq_pirr.
+Check eps0_fseq_mono.
+Check eps0_fseq_lt.
+Check eps0_fseq_limit.
+
+
+  Proof.  Qed.
+
 
 Section eps0_ltf_pos_rect.
 

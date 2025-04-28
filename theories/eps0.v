@@ -353,6 +353,9 @@ Section eps0_add_extra.
 
   Hint Resolve eps0_add_mono : core.
 
+  Fact eps0_add_mono_le_lt e e' f f' : e ≤ε₀ e' → f <ε₀ f' → e +₀ f <ε₀ e' +₀ f'.
+  Proof. intros; apply eps0_le_lt_trans with (e' +₀ f); auto. Qed.
+
   Fact eps0_add_incr_left e f : e ≤ε₀ f +₀ e.
   Proof. rewrite <- (eps0_add_zero_left e) at 1; auto. Qed.
 
@@ -432,6 +435,9 @@ Section eps0_add_extra.
     destruct (eps0_lt_sdec e f) as [ e f G | e | e f G ]; auto.
     all: apply eps0_succ_mono in G; auto; rewrite E in G; destruct (eps0_lt_irrefl _ G).
   Qed.
+
+  Fact eps0_add1_inj e f : e +₀ 1₀ = f +₀ 1₀ → e = f.
+  Proof. rewrite !eps0_add_one_right; apply eps0_succ_inj. Qed.
 
   (** There is no ordinal between e and (eps0_succ e) *)
   Corollary eps0_no_ordinal_between_n_and_succ e f :
@@ -530,6 +536,9 @@ Section eps0_omega.
   Qed.
 
   Hint Resolve eps0_exp_mono : core.
+
+  Fact eps0_exp_mono_le_lt e f n m : e ≤ε₀ f → n <ₒ m → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
+  Proof. intros; apply eps0_le_lt_trans with ω^⟨f,n⟩; auto. Qed.
 
   Fact eps0_exp_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n <ₒ m.
   Proof.

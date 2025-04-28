@@ -374,6 +374,9 @@ Section ord.
     all: exfalso; apply ord_lt_succ_mono_iff in C; revert C; rewrite H; apply ord_lt_irrefl.
   Qed.
 
+  Fact ord_succ_inj i j:  i +ₒ 1ₒ = j +ₒ 1ₒ → i = j.
+  Proof. apply ord_eq_succ_iff. Qed.
+
   Fact ord_le_succ_mono_iff i j : i +ₒ 1ₒ ≤ₒ j +ₒ 1ₒ ↔ i ≤ₒ j.
   Proof. now rewrite !ord_le_lt_iff, ord_eq_succ_iff, ord_lt_succ_mono_iff. Qed.
 
@@ -512,6 +515,14 @@ Section ord.
       now apply ord_add_mono_lt_right.
     + apply ord_mul_mono; auto.
   Qed.
+
+  Hint Resolve ord_fseq_incr ord_mseq_incr : core.
+
+  Fact ord_fseq_mono i l n m : n < m → @ord_fseq i l n <ₒ ord_fseq l m.
+  Proof. induction 1; eauto. Qed.
+
+  Fact ord_mseq_mono n m : n < m → ord_mseq n <ₒ ord_mseq m.
+  Proof. induction 1; eauto. Qed.
 
   (* i = ω.α hence 1 + i <= 1 + ω.α .??? *)
   Fact ord_is_limit_1add_eq i : ord_is_limit i → 1 +ₒ i = i.
