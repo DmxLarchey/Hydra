@@ -811,6 +811,10 @@ Section eps0_mult.
     rewrite <- (eps0_add_zero_right ω^⟨_,j⟩), eps0_mult_hnf; auto.
     now rewrite eps0_mult_zero_right, eps0_add_zero_right.
   Qed.
+  
+  Fact eps0_mult_hnf_omega a i b e :
+      0₀ <ε₀ e → b <ε₀ ω^a → (ω^⟨a,i⟩ +₀ b) *₀ ω^e = ω^(a+₀e).
+  Proof. apply eps0_mult_hnf_exp. Qed.
 
   Fact eps0_mult_exp_hnf a i e j f : 
       0₀ <ε₀ e

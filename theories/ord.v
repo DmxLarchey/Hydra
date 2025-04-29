@@ -175,6 +175,10 @@ Section ord.
      ∀n, ord_fseq lae n ≤ₒ a +ₒ ord_fseq le n.
   Proof. exfalso; now apply ord_nat_no_limit in le. Qed.
   
+  Fact ord_fseq_mul a e (le : ord_is_limit e) (lae : ord_is_limit (a *ₒ e)) :
+     ∀n, ord_fseq lae n ≤ₒ a *ₒ ord_fseq le n.
+  Proof. exfalso; now apply ord_nat_no_limit in le. Qed.
+  
   Definition ord_mseq (n : nat) : ord := n.
   
   Fact ord_mseq_incr n : ord_mseq n <ₒ ord_mseq (S n).
@@ -350,6 +354,9 @@ Section ord.
   
   Fact ord_add_incr_left i j : i ≤ₒ i +ₒ j.
   Proof. rewrite <- (ord_add_zero_right i) at 1; auto. Qed.
+  
+  Fact ord_add_incr_right i j : j ≤ₒ i +ₒ j.
+  Proof. rewrite <- (ord_add_zero_left j) at 1; auto. Qed.
 
   Fact pos_add_incr_left i j : j ≤ₒ i +ₒ 1ₒ +ₒ j.
   Proof. rewrite <- (ord_add_zero_left j) at 1; eauto. Qed.
