@@ -171,6 +171,10 @@ Section ord.
   Fact ord_fseq_limit i l j : j <ₒ i → ∃n, j <ₒ @ord_fseq i l n.
   Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
   
+  Fact ord_fseq_add a e (le : ord_is_limit e) (lae : ord_is_limit (a +ₒ e)) :
+     ∀n, ord_fseq lae n ≤ₒ a +ₒ ord_fseq le n.
+  Proof. exfalso; now apply ord_nat_no_limit in le. Qed.
+  
   Definition ord_mseq (n : nat) : ord := n.
   
   Fact ord_mseq_incr n : ord_mseq n <ₒ ord_mseq (S n).
@@ -472,6 +476,12 @@ Section ord.
       * now intros []%ord_add_is_zero_inv.
       * now intros [ | [] ].
   Qed.
+  
+  Fact ord_is_limit_succ_iff i : ord_is_limit (i +ₒ 1ₒ) ↔ False.
+  Proof. split; [ | easy ]; intros [ _ H]; apply H; auto. Qed.
+  
+  Fact ord_is_limit_add_succ i j : ord_is_limit (i +ₒ 1ₒ +ₒ j) ↔ ord_is_limit j.
+  Proof. rewrite ord_is_limit_add, ord_is_limit_succ_iff; tauto. Qed.
 
   Fact ord_is_limit_1add i : ord_is_limit (1 +ₒ i) ↔ ord_is_limit i.
   Proof.

@@ -770,13 +770,29 @@ Section eps0_omega.
 
   Fact eps0_zero_neq_hnf e i f : 0₀ ≠ ω^⟨e,i⟩ +₀ f.
   Proof. intro E; apply (@eps0_lt_irrefl 0₀); rewrite E at 2; auto. Qed.
-
+  
+  Fact eps0_add_hnf_exp_lt e₁ i₁ f₁ e₂ i₂ :
+      e₁ <ε₀ e₂
+    → f₁ <ε₀ ω^e₁
+    → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ ω^⟨e₂,i₂⟩ = ω^⟨e₂,i₂⟩.
+  Proof.
+    intros.
+    rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩) at 1.
+    rewrite eps0_add_hnf_lt, eps0_add_zero_right; auto.
+  Qed.
+  
+  Fact eps0_add_hnf_omega_lt e₁ i₁ f₁ e₂ :
+      e₁ <ε₀ e₂
+    → f₁ <ε₀ ω^e₁
+    → (ω^⟨e₁,i₁⟩ +₀ f₁) +₀ ω^e₂ = ω^e₂.
+  Proof. apply eps0_add_hnf_exp_lt. Qed.
+  
   Fact eps0_add_exp_hnf_lt e₁ i₁ e₂ i₂ f₂ :
       e₁ <ε₀ e₂
     → f₂ <ε₀ ω^e₂
     → ω^⟨e₁,i₁⟩ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
   Proof.
-    intros H1 H2.
+    intros.
     rewrite <- (eps0_add_zero_right ω^⟨e₁,i₁⟩).
     apply eps0_add_hnf_lt; auto.
   Qed.
@@ -805,6 +821,15 @@ Section eps0_omega.
     intro.
     rewrite <- (eps0_add_zero_right ω^⟨e,i₂⟩).
     rewrite eps0_add_hnf_eq, eps0_add_zero_right; auto.
+  Qed.
+  
+  Fact eps0_add_hnf_omega_eq e i₁ f₁ :
+      f₁ <ε₀ ω^e
+    → (ω^⟨e,i₁⟩ +₀ f₁) +₀ ω^e = ω^⟨e,i₁ +ₒ 1⟩.
+  Proof.
+    intro.
+    unfold eps0_omega.
+    rewrite eps0_add_hnf_exp_eq; auto.
   Qed.
 
   (* Ordinals below ω^e.n are of the form
