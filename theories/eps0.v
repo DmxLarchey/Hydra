@@ -252,6 +252,9 @@ Section eps0_order.
   Fact eps0_zero_lt_succ e : 0₀ <ε₀ S₀ e.
   Proof. apply eps0_le_lt_trans with (2 := eps0_lt_succ _); auto. Qed.
 
+  Fact eps0_zero_lt_one : 0₀ <ε₀ 1₀.
+  Proof. rewrite <- eps0_succ_zero_is_one; apply eps0_lt_succ. Qed.
+
   Fact eps0_lt_one : ∀e, e <ε₀ 1₀ → e = 0₀.
   Proof. intros []; rewrite eps0_lt_iff, eps0_eq_iff; apply E0_lt_one; auto. Qed.
 
@@ -266,6 +269,9 @@ Section eps0_order.
     apply eps0_le_lt_trans with (2 := eps0_lt_succ _).
     apply eps0_zero_least.
   Qed.
+
+  Fact eps0_zero_not_one : 0₀ ≠ 1₀.
+  Proof. rewrite <- eps0_succ_zero_is_one; apply eps0_zero_not_succ. Qed.
 
   Fact eps0_lt_not_le e f : e <ε₀ f → ¬ f ≤ε₀ e.
   Proof. intros ? ?; apply (@eps0_lt_irrefl e); eauto. Qed.
@@ -307,6 +313,9 @@ Section eps0_add_base.
 
   Fact eps0_add_one_right : ∀e, e +₀ 1₀ = S₀ e.
   Proof. intros []; apply eps0_eq_iff, E0_add_one_right; auto. Qed.
+
+  Fact eps0_lt_add1 e : e <ε₀ e +₀ 1₀.
+  Proof. rewrite eps0_add_one_right; apply eps0_lt_succ. Qed.
 
   (** The defining equation for _ + S _ *)
   Fact eps0_add_succ_right e f : e +₀ S₀ f = S₀ (e +₀ f).
@@ -418,6 +427,9 @@ Section eps0_add_extra.
     now apply eps0_lt_le_trans with (2 := H1).
   Qed.
 
+  Fact eps0_lt_add1_inv e f : e <ε₀ f +₀ 1₀ → e ≤ε₀ f.
+  Proof. rewrite eps0_add_one_right; apply eps0_succ_next_inv. Qed.
+
   Hint Resolve eps0_le_lt_trans eps0_lt_succ eps0_le_not_succ : core.
 
   Fact eps0_succ_mono e f : e <ε₀ f ↔ S₀ e <ε₀ S₀ f.
@@ -495,16 +507,16 @@ Section eps0_omega.
   Fact eps0_succ_exp n : S₀ ω^⟨0₀,n⟩ = ω^⟨0₀,n +ₒ 1ₒ⟩.
   Proof. apply eps0_eq_iff; simpl; apply E0_succ_pos. Qed.
 
-  Fact eps0_lt_exp : ∀ e n, e <ε₀ ω^⟨e,n⟩.
+  Fact eps0_exp_incr : ∀ e n, e <ε₀ ω^⟨e,n⟩.
   Proof.
     intros [] n; apply eps0_lt_iff; unfold eps0_exp; cbn.
     apply E0_lt_sub with n; auto.
   Qed.
 
-  Fact eps0_exp_mono_right : ∀ e n m, n < m → ω^⟨e,n⟩ <ε₀ ω^⟨e,m⟩.
+  Fact eps0_lt_exp_right : ∀ e n m, n <ₒ m → ω^⟨e,n⟩ <ε₀ ω^⟨e,m⟩.
   Proof. intros [] ? ?; rewrite eps0_lt_iff; simpl; constructor; constructor 2; right; auto. Qed.
 
-  Fact eps0_exp_mono_left : ∀ e f n m, e <ε₀ f → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
+  Fact eps0_lt_exp_left : ∀ e f n m, e <ε₀ f → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
   Proof. intros [] [] ? N; rewrite !eps0_lt_iff; apply E0_lt_exp. Qed.
 
   Fact eps0_add_exp : ∀ e i j, ω^⟨e,i⟩ +₀ ω^⟨e,j⟩ = ω^⟨e,i +ₒ 1ₒ +ₒ j⟩.
@@ -517,7 +529,7 @@ Section eps0_omega.
   (***********************)
 
   Fact eps0_lt_zero_exp e n : 0₀ <ε₀ ω^⟨e,n⟩.
-  Proof. apply eps0_le_lt_trans with (2 := eps0_lt_exp _ _); auto. Qed.
+  Proof. apply eps0_le_lt_trans with (2 := eps0_exp_incr _ _); auto. Qed.
 
   Hint Resolve eps0_lt_zero_exp : core.
 
@@ -527,41 +539,43 @@ Section eps0_omega.
     rewrite E at 2; apply eps0_lt_zero_exp.
   Qed.
 
-  Hint Resolve eps0_exp_mono_left eps0_exp_mono_right : core.
+  Hint Resolve eps0_lt_exp_left eps0_lt_exp_right : core.
 
-  Fact eps0_exp_mono e f n m : e ≤ε₀ f → n ≤ₒ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
+  Fact eps0_le_exp e f n m : e ≤ε₀ f → n ≤ₒ m → ω^⟨e,n⟩ ≤ε₀ ω^⟨f,m⟩.
   Proof.
     intros [ H1 | <- ]%eps0_le_iff_lt H2; auto.
     apply ord_le_lt_iff in H2 as [ <- | ]; auto.
   Qed.
 
-  Hint Resolve eps0_exp_mono : core.
+  Hint Resolve eps0_le_exp : core.
 
-  Fact eps0_exp_mono_le_lt e f n m : e ≤ε₀ f → n <ₒ m → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
+  Fact eps0_le_lt_exp e f n m : e ≤ε₀ f → n <ₒ m → ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩.
   Proof. intros; apply eps0_le_lt_trans with ω^⟨f,n⟩; auto. Qed.
 
-  Fact eps0_exp_mono_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ → e <ε₀ f ∨ e = f ∧ n <ₒ m.
+  Fact eps0_lt_exp_inv e f n m : ω^⟨e,n⟩ <ε₀ ω^⟨f,m⟩ ↔ e <ε₀ f ∨ e = f ∧ n <ₒ m.
   Proof.
-    intros H.
-    destruct (eps0_lt_sdec e f) as [ | e | e f H1 ]; auto.
-    + destruct (ord_lt_sdec n m) as [ | n | n m H2 ]; auto.
-      * contradict H; apply eps0_lt_irrefl.
+    split.
+    + intros H.
+      destruct (eps0_lt_sdec e f) as [ | e | e f H1 ]; auto.
+      * destruct (ord_lt_sdec n m) as [ | n | n m H2 ]; auto.
+        - contradict H; apply eps0_lt_irrefl.
+        - destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
+          apply eps0_lt_trans with (1 := H); auto.
       * destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
         apply eps0_lt_trans with (1 := H); auto.
-    + destruct (@eps0_lt_irrefl ω^⟨e,n⟩).
-      apply eps0_lt_trans with (1 := H); auto.
+    + intros [ | (-> & ?) ]; auto.
   Qed.
-  
+
   Fact eps0_exp_inj e f n m : ω^⟨e,n⟩ = ω^⟨f,m⟩ → e = f ∧ n = m.
   Proof.
     intros E.
     destruct (eps0_lt_sdec e f) as [ e f H | e | e f H ].
-    + apply eps0_exp_mono_left with (n := n) (m := m) in H.
+    + apply eps0_lt_exp_left with (n := n) (m := m) in H.
       rewrite E in H; now apply eps0_lt_irrefl in H.
     + destruct (ord_lt_sdec n m) as [ n m H | | n m H ]; auto;
-        apply eps0_exp_mono_right with (e := e) in H;
+        apply eps0_lt_exp_right with (e := e) in H;
         rewrite E in H; now apply eps0_lt_irrefl in H.
-    + apply eps0_exp_mono_left with (n := m) (m := n) in H.
+    + apply eps0_lt_exp_left with (n := m) (m := n) in H.
       rewrite E in H; now apply eps0_lt_irrefl in H.
   Qed.
 
@@ -571,6 +585,56 @@ Section eps0_omega.
 
   Fact eps0_omega_zero : ω^0₀ = 1₀.
   Proof. apply eps0_eq_iff; trivial. Qed.
+
+  (**********************)
+
+  Fact eps0_omega_incr e : e <ε₀ ω^e.
+  Proof. apply eps0_exp_incr. Qed.
+
+  Hint Resolve eps0_omega_incr : core.
+
+  Fact eps0_lt_omega : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
+  Proof. unfold eps0_omega; auto. Qed.
+
+  Fact eps0_lt_exp_omega e i f : e <ε₀ f → ω^⟨e,i⟩ <ε₀ ω^f.
+  Proof. unfold eps0_omega; auto. Qed.
+
+  Fact eps0_lt_omega_exp e i f : e <ε₀ f → ω^e <ε₀ ω^⟨f,i⟩.
+  Proof. unfold eps0_omega; auto. Qed.
+
+  Hint Resolve eps0_lt_omega eps0_lt_omega_exp eps0_lt_exp_omega ord_le_zero_least : core.
+
+  Fact eps0_le_omega_exp e i f : e ≤ε₀ f → ω^e ≤ε₀ ω^⟨f,i⟩.
+  Proof. intros; apply eps0_le_exp; auto. Qed. 
+
+  Fact eps0_le_omega e f : e ≤ε₀ f → ω^e ≤ε₀ ω^f.
+  Proof. apply eps0_le_omega_exp. Qed.
+
+  Fact eps0_le_exp_omega e i f : i = 0ₒ → e ≤ε₀ f → ω^⟨e,i⟩ ≤ε₀ ω^f.
+  Proof. intros ->; apply eps0_le_omega. Qed.
+
+  Hint Resolve eps0_le_omega eps0_le_exp_omega eps0_le_omega_exp : core.
+
+  Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
+  Proof. now intros []%eps0_exp_inj. Qed.
+
+  Fact eps0_add_exp_omega e i : ω^⟨e,i⟩ +₀ ω^e = ω^⟨e,i +ₒ 1ₒ⟩.
+  Proof. unfold eps0_omega; rewrite eps0_add_exp; auto. Qed.
+
+  Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
+  Proof. rewrite <- eps0_omega_zero; now intros <-%eps0_omega_inj. Qed.
+
+  Fact eps0_zero_lt_omega e : 0₀ <ε₀ ω^e.
+  Proof. apply eps0_lt_zero_exp. Qed.
+
+  Hint Resolve eps0_zero_lt_omega : core.
+
+  Fact eps0_zero_neq_omega e : 0₀ ≠ ω^e.
+  Proof. apply eps0_zero_neq_exp. Qed.
+
+  Hint Resolve ord_lt_le_weak : core.
+
+  (********************************)
 
   Fact eps0_add_below_omega : ∀ e f g, e <ε₀ ω^g → f <ε₀ ω^g → e +₀ f <ε₀ ω^g.
   Proof. intros [[] ] [[] ] []; rewrite !eps0_lt_iff; apply E0_add_below_omega. Qed.
@@ -619,6 +683,30 @@ Section eps0_omega.
       * constructor 2; now left.
       * constructor 2; right; auto.
       * now constructor 3.
+  Qed.
+
+  Fact eps0_lt_exp_hnf_inv e₁ i₁ e₂ i₂ f₂ :
+      f₂ <ε₀ ω^e₂
+    → ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ 0₀ <ε₀ f₂).
+  Proof.
+    intro.
+    rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩),
+                eps0_lt_hnf_inv; auto.
+    firstorder.
+  Qed.
+
+  Fact eps0_lt_hnf_exp_inv e₁ i₁ f₁ e₂ i₂ :
+      f₁ <ε₀ ω^e₁
+    → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
+    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ <ₒ i₂.
+  Proof.
+    intro.
+    rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩),
+                eps0_lt_hnf_inv; auto.
+    apply or_iff_compat_l, and_iff_compat_l.
+    split; auto.
+    intros [ | (_ & ?%eps0_zero_not_gt) ]; now auto.
   Qed.
 
   Fact eps0_add_hnf_lt e₁ i₁ f₁ e₂ i₂ f₂ :
@@ -677,72 +765,6 @@ Section eps0_omega.
     Qed.
 
   End eps0_hnf_rect.
-
-  (**********************)
-
-  Fact eps0_lt_omega e : e <ε₀ ω^e.
-  Proof. apply eps0_lt_exp. Qed.
-
-  Hint Resolve eps0_lt_omega : core.
-
-  Fact eps0_omega_mono_lt : ∀ e f, e <ε₀ f → ω^e <ε₀ ω^f.
-  Proof. unfold eps0_omega; auto. Qed.
-
-  Fact eps0_omega_mono_le e f : e ≤ε₀ f → ω^e ≤ε₀ ω^f.
-  Proof. rewrite !eps0_le_iff_lt; intros [ | <- ]; auto; left; now apply eps0_omega_mono_lt. Qed.
-
-  Fact eps0_omega_inj e f : ω^e = ω^f → e = f.
-  Proof. now intros []%eps0_exp_inj. Qed.
-
-  Fact eps0_add_exp_omega e i : ω^⟨e,i⟩ +₀ ω^e = ω^⟨e,i +ₒ 1ₒ⟩.
-  Proof. unfold eps0_omega; rewrite eps0_add_exp; auto. Qed.
-
-  Fact eps0_one_eq_omega e : 1₀ = ω^e → e = 0₀.
-  Proof. rewrite <- eps0_omega_zero; now intros <-%eps0_omega_inj. Qed.
-
-  Fact eps0_zero_lt_omega e : 0₀ <ε₀ ω^e.
-  Proof. apply eps0_lt_zero_exp. Qed.
-
-  Hint Resolve eps0_zero_lt_omega : core.
-
-  Fact eps0_zero_neq_omega e : 0₀ ≠ ω^e.
-  Proof. apply eps0_zero_neq_exp. Qed.
-
-  (** head_normal_forms *)
-
-  Fact eps0_lt_exp_hnf_inv e₁ i₁ e₂ i₂ f₂ :
-      f₂ <ε₀ ω^e₂
-    → ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩ +₀ f₂
-    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ (i₁ < i₂ ∨ i₁ = i₂ ∧ 0₀ <ε₀ f₂).
-  Proof.
-    intro.
-    rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩),
-                eps0_lt_hnf_inv; auto.
-    firstorder.
-  Qed.
-
-  Fact eps0_lt_hnf_exp_inv e₁ i₁ f₁ e₂ i₂ :
-      f₁ <ε₀ ω^e₁
-    → ω^⟨e₁,i₁⟩ +₀ f₁ <ε₀ ω^⟨e₂,i₂⟩
-    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ <ₒ i₂.
-  Proof.
-    intro.
-    rewrite <- (eps0_add_zero_right ω^⟨e₂,_⟩),
-                eps0_lt_hnf_inv; auto.
-    apply or_iff_compat_l, and_iff_compat_l.
-    split; auto.
-    intros [ | (_ & ?%eps0_zero_not_gt) ]; now auto.
-  Qed.
-
-  Fact eps0_lt_exp_inv e₁ i₁ e₂ i₂ :
-      ω^⟨e₁,i₁⟩ <ε₀ ω^⟨e₂,i₂⟩
-    ↔ e₁ <ε₀ e₂ ∨ e₁ = e₂ ∧ i₁ <ₒ i₂.
-  Proof.
-    rewrite <- (eps0_add_zero_right ω^⟨e₁,_⟩).
-    apply eps0_lt_hnf_exp_inv; auto.
-  Qed.
-
-  Hint Resolve ord_lt_le_weak : core.
 
   Fact eps0_le_exp_inv e₁ i₁ e₂ i₂ :
       ω^⟨e₁,i₁⟩ ≤ε₀ ω^⟨e₂,i₂⟩
@@ -904,13 +926,12 @@ Section eps0_omega.
     + rewrite eps0_add_assoc.
       apply eps0_lt_le_trans with (2 := eps0_le_add_exp_omega _ H); auto.
       apply eps0_add_mono_right, eps0_add_below_omega; auto.
-      now apply eps0_lt_trans with (1 := H2), eps0_exp_mono_left.
+      apply eps0_lt_trans with (1 := H2); auto.
     + rewrite eps0_add_zero_right; apply eps0_lt_trans with (1 := H); auto.
-    + apply eps0_lt_le_trans with ω^e.
-      * apply eps0_add_below_omega; auto.
-        - now apply eps0_lt_trans with (1 := H), eps0_exp_mono_left.
-        - now apply eps0_lt_trans with (1 := H2), eps0_exp_mono_left.
-      * apply eps0_exp_mono; auto.
+    + apply eps0_lt_le_trans with ω^e; auto.
+      apply eps0_add_below_omega; auto.
+      * apply eps0_lt_trans with (1 := H); auto.
+      * apply eps0_lt_trans with (1 := H2); auto.
   Qed.
 
   Section eps0_hnf_pos_rect.

@@ -418,13 +418,10 @@ Section eps0_m1add.
       apply eps0_lt_exp_inv; auto.
   Qed.
 
+  Hint Resolve eps0_lt_trans eps0_lt_exp_left eps0_lt_exp_omega : core.
+
   Fact eps0_m1add_below_omega' a n e i : a <ε₀ ω^⟨e,i⟩ → eps0_m1add a n <ε₀ ω^(S₀ e).
-  Proof.
-    intros H.
-    apply eps0_m1add_below_omega,
-          eps0_lt_trans with (1 := H),
-          eps0_exp_mono_left; auto.
-  Qed.
+  Proof. intros; apply eps0_m1add_below_omega; eauto. Qed.
 
   Fact eps0_m1add_is_limit a j : ord_is_limit j → a = 0₀ ∨ eps0_is_limit (eps0_m1add a j).
   Proof.
@@ -531,7 +528,7 @@ Section eps0_momega.
     + now apply eps0_zero_not_gt in Hab.
     + rewrite !eps0_momega_fix_1; auto.
       apply eps0_lt_hnf_inv in Hab; auto.
-      apply eps0_omega_mono_le.
+      apply eps0_le_omega.
       destruct Hab as [ | (<- & _) ]; auto.
   Qed.
 
@@ -544,8 +541,9 @@ Section eps0_momega.
     destruct a using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in H.
     + rewrite !eps0_momega_fix_1; auto.
-      apply eps0_omega_mono_lt; auto.
   Qed.
+
+  Hint Resolve eps0_le_omega eps0_lt_exp_omega : core.
 
   Fact eps0_momega_lt_pos a e :
       0₀ <ε₀ a
@@ -556,7 +554,6 @@ Section eps0_momega.
     destruct a using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Ha.
     + rewrite eps0_momega_fix_1; auto.
-      apply eps0_omega_mono_le; auto.
   Qed.
 
   Fact eps0_lt_m1add_momega a n f :
@@ -572,7 +569,6 @@ Section eps0_momega.
       * rewrite eps0_m1add_fix_1; auto.
         apply eps0_lt_hnf_exp_inv; auto.
       * rewrite eps0_m1add_fix_2; auto.
-        apply eps0_exp_mono_left; auto.
   Qed.
 
   Fact eps0_momega_below_omega a b e f :
@@ -585,7 +581,7 @@ Section eps0_momega.
     + apply eps0_le_lt_trans with (eps0_momega ω^⟨g,i⟩ b).
       * apply eps0_momega_mono_left; auto.
       * rewrite eps0_momega_exp.
-        apply eps0_omega_mono_lt.
+        apply eps0_lt_omega.
         apply eps0_lt_le_trans with (g +₀ f); auto.
   Qed.
 
@@ -597,11 +593,10 @@ Section eps0_momega.
     intros [ [ -> | (i & c & -> & ? & ?) ] | (g & i & H1 & ?) ]%eps0_below_exp_inv ?.
     + rewrite eps0_momega_fix_0; auto.
     + rewrite eps0_momega_fix_1; auto.
-      apply eps0_omega_mono_lt; auto.
     + apply eps0_lt_le_weak, eps0_momega_mono_left with (c := b) in H1.
       apply eps0_le_lt_trans with (1 := H1).
       rewrite eps0_momega_exp; auto.
-      apply eps0_omega_mono_lt.
+      apply eps0_lt_omega.
       apply eps0_le_lt_trans with (e +₀ b); auto.
   Qed.
 
@@ -697,9 +692,8 @@ Section eps0_mult.
                 eps0_m1add_add; auto.
       * rewrite eps0_mult_hnf_right; auto.
         apply eps0_add_below_omega.
-        - now apply eps0_exp_mono_left.
-        - apply eps0_lt_trans with (1 := H),
-                eps0_omega_mono_lt; auto.
+        - now apply eps0_lt_exp_omega.
+        - apply eps0_lt_trans with (1 := H); auto.
   Qed.
 
   Fact eps0_m1add_momega_eq a n e :
