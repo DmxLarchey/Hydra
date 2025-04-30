@@ -7,9 +7,137 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import Arith Euclid Lia Utf8.
+From Coq Require Import Relations Utf8.
 
-From Hydra Require Import ordered.
+From Hydra Require Import utils ordered.
+
+Set Implicit Arguments.
+
+Record ord : Type := {
+  ord_type :> Type;
+  ord_lt : ord_type → ord_type → Prop;
+  ord_le : ord_type → ord_type → Prop;
+  ord_zero : ord_type;
+  ord_one  : ord_type;
+  ord_add : ord_type → ord_type → ord_type;
+  ord_mul : ord_type → ord_type → ord_type;
+  ord_lt_wf : well_founded ord_lt;
+  ord_lt_irrefl : ∀i, ¬ ord_lt i i;
+  ord_lt_trans : transitive ord_lt;
+  ord_le_lt_iff : ∀ i j, ord_le i j ↔ i = j ∨ ord_lt i j;
+  ord_lt_sdec : ∀ i j, sdec ord_lt i j;
+  ord_le_zero_least : ∀i, ord_le ord_zero i;
+  ord_zero_lt_one : ord_lt ord_zero ord_one;
+  ord_zero_ge_one : ∀i, i = ord_zero ∨ ord_le ord_one i;
+  ord_sub : ∀ i j, ord_le i j → { k | j = ord_add i k };
+  ord_add_zero_left : ∀i, ord_add ord_zero i = i;
+  ord_add_zero_right : ∀i, ord_add i ord_zero = i;
+  ord_1add_le_succ_comm : ∀i, ord_le (ord_add ord_one i) (ord_add i ord_one);
+  ord_lt_add_right : ∀ i j k, ord_lt i j → ord_lt (ord_add k i) (ord_add k j);
+  ord_le_add_left  : ∀ i j k, ord_le i j → ord_le (ord_add i k) (ord_add j k);
+  ord_add_assoc : ∀ i j k, ord_add (ord_add i j) k = ord_add i (ord_add j k); }.
+ 
+  Fact ord_mul_assoc i j k : (i *ₒ j) *ₒ k = i *ₒ (j *ₒ k).
+  Proof. solve ord. Qed.
+  
+  Fact ord_mul_zero_left i : 0ₒ *ₒ i = 0ₒ.
+  Proof. solve ord. Qed.
+  
+  Fact ord_mul_zero_right i : i *ₒ 0ₒ = 0ₒ.
+  Proof. solve ord. Qed.
+  
+  Fact ord_mul_one_left i : 1ₒ *ₒ i = i.
+  Proof. solve ord. Qed.
+  
+  Fact ord_mul_one_right i : i *ₒ 1ₒ = i.
+  Proof. solve ord. Qed.
+  
+  Fact ord_mul_distr i j k : k *ₒ (i +ₒ j) = k *ₒ i +ₒ k *ₒ j.
+  Proof. solve ord. Qed.
+
+  (* Strict monotony on the right can be derived !! *)
+  Fact ord_mul_mono i j k l : i ≤ₒ j → k ≤ₒ l → i *ₒ k ≤ₒ j *ₒ l.
+  Proof. solve ord; apply Nat.mul_le_mono. Qed.
+
+  Fact ord_mul_is_zero_inv i j : i *ₒ j = 0 → i = 0 ∨ j = 0.
+  Proof. solve ord. Qed.
+
+  Definition ord_is_succ n := (∃j, n = j +ₒ 1ₒ).
+  Definition ord_is_limit n := n ≠ 0ₒ ∧ ¬ ord_is_succ n.
+
+  Fact ord_is_succ_dec i : { j | i = j +ₒ 1ₒ } + { ¬ ord_is_succ i }.
+  Proof.
+    destruct i as [ | i ].
+    + right; intros (? & H); revert H; solve ord.
+    + left; exists i; solve ord.
+  Qed.
+
+  (* if _.i is a successor then i must be a successor *)
+  Fact ord_mul_is_succ_inv a i : ord_is_succ (a *ₒ i) → ord_is_succ i.
+  Proof.
+    destruct i as [ | i ].
+    + intros (j & H); exfalso; revert H; solve ord.
+    + exists i; solve ord.
+  Qed.
+  
+  Local Fact ord_nat_no_limit n : ord_is_limit n → False.
+  Proof.
+    destruct n; intros (? & H); [ easy | ].
+    apply H; exists n; solve ord.
+  Qed.
+  
+  Definition ord_fseq {i} : ord_is_limit i → nat → ord.
+  Proof. intros []%ord_nat_no_limit. Qed.
+  
+  Fact ord_fseq_pirr i (l₁ l₂ : ord_is_limit i) n : ord_fseq l₁ n = ord_fseq l₂ n.
+  Proof. exfalso; now apply ord_nat_no_limit in l₁. Qed.
+  
+  Fact ord_fseq_incr i l n : @ord_fseq i l n <ₒ ord_fseq l (S n).
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+ 
+  Fact ord_fseq_lt i l n : @ord_fseq i l n <ₒ i.
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+  
+  Fact ord_fseq_limit i l j : j <ₒ i → ∃n, j <ₒ @ord_fseq i l n.
+  Proof. exfalso; now apply ord_nat_no_limit in l. Qed.
+  
+  Fact ord_fseq_add a e (le : ord_is_limit e) (lae : ord_is_limit (a +ₒ e)) :
+     ∀n, ord_fseq lae n ≤ₒ a +ₒ ord_fseq le n.
+  Proof. exfalso; now apply ord_nat_no_limit in le. Qed.
+  
+  Fact ord_fseq_mul a e (le : ord_is_limit e) (lae : ord_is_limit (a *ₒ e)) :
+     ∀n, ord_fseq lae n ≤ₒ a *ₒ ord_fseq le n.
+  Proof. exfalso; now apply ord_nat_no_limit in le. Qed.
+  
+  Definition ord_mseq (n : nat) : ord := n.
+  
+  Fact ord_mseq_incr n : ord_mseq n <ₒ ord_mseq (S n).
+  Proof. unfold ord_mseq; solve ord. Qed.
+ 
+  Fact ord_mseq_limit j : ∃n, j <ₒ ord_mseq n.
+  Proof. exists (S j); unfold ord_mseq; solve ord. Qed.
+
+  Fact ord_euclid a d : 0ₒ <ₒ d → { q : ord & { r | a = d *ₒ q +ₒ r ∧ r <ₒ d } }.
+  Proof.
+    intro Hd.
+    destruct (eucl_dev d Hd a) as [ q r ].
+    exists q, r; split; subst; solve ord.
+  Qed.
+}.
+
+Arguments ord_lt {_}.
+Arguments ord_le {_}.
+Arguments ord_add {_}.
+Arguments ord_mul {_}.
+
+#[global] Notation "x '<ₒ' y" := (ord_lt x y) (at level 70, no associativity, format "x  <ₒ  y").
+#[global] Notation "x '≤ₒ' y" := (ord_le x y) (at level 70, no associativity, format "x  ≤ₒ  y").
+
+#[global] Notation "0ₒ" := (@ord_zero _).
+#[global] Notation "1ₒ" := (@ord_one _).
+#[global] Notation "x '+ₒ' y" := (ord_add x y) (at level 31, left associativity).
+#[global] Notation "x '*ₒ' y" := (ord_mul x y) (at level 29, left associativity).
+
 
 Definition ord := nat.
 
@@ -18,16 +146,11 @@ Definition ord_one : ord := 1.
 Definition ord_lt (i j : ord) := (lt i j).
 Definition ord_le (i j : ord) := (le i j).
 
-#[global] Notation "x '<ₒ' y" := (ord_lt x y) (at level 70, no associativity, format "x  <ₒ  y").
-#[global] Notation "x '≤ₒ' y" := (ord_le x y) (at level 70, no associativity, format "x  ≤ₒ  y").
-#[global] Notation "0ₒ" := ord_zero.
-#[global] Notation "1ₒ" := ord_one.
+
 
 Definition ord_add (i j : ord) := i+j.
 Definition ord_mul (i j : ord) := i*j.
 
-#[global] Notation "x '+ₒ' y" := (ord_add x y) (at level 31, left associativity).
-#[global] Notation "x '*ₒ' y" := (ord_mul x y) (at level 29, left associativity).
 
 
 (*
@@ -73,6 +196,7 @@ Section ord.
   Fact ord_zero_lt_one : 0ₒ <ₒ 1ₒ.
   Proof. solve ord. Qed.
   
+  (* keep *)
   Fact ord_lt_one_is_zero i : i <ₒ 1ₒ → i = 0ₒ.
   Proof. solve ord. Qed.
 
