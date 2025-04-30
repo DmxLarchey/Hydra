@@ -590,15 +590,46 @@ Section eps0_fseq.
         now apply eps0_lt_trans with (1 := eps0_fseq_lt _ _).
   Qed.
 
+  Fact eps0_fseq_incr e l n : @eps0_fseq e l n <ε₀ eps0_fseq l (S n).
+  Proof. apply eps0_fseq_mono; auto. Qed.
+
 End eps0_fseq.
+
+Section eps0_mseq.
+
+  Fixpoint eps0_mseq n :=
+    match n with
+    | 0   => 0₀
+    | S n => ω^(eps0_mseq n)
+    end.
+
+  Fact eps0_mseq_incr n : eps0_mseq n <ε₀ eps0_mseq (S n).
+  Proof. apply eps0_omega_incr. Qed.
+
+  Fact eps0_mseq_limit e : ∃n, e <ε₀ eps0_mseq n.
+  Proof.
+    induction e as [ | e i f H (n & Hn) _ ] using eps0_hnf_rect.
+    + exists 1; apply eps0_zero_lt_omega.
+    + exists (S n); simpl.
+      apply eps0_add_below_omega.
+      * now apply eps0_lt_exp_omega.
+      * apply eps0_lt_trans with (1 := H); auto.
+  Qed.
+
+End eps0_mseq.
 
 Check eps0_fseq.
 Check eps0_fseq_pirr.
+Check eps0_fseq_incr.
 Check eps0_fseq_mono.
 Check eps0_fseq_gt_zero.
 Check eps0_fseq_lt.
 Check eps0_fseq_limit.
 Check eps0_fseq_add.
 Check eps0_fseq_mult.
+
+Check eps0_mseq.
+Check eps0_mseq_incr.
+Check eps0_mseq_limit.
 
 
