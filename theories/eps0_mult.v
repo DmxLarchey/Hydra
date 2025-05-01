@@ -963,6 +963,9 @@ Section eps0_multiplication.
 
   Fact eps0_mult_succ_right a e : a *₀ (S₀ e) = a *₀ e +₀ a.
   Proof. now rewrite <- eps0_add_one_right, eps0_mult_distr, eps0_mult_one_right. Qed.
+
+  Fact eps0_zero_not_succ : ~ @eps0_is_succ o 0₀.
+  Proof. intros (p & Hp); revert Hp; apply eps0_lt_neq, eps0_zero_lt_add1. Qed.
   
   (** See comment here for an algo. 
   
@@ -1010,19 +1013,90 @@ Section eps0_multiplication.
 
   *)
 
-  End eps0_mult.
+  Hint Resolve eps0_zero_lt_succ eps0_is_limit_pos ord_is_succ_succ : core.
 
-  Infix "*₀" := eps0_mult.
-
-  Fact eps0_omega_succ e : ω^(S₀ e) = ω^e *₀ ω^1₀.
+  Fact eps0_mult_omega_limit a e :
+      eps0_is_limit e
+    → eps0_is_limit (ω^a *₀ e).
   Proof.
-    now rewrite <- eps0_succ_zero_is_one,
-                   eps0_mult_omega,
-                   eps0_succ_zero_is_one,
-                   eps0_add_one_right.
+    destruct 1 as [ | e j l H | e j f l l' Hf ? ] using eps0_limit_dep_rect.
+    + rewrite eps0_mult_omega_exp, eps0_add_zero_right, eps0_is_limit_exp_iff.
+      destruct (eps0_eq_dec a 0₀); auto.
+    + rewrite eps0_mult_omega_exp, eps0_is_limit_exp_iff.
+      left; intros (? & ->)%eps0_add_eq_zero.
+      revert H; apply eps0_lt_irrefl.
+    + rewrite eps0_mult_omega_hnf; auto.
+      now apply eps0_add_is_limit.
+  Qed.
+  
+  Fact eps0_mult_exp_is_limit a e n :
+    0₀ <ε₀ a → 0₀ <ε₀ e → eps0_is_limit (a *₀ ω^⟨e,n⟩).
+  Proof.
+    intros Ha He.
+    destruct a as [ | b i c H1 H2 ] using eps0_hnf_rect.
+    + contradict Ha; apply eps0_lt_irrefl.
+    + rewrite eps0_mult_hnf_exp; auto.
+      apply eps0_is_limit_exp_iff; left.
+      intros (-> & ->)%eps0_add_eq_zero.
+      revert He; apply eps0_lt_irrefl.
   Qed.
 
+  (* Of course, if a is 0 then a.e = 0 is not a limit ordinal
+     is the sense we use for the fundemental sequence *)
+  Fact eps0_mult_is_limit a e :
+    0₀ <ε₀ a → eps0_is_limit e → eps0_is_limit (a *₀ e).
+  Proof.
+    intros Ha.
+    induction e as [ | | e n f He Hf IHe IHf ] using eps0_hnf_pos_rect.
+    + now rewrite eps0_mult_zero_right.
+    + intros [ [] | (_ & l) ]%eps0_is_limit_exp_iff; auto.
+      rewrite eps0_mult_1add_right.
+      destruct (eps0_m1add_is_limit a l) as [ -> | ]; auto.
+      now apply eps0_lt_irrefl in Ha.
+    + intros [ (-> & H) | H ]%eps0_add_is_limit_inv.
+      * rewrite eps0_add_zero_right; apply eps0_mult_exp_is_limit; auto.
+      * rewrite eps0_mult_distr; apply eps0_add_is_limit; auto.
+  Qed.
+
+  Fact eps0_mult_limit_ord_limit a i b (n : o) :
+      b <ε₀ ω^a
+    → ord_is_limit n
+    → (ω^⟨a,i⟩ +₀ b) *₀ ω^⟨0₀,n⟩ = ω^⟨a,i +ₒ (1ₒ +ₒ i) *ₒ n⟩.
+  Proof.
+    intros Hb Hn.
+    rewrite <- eps0_m1add_eq, eps0_m1add_fix_2; auto.
+  Qed.
+  
+  Fact eps0_mult_hnf_ord_le a i b (n : o) :
+      b <ε₀ ω^a
+    → ω^⟨a,i +ₒ (1ₒ +ₒ i) *ₒ n⟩ ≤ε₀ (ω^⟨a,i⟩ +₀ b) *₀ ω^⟨0₀,n⟩ .
+  Proof.
+    intros Hb.
+    rewrite <- eps0_m1add_eq.
+    destruct (ord_zero_succ_limit_dec _ n) as [ [ -> | (k & ->) ] | Hn ].
+    + rewrite eps0_m1add_fix_1; auto.
+      apply ord_is_succ_10.
+    + rewrite eps0_m1add_fix_1; auto.
+      apply ord_is_succ_1add; auto.
+    + rewrite eps0_m1add_fix_2; auto.
+  Qed.
+
+  Hint Resolve eps0_is_succ_add1 : core.
+
+  Fact eps0_mult_is_succ_inv a e : eps0_is_succ (a *₀ e) → eps0_is_succ e.
+  Proof.
+    destruct (eps0_zero_or_pos a) as [ -> | Ha ].
+    1: rewrite eps0_mult_zero_left; intros []%eps0_not_is_succ_zero.  
+    destruct (eps0_zero_succ_limit_dec e) as [ [ -> | (p & ->) ] | Hae ]; auto.
+    + rewrite eps0_mult_zero_right; intros []%eps0_not_is_succ_zero.
+    + intros []%(eps0_mult_is_limit _ Ha Hae).
+  Qed.
+
+  End eps0_mult.
+
 End eps0_multiplication.
+
+Arguments eps0_mult {_}.
 
 Infix "*₀" := eps0_mult.
 
@@ -1047,7 +1121,6 @@ Check eps0_mult_cancel.
 
 
 Check eps0_omega_zero.
-Check eps0_omega_succ.
 
 (*
 

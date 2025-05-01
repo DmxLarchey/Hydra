@@ -243,6 +243,12 @@ Section eps0.
   Fact eps0_lt_one : ∀e, e <ε₀ 1₀ → e = 0₀.
   Proof. intros []; rewrite eps0_lt_iff, eps0_eq_iff; apply E0_lt_one; auto. Qed.
 
+  Fact eps0_zero_or_ge_one e : e = 0₀ ∨ 1₀ ≤ε₀ e.
+  Proof.
+    destruct (eps0_le_lt_dec 1₀ e) as [ | C ]; auto.
+    left; revert C; apply eps0_lt_one.
+  Qed.
+
   Fact eps0_le_not_succ e : ¬ S₀ e ≤ε₀ e.
   Proof. intros H; apply (@eps0_lt_irrefl e), eps0_lt_le_trans with (2 := H), eps0_lt_succ. Qed.
 
@@ -805,6 +811,12 @@ Section eps0.
     apply eps0_add_hnf_lt; auto.
   Qed.
 
+  Fact eps0_add_omega_hnf_lt e₁ e₂ i₂ f₂ :
+      e₁ <ε₀ e₂
+    → f₂ <ε₀ ω^e₂
+    → ω^e₁ +₀ (ω^⟨e₂,i₂⟩ +₀ f₂) = ω^⟨e₂,i₂⟩ +₀ f₂.
+  Proof. apply eps0_add_exp_hnf_lt. Qed.
+
   Fact eps0_add_exp_lt e₁ i₁ e₂ i₂ :
       e₁ <ε₀ e₂ → ω^⟨e₁,i₁⟩ +₀ ω^⟨e₂,i₂⟩ = ω^⟨e₂,i₂⟩.
   Proof.
@@ -838,6 +850,15 @@ Section eps0.
     intro.
     unfold eps0_omega.
     rewrite eps0_add_hnf_exp_eq, ord_add_zero_right; auto.
+  Qed.
+
+  Fact eps0_add_omega_hnf_eq e i₂ f₂ :
+      f₂ <ε₀ ω^e
+    → ω^e +₀ (ω^⟨e,i₂⟩ +₀ f₂) = ω^⟨e,1ₒ +ₒ i₂⟩ +₀ f₂.
+  Proof.
+    intro.
+    unfold eps0_omega.
+    rewrite eps0_add_exp_hnf_eq, ord_add_zero_left; auto.
   Qed.
 
   (* Ordinals below ω^e.n are of the form
@@ -875,6 +896,15 @@ Section eps0.
     → (a = 0₀) 
     + {f : ε₀ & {n | a <ε₀ ω^⟨f,n⟩ ∧ f <ε₀ e}}.
   Proof. intros [[ -> | (i & ? & ? & []%ord_not_lt_zero & _) ] | ]%eps0_below_exp_inv; auto. Qed.
+
+  Fact eps0_below_omega1_inv a :
+      a <ε₀ ω^1₀
+    → (a = 0₀) 
+    + {n | a <ε₀ ω^⟨0₀,n⟩}.
+  Proof.
+    intros [ | (f & n & H1 & H2)]%eps0_below_omega_inv; auto; right.
+    exists n; now apply eps0_lt_one in H2 as ->.
+  Qed.
 
   Fact eps0_add_lt_omega a e : a <ε₀ ω^e → a +₀ ω^e = ω^e.
   Proof.
@@ -950,10 +980,27 @@ Section eps0.
   Notation "ω^⟨ e , i ⟩" := (eps0_exp e i).
   Notation "ω^ e" := (eps0_omega e).
 
+  Fact eps0_1add_le_succ_comm e : 1₀ +₀ e ≤ε₀ e +₀ 1₀.
+  Proof.
+    rewrite <- eps0_omega_zero.
+    destruct e as [ | e i f Hf ] using eps0_hnf_rect.
+    + now rewrite eps0_add_zero_left, eps0_add_zero_right.
+    + destruct (eps0_zero_or_pos e) as [ -> | ].
+      * rewrite eps0_add_omega_hnf_eq; auto.
+        rewrite eps0_omega_zero in Hf.
+        apply eps0_lt_one in Hf as ->.
+        rewrite !eps0_add_zero_right.
+        unfold eps0_omega.
+        rewrite eps0_add_exp, ord_add_zero_right.
+        apply eps0_le_exp; auto.
+        apply ord_1add_le_succ_comm.
+      * rewrite eps0_add_omega_hnf_lt; auto.
+  Qed.
+
 (* Hence a successor is not a limit ordinal 
 
-   Successor is of shape ω[_++[(ω[[]],1+i)]]
-   Limit is either ω[[]] or ω[_++[(x,i)]] with 0 < i and x <> ω[[]] *)
+  Successor is of shape ω[_++[(ω[[]],1+i)]]
+  Limit is either ω[[]] or ω[_++[(x,i)]] with 0 < i and x <> ω[[]] *)
 
   Definition eps0_is_succ e := ∃f, e = f +₀ 1₀.
 
@@ -987,6 +1034,13 @@ Section eps0.
   Qed.
 
   Hint Resolve eps0_is_succ_exp_zero : core.
+
+  Fact eps0_not_is_succ_zero : ¬ eps0_is_succ 0₀.
+  Proof.
+   intros (p & Hp); symmetry in Hp; revert Hp. 
+   intros (_ & H)%eps0_add_eq_zero; symmetry in H.
+   revert H; apply eps0_zero_not_one.
+  Qed.
 
   Definition eps0_is_limit e := e ≠ 0₀ ∧ ¬ eps0_is_succ e.
 
@@ -1152,6 +1206,20 @@ Section eps0.
     + right; rewrite eps0_add_is_limit_iff; auto.
   Qed.
 
+  Fact eps0_add_is_succ_iff a e : eps0_is_succ (a +₀ e) ↔ eps0_is_succ e ∨ e = 0₀ ∧ eps0_is_succ a.
+  Proof.
+    split.
+    + destruct (eps0_zero_succ_limit_dec e) as [ [ -> | (p & ->) ] | He ]; auto.
+      * rewrite eps0_add_zero_right; auto.
+      * intros H.
+        assert (eps0_is_limit (a +₀ e)) as C
+          by now apply eps0_add_is_limit.
+        now apply C in H.
+    + intros [ (p & ->) | (-> & ?) ].
+      * rewrite <- eps0_add_assoc; auto.
+      * now rewrite eps0_add_zero_right.
+  Qed.
+
   Fact eps0_zero_lt_add1 e : 0₀ <ε₀ e +₀ 1₀.
   Proof. apply eps0_le_lt_trans with (2 := eps0_lt_add1 _); auto. Qed.
 
@@ -1215,7 +1283,39 @@ Section eps0.
       rewrite eps0_add_exp_lt; auto.
   Qed.
 
+  Section eps0_limit_dep_rect.
+
+  Variables (P : ∀e, eps0_is_limit e → Type)
+            (HP0 : ∀ j l, ord_is_limit j → @P ω^⟨0₀,j⟩ l)
+            (HP1 : ∀ e j l, 0₀ <ε₀ e → @P ω^⟨e,j⟩ l)
+            (HP2 : ∀ e j f l l', 0₀ <ε₀ e → f <ε₀ ω^e → @P f l → @P (ω^⟨e,j⟩ +₀ f) l').
+
+  Theorem eps0_limit_dep_rect e l : @P e l.
+  Proof.
+    induction e as [ | e j f H IH1 IH2 ] in l |- * using eps0_hnf_rect.
+    + exfalso; now destruct l.
+    + destruct (eps0_is_limit_dec f) as [ Hf | Hf ].
+      * apply HP2 with (3 := IH2 Hf); auto.
+        destruct (eps0_zero_or_pos e) as [ -> | ]; auto.
+        rewrite eps0_omega_zero in H.
+        apply eps0_lt_one in H as ->.
+        now destruct Hf as [ [] ].
+      * assert (f = 0₀) as ->
+          by (rewrite eps0_hnf_is_limit in l; tauto).
+        revert l; rewrite eps0_add_zero_right; intros l.
+        destruct (eps0_eq_dec e 0₀) as [ -> | He ].
+        - apply HP0.
+          apply eps0_is_limit_exp_iff in l; tauto.
+        - apply HP1.
+          now destruct (eps0_zero_or_pos e).
+  Qed.
+
+  End eps0_limit_dep_rect.
+
 End eps0.
+
+Arguments eps0_is_succ {_}.
+Arguments eps0_is_limit {_}.
 
 #[global] Notation ε₀ := (@eps0 _).
 

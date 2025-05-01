@@ -220,8 +220,11 @@ Section ord_extra.
 
   Hint Resolve ord_lt_zero_succ : core.
 
+  Fact ord_zero_not_succ i : 0ₒ ≠ i +ₒ 1ₒ .
+  Proof. apply ord_lt_neq; auto. Qed.
+
   Fact ord_succ_not_zero i : i +ₒ 1ₒ ≠ 0ₒ.
-  Proof. symmetry; apply ord_lt_neq; auto. Qed.
+  Proof. symmetry; apply ord_zero_not_succ. Qed.
 
   Fact ord_add_mono_lt_inv i j k : k +ₒ i <ₒ k +ₒ j → i <ₒ j.
   Proof.
