@@ -7,8 +7,8 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Arith Lia Wellfounded Utf8.
-From Hydra Require Import utils ord ordered eps0.
+From Coq Require Import List Relations Wellfounded Utf8.
+From Hydra Require Import utils ordinal ordered eps0.
 
 Import ListNotations.
 
@@ -19,15 +19,15 @@ Set Implicit Arguments.
 
 #[local] Hint Resolve eps0_le_refl eps0_lt_succ
                       eps0_zero_least
-                      eps0_add_incr
-                      eps0_add_mono_right
+                      eps0_lt_add_incr
+                      eps0_lt_add_right
                       eps0_lt_zero_exp 
                       eps0_zero_lt_omega 
                       eps0_lt_le_weak 
-                      eps0_add_mono_left 
-                      eps0_add_mono
-                      eps0_add_incr_left
-                      eps0_add_incr_right
+                      eps0_le_add_left 
+                      eps0_le_add
+                      eps0_le_add_incr_left
+                      eps0_le_add_incr_right
 : core.
 
 (** Multiplication rules for j < ε₀
@@ -116,20 +116,24 @@ Set Implicit Arguments.
 
 Section ord_extra.
 
-  Fact ord_not_is_succ_is_limit j : ord_is_succ (1 +ₒ j) → ord_is_limit j → False.
+  Variables (o : ord).
+
+  Implicit Types (i j k : o).
+
+  Fact ord_not_is_succ_is_limit j : ord_is_succ (1ₒ +ₒ j) → ord_is_limit j → False.
   Proof. intros H G%ord_is_limit_1add; now apply G in H. Qed.
 
   Fact ord_1add_choose j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
   Proof.
-    destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | ]; auto; left.
+    destruct (ord_zero_succ_limit_dec _ j) as [ [ -> | (p & ->) ] | ]; auto; left.
     + apply ord_is_succ_10.
     + apply ord_is_succ_1add, ord_is_succ_succ.
   Qed. 
 
   Fact ord_mulp_distr k i j : k *ₚ (i +ₚ j) = (k *ₚ i) +ₚ (k *ₚ j).
   Proof.
-    rewrite !ord_add_assoc, <-(ord_add_assoc 1ₒ).
-    rewrite <-(ord_mul_one_right (1ₒ +ₒ k)) at 3.
+    rewrite !ord_add_assoc, <-(@ord_add_assoc o 1ₒ).
+    rewrite <-(ord_mul_one_right _ (1ₒ +ₒ k)) at 3.
     now rewrite <- !ord_mul_distr.
   Qed.
 
@@ -167,23 +171,28 @@ Section ord_extra.
    + now apply ord_is_limit_1add.
   Qed.
 
-  Fact ord_mulp_zero_left n : 0ₒ *ₚ n = n.
+  Fact ord_mulp_zero_left i : 0ₒ *ₚ i = i.
   Proof. now rewrite ord_add_zero_right, ord_add_zero_left, ord_mul_one_left. Qed.
 
 End ord_extra.
 
-#[local] Hint Resolve ord_mulp_is_succ
+Section eps0_multiplication.
+
+  Hint Resolve ord_mulp_is_succ
                ord_mulp_is_limit_left
                ord_mulp_is_limit_right : core.
 
-Section eps0_m1add.
+  Variables (o : ord).
 
+  Notation ε₀ := (@eps0 o).
+
+  Section eps0_m1add.
 
   (** The operation (θ : ε₀) (j : ord) => θ.(1+j)
       remember (1+i)*(1+j) = 1+(i+(1+i)*j) *)
   Inductive eps0_m1add_gr j : ε₀ → ε₀ → Prop :=
     | eps0_m1add_gr_0 :       eps0_m1add_gr j 0₀ 0₀
-    | eps0_m1add_gr_1 α i β : ord_is_succ (1 +ₒ j)
+    | eps0_m1add_gr_1 α i β : ord_is_succ (1ₒ +ₒ j)
                             → β <ε₀ ω^α
                             → eps0_m1add_gr j (ω^⟨α,i⟩ +₀ β) (ω^⟨α,i *ₚ j⟩ +₀ β)
     | eps0_m1add_gr_2 α i β : ord_is_limit j
@@ -207,7 +216,7 @@ Section eps0_m1add.
   Proof.
     destruct e as [ | e i f H _ _ ] using eps0_hnf_rect.
     + exists 0₀; constructor.
-    + destruct (ord_1add_choose j) as [ G | G ].
+    + destruct (ord_1add_choose _ j) as [ G | G ].
       * exists (ω^⟨e,i *ₚ j⟩ +₀ f); now constructor.
       * exists (ω^⟨e,i *ₚ j⟩); now constructor.
   Qed.
@@ -224,7 +233,7 @@ Section eps0_m1add.
   Proof. solve m1add. Qed.
 
   Fact eps0_m1add_fix_1 j α i β :
-    ord_is_succ (1 +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^⟨α,i⟩ +₀ β) j = ω^⟨α,i *ₚ j⟩ +₀ β.
+    ord_is_succ (1ₒ +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^⟨α,i⟩ +₀ β) j = ω^⟨α,i *ₚ j⟩ +₀ β.
   Proof. solve m1add. Qed.
 
   Fact eps0_m1add_fix_2 j α i β :
@@ -234,7 +243,7 @@ Section eps0_m1add.
   Fact eps0_m1add_exp j α i : eps0_m1add ω^⟨α,i⟩ j = ω^⟨α,i *ₚ j⟩.
   Proof. 
     rewrite <- (eps0_add_zero_right ω^⟨_,i⟩).
-    destruct (ord_1add_choose j).
+    destruct (ord_1add_choose _ j).
     + rewrite eps0_m1add_fix_1, eps0_add_zero_right; auto.
     + rewrite eps0_m1add_fix_2; auto.
   Qed.
@@ -250,7 +259,7 @@ Section eps0_m1add.
   Qed.
 
   Fact eps0_m1add_omega_add_succ j α β : 
-    ord_is_succ (1 +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^α +₀ β) j = ω^⟨α,j⟩ +₀ β.
+    ord_is_succ (1ₒ +ₒ j) → β <ε₀ ω^α → eps0_m1add (ω^α +₀ β) j = ω^⟨α,j⟩ +₀ β.
   Proof.
     intros; unfold eps0_omega.
     rewrite eps0_m1add_fix_1; auto; f_equal; trivial.
@@ -276,8 +285,8 @@ Section eps0_m1add.
   Proof.
     destruct e using eps0_hnf_rect.
     + now rewrite !eps0_m1add_fix_0, eps0_add_zero_left.
-    + destruct (ord_1add_choose j) as [ Gj | Gj ];
-      destruct (ord_1add_choose i) as [ Gi | Gi ].
+    + destruct (ord_1add_choose _ j) as [ Gj | Gj ];
+      destruct (ord_1add_choose _ i) as [ Gi | Gi ].
       * do 3 (rewrite eps0_m1add_fix_1; auto).
         - rewrite eps0_add_hnf_eq, ord_mulp_distr; auto.
         - rewrite !ord_add_assoc, <- ord_add_assoc.
@@ -300,8 +309,8 @@ Section eps0_m1add.
   Proof.
     destruct e using eps0_hnf_rect.
     + now rewrite !eps0_m1add_fix_0.
-    + destruct (ord_1add_choose j) as [ Gj | Gj ];
-      destruct (ord_1add_choose i) as [ Gi | Gi ].
+    + destruct (ord_1add_choose _ j) as [ Gj | Gj ];
+      destruct (ord_1add_choose _ i) as [ Gi | Gi ].
       * do 3 (rewrite eps0_m1add_fix_1; auto).
         now rewrite ord_mulp_assoc.
       * rewrite eps0_m1add_fix_2 with (j := i); auto.
@@ -315,8 +324,10 @@ Section eps0_m1add.
         rewrite eps0_m1add_exp, ord_mulp_assoc; auto.
   Qed.
 
-  Hint Resolve ord_add_mono_le ord_mul_mono ord_le_refl ord_lt_le_weak 
-               ord_add_mono_lt_right : core.
+  Hint Resolve ord_le_add ord_le_mul ord_le_refl ord_lt_le_weak 
+               ord_lt_add_right : core.
+
+  Hint Resolve eps0_lt_le_trans : core.
 
   (* This is incorrect for limit ordinals : 3.ω = 2.ω but not 3 < 2 *) 
   Fact eps0_m1add_mono_left_eq_succ a b n : 
@@ -327,8 +338,8 @@ Section eps0_m1add.
       destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Hab.
     + rewrite eps0_m1add_fix_0.
-      destruct (ord_1add_choose n).
-      * rewrite eps0_m1add_fix_1; auto.
+      destruct (ord_1add_choose _ n).
+      * rewrite eps0_m1add_fix_1; eauto.
       * rewrite eps0_m1add_fix_2; auto.
     + now apply eps0_zero_not_gt in Hab.
     + apply eps0_lt_hnf_inv in Hab; auto.
@@ -351,7 +362,7 @@ Section eps0_m1add.
       destruct b as [ | g j h H2 _ _ ] using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Hab.
     + rewrite eps0_m1add_fix_0.
-      destruct (ord_1add_choose n).
+      destruct (ord_1add_choose _ n).
       * rewrite eps0_m1add_fix_1; auto.
       * rewrite eps0_m1add_fix_2; auto.
     + now apply eps0_zero_not_gt in Hab.
@@ -366,7 +377,7 @@ Section eps0_m1add.
     a ≤ε₀ b → eps0_m1add a n ≤ε₀ eps0_m1add b n.
   Proof.
     intros [ | -> ]%eps0_le_iff_lt; auto.
-    destruct (ord_1add_choose n).
+    destruct (ord_1add_choose _ n).
     + apply eps0_le_iff_lt; left; apply eps0_m1add_mono_left_eq_succ; auto.
     + apply eps0_m1add_mono_left_eq_limit; auto.
   Qed.
@@ -399,8 +410,7 @@ Section eps0_m1add.
     replace (n +ₒ 1ₒ) with (n +ₚ 0ₒ).
     2: now rewrite ord_add_zero_right.
     rewrite <- eps0_m1add_add.
-    rewrite <- (eps0_add_zero_right (eps0_m1add a n)) at 1.
-    apply eps0_add_mono_right; auto.
+    rewrite <- (eps0_add_zero_right (eps0_m1add a n)) at 1; auto.
   Qed.
 
   Hint Resolve eps0_m1add_mono_right_le : core.
@@ -433,11 +443,12 @@ Section eps0_m1add.
       destruct (eps0_eq_dec e 0₀); auto.
   Qed. 
 
-End eps0_m1add.
+  End eps0_m1add.
 
-#[local] Hint Resolve eps0_m1add_mono_left eps0_m1add_gt_zero : core.
+  Hint Resolve eps0_m1add_mono_left eps0_m1add_gt_zero : core.
+  Hint Resolve eps0_lt_omega : core.
 
-Section eps0_momega.
+  Section eps0_momega.
 
   (** now the operation (θ α : ε₀) => θ.ω^α *)
   Inductive eps0_momega_gr α : ε₀ → ε₀ → Prop :=
@@ -479,7 +490,7 @@ Section eps0_momega.
     intros He.
     destruct a using eps0_hnf_rect.
     + now rewrite eps0_m1add_fix_0.
-    + destruct (ord_1add_choose i).
+    + destruct (ord_1add_choose _ i).
       * rewrite eps0_m1add_fix_1; auto.
         rewrite !eps0_momega_fix_1; auto.
       * rewrite eps0_m1add_fix_2; auto.
@@ -496,7 +507,7 @@ Section eps0_momega.
     + now rewrite !eps0_m1add_fix_0, eps0_add_zero_left.
     + rewrite eps0_momega_fix_1; auto.
       rewrite eps0_m1add_omega.
-      destruct (ord_1add_choose n).
+      destruct (ord_1add_choose _ n).
       * rewrite eps0_m1add_fix_1; auto.
         rewrite <- (eps0_add_zero_right ω^⟨_,k⟩).
         rewrite eps0_add_hnf_lt; auto.
@@ -565,7 +576,7 @@ Section eps0_momega.
     destruct a using eps0_hnf_rect.
     + now apply eps0_lt_irrefl in Ha.
     + rewrite eps0_momega_fix_1; auto.
-      destruct (ord_1add_choose n).
+      destruct (ord_1add_choose _ n).
       * rewrite eps0_m1add_fix_1; auto.
         apply eps0_lt_hnf_exp_inv; auto.
       * rewrite eps0_m1add_fix_2; auto.
@@ -600,9 +611,9 @@ Section eps0_momega.
       apply eps0_le_lt_trans with (e +₀ b); auto.
   Qed.
 
-End eps0_momega.
+  End eps0_momega.
 
-Section eps0_mult.
+  Section eps0_mult.
 
   (* now the operation (γ α : ε₀) => γ.α *)
   Inductive eps0_mult_gr γ : ε₀ → ε₀ → Prop :=
@@ -760,8 +771,10 @@ Section eps0_mult.
   Proof.
     intros ? (? & -> & ?)%eps0_lt_inv_add.
     rewrite eps0_mult_distr.
-    now apply eps0_add_incr, eps0_mult_gt_zero.
+    now apply eps0_lt_add_incr, eps0_mult_gt_zero.
   Qed.
+
+  Hint Resolve ord_le_refl eps0_le_add eps0_m1add_mono eps0_momega_mono_left : core.
 
   Fact eps0_mult_mono_left a b e :
     a <ε₀ b → a *₀ e ≤ε₀ b *₀ e.
@@ -771,9 +784,6 @@ Section eps0_mult.
     + rewrite !eps0_mult_zero_right; auto.
     + rewrite !eps0_mult_1add_right; auto.
     + rewrite !eps0_mult_right; auto.
-      apply eps0_add_mono; auto.
-      apply eps0_m1add_mono; auto.
-      apply eps0_momega_mono_left; auto.
   Qed.
 
   Fact eps0_mult_mono a b e f :
@@ -874,7 +884,7 @@ Section eps0_mult.
       destruct a as [ | a1 j a2 ] using eps0_hnf_rect.
       * now rewrite !eps0_mult_zero_left, eps0_add_zero_left, eps0_m1add_fix_0.
       * rewrite eps0_mult_hnf_exp; auto.
-        destruct (ord_1add_choose n).
+        destruct (ord_1add_choose _ n).
         - rewrite !eps0_m1add_fix_1; auto.
           ++ rewrite eps0_mult_distr, eps0_mult_hnf_exp; auto.
           ++ apply eps0_mult_below_omega with (n := j +ₚ 0ₒ); auto.
@@ -937,7 +947,7 @@ Section eps0_mult.
     intros E.
     destruct (eps0_zero_or_pos a) as [ | Ha ]; auto.
     destruct (eps0_zero_or_pos e) as [ | He ]; auto.
-    destruct (@eps0_lt_irrefl 0₀).
+    destruct (@eps0_lt_irrefl o 0₀).
     rewrite <- E at 2.
     now apply eps0_mult_gt_zero.
   Qed.
@@ -946,7 +956,7 @@ Section eps0_mult.
   Proof.
     intros Ha H.
     destruct (eps0_lt_sdec e f) as [ e f C | | e f C ]; auto; exfalso;
-      apply (@eps0_lt_irrefl (a *₀ e)).
+      apply (@eps0_lt_irrefl _ (a *₀ e)).
     + rewrite H at 2; now apply eps0_mult_mono_right.
     + rewrite H at 1; now apply eps0_mult_mono_right.
   Qed.
@@ -1000,7 +1010,19 @@ Section eps0_mult.
 
   *)
 
-End eps0_mult.
+  End eps0_mult.
+
+  Infix "*₀" := eps0_mult.
+
+  Fact eps0_omega_succ e : ω^(S₀ e) = ω^e *₀ ω^1₀.
+  Proof.
+    now rewrite <- eps0_succ_zero_is_one,
+                   eps0_mult_omega,
+                   eps0_succ_zero_is_one,
+                   eps0_add_one_right.
+  Qed.
+
+End eps0_multiplication.
 
 Infix "*₀" := eps0_mult.
 
@@ -1023,13 +1045,6 @@ Check eps0_mult_cancel.
 
 (** Section expo *)
 
-Fact eps0_omega_succ e : ω^(S₀ e) = ω^e *₀ ω^1₀.
-Proof.
-  now rewrite <- eps0_succ_zero_is_one,
-                 eps0_mult_omega,
-                 eps0_succ_zero_is_one,
-                 eps0_add_one_right.
-Qed.
 
 Check eps0_omega_zero.
 Check eps0_omega_succ.

@@ -49,7 +49,7 @@ Record ord : Type := {
 
   ord_is_succ_dec : ∀i, { j | i = ord_add j ord_one } + { ¬ ∃j, i = ord_add j ord_one  };
   (* if _.i is a successor then i must be a successor *)
-  ord_mul_is_succ_inv : ∀ a i, (∃j, ord_add (ord_mul a i) ord_one = ord_add j ord_one) 
+  ord_mul_is_succ_inv : ∀ a i, (∃j, ord_mul a i = ord_add j ord_one) 
                              → (∃j, i = ord_add j ord_one);
 
   ord_fseq : ∀ i, (i ≠ ord_zero ∧ ¬ ∃j, i = ord_add j ord_one) → nat → ord_type;
@@ -69,6 +69,7 @@ Arguments ord_lt {_}.
 Arguments ord_le {_}.
 Arguments ord_add {_}.
 Arguments ord_mul {_}.
+Arguments ord_sub {_}.
 Arguments ord_fseq {_ _}.
 Arguments ord_zero_ge_one {_}.
 Arguments ord_lt_sdec {_}.
@@ -222,8 +223,6 @@ Section ord_extra.
   Fact ord_succ_not_zero i : i +ₒ 1ₒ ≠ 0ₒ.
   Proof. symmetry; apply ord_lt_neq; auto. Qed.
 
-now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
-
   Fact ord_add_mono_lt_inv i j k : k +ₒ i <ₒ k +ₒ j → i <ₒ j.
   Proof.
     intros H.
@@ -240,7 +239,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   (* False: 2 + ω <= 1 + ω but not 2 <= 1 *)
   (* Fact ord_add_mono_le_inv_left i j k : i +ₒ k ≤ₒ j +ₒ k → i ≤ₒ j. *)
   
-  Fact ord_lt_add_one_is_succ i j : i <ₒ j → j <ₒ i +ₒ 1 → False.
+  Fact ord_lt_add_one_is_succ i j : i <ₒ j → j <ₒ i +ₒ 1ₒ → False.
   Proof.
     intros H1 H2.
     destruct (ord_sub i j) as (k & ->); auto.
@@ -251,30 +250,31 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   
   Hint Resolve ord_lt_succ : core.
   
-  Fact ord_lt__succ_le_iff i j : i <ₒ j ↔ i +ₒ 1 ≤ₒ j.
+  Fact ord_lt__succ_le_iff i j : i <ₒ j ↔ i +ₒ 1ₒ ≤ₒ j.
   Proof.
     split; eauto.
     intros H.
-    destruct (ord_le_lt_dec (i +ₒ 1) j); auto.
+    destruct (ord_le_lt_dec (i +ₒ 1ₒ) j); auto.
     now destruct (ord_lt_add_one_is_succ i j).
   Qed.
   
-  Fact ord_lt_succ__le_iff i j : i <ₒ j +ₒ 1 ↔ i ≤ₒ j.
+  Fact ord_lt_succ__le_iff i j : i <ₒ j +ₒ 1ₒ ↔ i ≤ₒ j.
   Proof.
     split; eauto.
     intros H.
     destruct (ord_le_lt_dec i j) as [ | ?%ord_lt__succ_le_iff ]; auto.
-    destruct (ord_lt_irrefl (j +ₒ 1)); eauto.
+    destruct (ord_lt_irrefl (j +ₒ 1ₒ)); eauto.
   Qed.
 
+(*
   Hint Resolve ord_add_mono_lt_right ord_zero_lt_one
                ord_add_mono_le ord_le_zero_least
-               ord_le_refl : core.
+               ord_le_refl : core. *)
 
-  Fact ord_zero_lt_succ i : 0 <ₒ i +ₒ 1ₒ.
+  Fact ord_zero_lt_succ i : 0ₒ <ₒ i +ₒ 1ₒ.
   Proof. apply ord_le_lt_trans with (i +ₒ 0ₒ); eauto. Qed.
   
-  Fact ord_zero_lt_1add i : 0 <ₒ 1ₒ +ₒ i.
+  Fact ord_zero_lt_1add i : 0ₒ <ₒ 1ₒ +ₒ i.
   Proof. apply ord_lt_le_trans with (1ₒ +ₒ 0ₒ); eauto. Qed.
   
   Hint Resolve ord_zero_lt_1add : core.
@@ -306,8 +306,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   
   Fact ord_eq_succ_iff i j : i +ₒ 1ₒ = j +ₒ 1ₒ ↔ i = j. 
   Proof.
-    split; auto.
-    intros H.
+    split; intros H; subst; auto.
     destruct (ord_lt_sdec i j) as [ i j C | | i j C ]; auto.
     all: exfalso; apply ord_lt_succ_mono_iff in C; revert C; rewrite H; apply ord_lt_irrefl.
   Qed.
@@ -321,7 +320,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   Fact ord_zero_succ_limit_dec n : (n = 0ₒ) + { p | n = p +ₒ 1ₒ } + (ord_is_limit n).
   Proof.
     destruct (ord_eq_dec n 0ₒ) as [ -> | H1 ]; auto.
-    destruct (ord_is_succ_dec n) as [ | H2 ]; auto.
+    destruct (ord_is_succ_dec _ n) as [ | H2 ]; auto.
     right; now split.
   Qed.
 
@@ -368,18 +367,18 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   Fact ord_add_zero_inv i j : i +ₒ j = 0ₒ → i = 0ₒ ∧ j = 0ₒ.
   Proof.
     intros H.
-    generalize (ord_le_zero_least i).
+    generalize (ord_le_zero_least _ i).
     intros [<- | C ]%ord_le_lt_iff.
     + now rewrite ord_add_zero_left in H.
-    + destruct (ord_lt_irrefl 0ₒ).
+    + destruct (@ord_lt_irrefl o 0ₒ).
       rewrite <- H at 2.
       apply ord_lt_le_trans with (1 := C); auto.
       apply ord_add_incr_left.
   Qed.
 
-  Hint Resolve ord_is_succ_succ : core.
+  Hint Resolve ord_is_succ_10 ord_is_succ_succ : core.
 
-  Fact ord_is_succ_add i j : ord_is_succ (i +ₒ j) ↔ ord_is_succ j ∨ j = 0 ∧ ord_is_succ i.
+  Fact ord_is_succ_add i j : ord_is_succ (i +ₒ j) ↔ ord_is_succ j ∨ j = 0ₒ ∧ ord_is_succ i.
   Proof.
     split.
     + destruct (ord_eq_dec j 0ₒ) as [ -> | ].
@@ -388,7 +387,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
       destruct (ord_sub i k) as (p & ->).
       * apply ord_le_succ_mono_iff.
         rewrite <- Hk.
-        apply ord_add_mono_le; auto.
+        apply ord_le_add; auto.
         rewrite <- (ord_add_zero_left 1ₒ),
                 <- ord_lt__succ_le_iff.
         now destruct (ord_zero_or_above j).
@@ -399,7 +398,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
       * now rewrite ord_add_zero_right.
   Qed.
 
-  Fact ord_is_limit_add i j : ord_is_limit (i +ₒ j) ↔ ord_is_limit j ∨ j = 0 ∧ ord_is_limit i.
+  Fact ord_is_limit_add i j : ord_is_limit (i +ₒ j) ↔ ord_is_limit j ∨ j = 0ₒ ∧ ord_is_limit i.
   Proof.
     destruct (ord_eq_dec j 0ₒ) as [ -> | D ].
     1: { rewrite ord_add_zero_right; split; auto.
@@ -417,7 +416,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   Fact ord_is_limit_add_succ i j : ord_is_limit (i +ₒ 1ₒ +ₒ j) ↔ ord_is_limit j.
   Proof. rewrite ord_is_limit_add, ord_is_limit_succ_iff; tauto. Qed.
 
-  Fact ord_is_limit_1add i : ord_is_limit (1 +ₒ i) ↔ ord_is_limit i.
+  Fact ord_is_limit_1add i : ord_is_limit (1ₒ +ₒ i) ↔ ord_is_limit i.
   Proof.
     split; intros (H1 & H2); split.
     + intros ->; apply H2; auto.
@@ -436,7 +435,7 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   Proof.
     intros H1 (H2 & H3); split.
     + now intros [-> | ->]%ord_mul_is_zero_inv.
-    + contradict H3; revert H3; apply ord_mul_is_succ_inv.
+    + contradict H3; revert H3. apply ord_mul_is_succ_inv.
   Qed.
 
   Fact ord_mul_is_limit_left a i : i ≠ 0ₒ → ord_is_limit a → ord_is_limit (a *ₒ i).
@@ -450,26 +449,25 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
       apply H.
   Qed.
 
-  Fact ord_mul_mono_lt i j k l : 0 <ₒ i → k <ₒ l → i *ₒ k <ₒ i *ₒ l.
+  Fact ord_lt_mul i j k l : 0ₒ <ₒ i → k <ₒ l → i *ₒ k <ₒ i *ₒ l.
   Proof. 
     intros H ?%ord_lt__succ_le_iff.
-    apply ord_lt_le_trans with (i *ₒ (k +ₒ 1)).
+    apply ord_lt_le_trans with (i *ₒ (k +ₒ 1ₒ)).
     + rewrite ord_mul_distr, ord_mul_one_right.
-      rewrite <- (ord_add_zero_right (i *ₒ k)) at 1.
-      now apply ord_add_mono_lt_right.
-    + apply ord_mul_mono; auto.
+      rewrite <- (ord_add_zero_right (i *ₒ k)) at 1; auto.
+    + apply ord_le_mul; auto.
   Qed.
 
   Hint Resolve ord_fseq_incr ord_mseq_incr : core.
 
-  Fact ord_fseq_mono i l n m : n < m → @ord_fseq i l n <ₒ ord_fseq l m.
+  Fact ord_fseq_mono i l n m : n < m → @ord_fseq _ i l n <ₒ ord_fseq l m.
   Proof. induction 1; eauto. Qed.
 
-  Fact ord_mseq_mono n m : n < m → ord_mseq n <ₒ ord_mseq m.
+  Fact ord_mseq_mono n m : n < m → @ord_mseq o n <ₒ @ord_mseq o m.
   Proof. induction 1; eauto. Qed.
 
   (* i = ω.α hence 1 + i <= 1 + ω.α .??? *)
-  Fact ord_is_limit_1add_eq i : ord_is_limit i → 1 +ₒ i = i.
+  Fact ord_is_limit_1add_eq i : ord_is_limit i → 1ₒ +ₒ i = i.
   Proof.
     intros H.
     apply ord_le_antisym; auto.
@@ -558,10 +556,14 @@ now intros [ _ ?%ord_one_not_zero ]%ord_add_is_zero_inv. Qed.
   
 *)
 
-End ord.
+End ord_extra.
 
-#[global] Opaque ord_add ord_mul ord ord_one ord_zero ord_lt ord_le.
+Arguments ord_zero_or_1add {_}.
+Arguments ord_is_succ {_}.
+Arguments ord_is_limit {_}.
+Arguments ord_le_lt_dec {_}.
 
+(*
 #[global] Hint Resolve
     ord_le_refl : core.
     
@@ -574,3 +576,4 @@ End ord.
     pos_add_mono_lt_left : core. 
     *)
 
+*)

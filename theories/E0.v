@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Wellfounded Utf8.
-From Hydra Require Import utils ord ordered lex2 lex_list list_order wlist.
+From Hydra Require Import utils ordinal ordered lex2 lex_list list_order wlist.
 
 Import ListNotations.
 
@@ -34,15 +34,15 @@ Set Implicit Arguments.
 #[local] Reserved Notation "e '≤E₀' f" (at level 70, format "e  ≤E₀  f").
 #[local] Reserved Notation "e '≺E₀' f" (at level 70, format "e  ≺E₀  f").
 
-Opaque ord ord_zero ord_one ord_add ord_mul ord_le ord_lt.
-
 Section E0.
+
+  Variables o : ord.
 
   Unset Elimination Schemes.
 
   (* The nested type of trees decorated with positive integers *)
-  Inductive E0 : Set :=
-    | E0_cons : list (E0*ord) → E0.
+  Inductive E0 : Type :=
+    | E0_cons : list (E0*o) → E0.
 
   Notation "[ l ]₀" := (E0_cons l).
 
@@ -164,7 +164,7 @@ Section E0.
   Lemma E0_lt_sdec e f : sdec E0_lt e f.
   Proof.
     revert f; induction e as [l]; intros [m].
-    destruct (@lex_list_sdec _ (lex2 E0_lt lt) l m); eauto.
+    destruct (@lex_list_sdec _ (lex2 E0_lt ord_lt) l m); eauto.
   Qed.
 
   (* Hence decidable *)
@@ -180,7 +180,7 @@ Section E0.
      of the shape ω[(e₁,i₁);...;(eₙ,iₙ)] with
      0 < i₁,...,iₙ and e₁ >ε₀ ... >ε₀ eₙ *)
 
-  Definition E0_cnf_pred (l : list (E0*ord)) := ordered E0_lt⁻¹ (map fst l).
+  Definition E0_cnf_pred (l : list (E0*o)) := ordered E0_lt⁻¹ (map fst l).
 
   Definition E0_cnf := E0_fall E0_cnf_pred.
 
@@ -200,8 +200,8 @@ Section E0.
     destruct (ordered_dec E0_lt⁻¹ (map fst l))
       as [ H1 | H1 ]; eauto.
     + destruct list_fall_choose
-        with (P := fun xi : E0*ord => ~ E0_cnf (fst xi))
-             (Q := fun xi : E0*ord => E0_cnf (fst xi))
+        with (P := fun xi : E0*o => ~ E0_cnf (fst xi))
+             (Q := fun xi : E0*o => E0_cnf (fst xi))
              (l := l)
       as [ ((x,i) & H2 & H3) | H2 ].
       * intros (x,i) []%IHl; auto.
@@ -361,7 +361,7 @@ Section E0.
     Hint Resolve ord_lt_wf : core.
 
     Let R x y := cnf x ∧ x <E₀ y.
-    Let T := lex2 R ord_lt.
+    Let T := lex2 R (@ord_lt o).
  
     Local Fact HRT x i : Acc R x → Acc T (x,i).
     Proof. intros; apply Acc_lex2; auto. Qed.
@@ -525,7 +525,7 @@ Section E0.
     apply wlist_add_assoc; auto.
   Qed.
   
-  Hint Resolve pos_add_incr_left E0_le_cons ord_add_mono_le ord_lt_le_weak : core.
+  Hint Resolve pos_add_incr_left E0_le_cons ord_le_add ord_lt_le_weak ord_le_refl: core.
 
   (** We show  ω[l] +₀ e ≤E₀ ω[m] +₀ e by induction on lex_list _ l m *)
   Lemma E0_add_mono_left u v e : cnf u → cnf v → cnf e → u ≤E₀ v → u +₀ e ≤E₀ v +₀ e.
@@ -575,7 +575,7 @@ Section E0.
     1: now intros ?%E0_lt_irrefl.
     intros _.
     unfold E0_add.
-    destruct (wlist_cut_choice E0_lt_sdec l y)
+    destruct (wlist_cut_choice _ E0_lt_sdec l y)
         as [ G1 
          | [ (i & l' & r & E & G1) 
          |   (x & i & l' & r & E & G1 & G2) ] ]; subst; simpl.
@@ -589,7 +589,7 @@ Section E0.
       constructor 2; now left.
   Qed.
   
-  Hint Resolve ord_add_mono_lt_right : core.
+  Hint Resolve ord_lt_add_right : core.
 
   Lemma E0_add_mono_right : ∀ e u v, cnf e → cnf u → cnf v → u <E₀ v → e +₀ u <E₀ e +₀ v.
   Proof.
@@ -598,7 +598,7 @@ Section E0.
     destruct m as [ | yj m ].
     1: intros; apply E0_add_incr; eauto.
     intros [ (y,j) [ Hyz | (<- & Hjh) ]%lex2_inv | Hmk ]%E0_lt_inv%lex_list_inv; constructor.
-    + destruct (wlist_cut_choice E0_lt_sdec l z)
+    + destruct (wlist_cut_choice _ E0_lt_sdec l z)
         as [ G1 
          | [ (i & l' & r' & E & G1) 
          |   (x & i & l' & r' & E & G1 & G2) ] ]; subst; simpl app.
@@ -613,12 +613,12 @@ Section E0.
         2: revert G1; apply Forall_impl; eauto.
         apply lex_list_app_head.
         rewrite wlist_add_lt with (y := z); auto.
-        destruct (wlist_add_choice E0_lt_sdec)
+        destruct (wlist_add_choice o E0_lt_sdec)
           with (x := x) (i := i) (y := y) (j := j) (l := r') (m := m)
           as (a & b & c & -> & H); auto.
         constructor 2; left.
         destruct H as [ (_ & <- & _) | [ (_& <- & _) | (_ & -> & _)] ]; auto.
-    + destruct (wlist_add_common E0_lt_sdec l y) as (l' & i & H).
+    + destruct (wlist_add_common o E0_lt_sdec l y) as (l' & i & H).
       rewrite !H.
       apply lex_list_app_head.
       constructor 2; right; auto.
@@ -807,7 +807,7 @@ Section E0.
     apply E0_is_limit_iff; eauto.
     destruct a as [l].
     unfold E0_add.
-    destruct (wlist_add_last E0_lt_sdec l m b i)
+    destruct (wlist_add_last o E0_lt_sdec l m b i)
       as (r & j & H1 & H2).
     exists r, b, j; split; auto; f_equal; auto.
     destruct H2 as [ <- | (k & ->) ]; auto.
@@ -826,7 +826,7 @@ Section E0.
     destruct a as [l]; destruct e as [k].
     destruct k as [|k (c,j) _] using rev_rect; auto; right.
     unfold E0_add in E; apply E0_eq_inv in E.
-    destruct (wlist_add_last E0_lt_sdec l k c j)
+    destruct (wlist_add_last o E0_lt_sdec l k c j)
       as (r & p & Hp & H).
     rewrite Hp in E.
     apply app_inj_tail in E as (<- & [=]); subst p c.
@@ -872,7 +872,7 @@ Section E0.
   Hint Resolve E0_omega_cnf : core.
 
   Fact E0_lt_omega e : cnf e → e <E₀ ω^e.
-  Proof. intro; apply E0_lt_sub with 0; auto. Qed.
+  Proof. intro; apply E0_lt_sub with 0ₒ; auto. Qed.
 
   Fact E0_add_lt_omega a e : cnf a → e ≠ 0₀ → a <E₀ ω^e → a +₀ ω^e = ω^e.
   Proof.
@@ -886,9 +886,9 @@ Section E0.
   Proof.
     revert a b e f.
     intros [a] [b] e f; unfold E0_omega, E0_add.
-    destruct (wlist_add_last E0_lt_sdec a [] e 0ₒ)
+    destruct (wlist_add_last _ E0_lt_sdec a [] e 0ₒ)
       as (l & i & H1 & H2).
-    destruct (wlist_add_last E0_lt_sdec b [] f 0ₒ)
+    destruct (wlist_add_last _ E0_lt_sdec b [] f 0ₒ)
       as (m & j & H3 & H4).
     simpl app in H1, H3.
     rewrite H1, H3.
@@ -1099,15 +1099,20 @@ Section E0.
 
 End E0.
 
+Arguments E0_cons {_}.
+Arguments E0_lt {_}.
+
 Section E0_lpo.
+
+  Variables (o : ord).
 
   Notation "[ l ]₀" := (E0_cons l).
   Infix "<E₀" := E0_lt.
 
   Unset Elimination Schemes.
 
-  Inductive E0_lpo : E0 → E0 → Prop :=
-    | E0_lpo_intro l m : lo (lex2 E0_lpo lt) l m → E0_lpo [l]₀ [m]₀.
+  Inductive E0_lpo : E0 o → E0 o → Prop :=
+    | E0_lpo_intro l m : lo (lex2 E0_lpo ord_lt) l m → E0_lpo [l]₀ [m]₀.
 
   Set Elimination Schemes.
 
@@ -1115,7 +1120,7 @@ Section E0_lpo.
 
   Notation "x '≺E₀' y" := (E0_lpo x y) (at level 70).
 
-  Fact E0_lpo_inv l m : [l]₀ ≺E₀ [m]₀ ↔ lo (lex2 E0_lpo lt) l m.
+  Fact E0_lpo_inv l m : [l]₀ ≺E₀ [m]₀ ↔ lo (lex2 E0_lpo ord_lt) l m.
   Proof. split; auto; now inversion 1. Qed.
 
   Fact E0_lpo_trans : transitive E0_lpo.
@@ -1124,17 +1129,17 @@ Section E0_lpo.
     constructor; econstructor 2; eauto.
   Qed.
 
-  Hint Resolve E0_lpo_trans lt_trans : core.
+  Hint Resolve E0_lpo_trans ord_lt_trans : core.
 
   Fact E0_lpo_trans' e f : clos_trans E0_lpo e f → e ≺E₀ f.
   Proof. induction 1; eauto. Qed.
 
-  Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo lt).
+  Fact lex2_E0_lpo_lt_trans : transitive (lex2 E0_lpo (@ord_lt o)).
   Proof. intros a b c; apply lex2_trans with [a] [b] [c]; eauto. Qed.
 
   Hint Resolve lex2_E0_lpo_lt_trans : core.
 
-  Fact lex2_E0_lpo_lt_trans' xi yj : clos_trans (lex2 E0_lpo lt) xi yj → lex2 E0_lpo lt xi yj.
+  Fact lex2_E0_lpo_lt_trans' xi yj : clos_trans (lex2 E0_lpo (@ord_lt o)) xi yj → lex2 E0_lpo ord_lt xi yj.
   Proof. induction 1; eauto. Qed.
 
   Hint Resolve lex_list_mono : core.
@@ -1165,7 +1170,7 @@ Section E0_lpo.
   Proof.
     intros e.
     induction e as [ l IH ].
-    cut (Acc (lo (lex2 E0_lpo lt)) l).
+    cut (Acc (lo (lex2 E0_lpo ord_lt)) l).
     + apply Acc_rel_morph with (f := fun l e => [l]₀ = e); auto.
       * intros []; eauto.
       * now intros ? ? ? ? <- <- ?%E0_lpo_inv.
@@ -1193,7 +1198,7 @@ Section E0_lpo.
   (** Another proof, relying on a stronger result: 
         on sorted E0 trees (cnf), <E₀ and ≺E₀ are the same relation *)
 
-  Theorem E0_lt_wf_alt : well_founded (λ x y, cnf x ∧ x <E₀ y).
+  Theorem E0_lt_wf_alt : well_founded (λ x y : E0 o, cnf x ∧ x <E₀ y).
   Proof.
     apply well_founded_both__left.
     generalize wf_E0_lpo.

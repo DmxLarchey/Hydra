@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Arith Lia Utf8.
-From Hydra Require Import utils ord ordered lex_list.
+From Hydra Require Import utils ordinal ordered lex_list.
 
 Import ListNotations.
 
@@ -19,12 +19,12 @@ Set Implicit Arguments.
 
 Section wlist_add.
 
-  Variables (X : Type) (R : X → X → Prop)
+  Variables (X : Type) (o : ord) (R : X → X → Prop)
             (R_sdec : ∀ x y, sdec R x y)
             (R_irrefl : ∀x, ¬ R x x)
             (R_trans : transitive R).
 
-  Implicit Type (l m : list (X*ord)).
+  Implicit Type (l m : list (X*o)).
 
   Fixpoint wlist_cut m y j :=
     match m with
@@ -248,9 +248,9 @@ Section wlist_add.
   Proof.
     simpl.
     induction l as [ | (x,i) l (l' & k & Hl') ]; simpl.
-    + exists [], 0ₒ; auto.
+    + exists [], 0ₒ; intros; now rewrite ord_add_zero_left.
     + destruct (R_sdec x y) as [ x y H | y | x y H ].
-      * exists [], 0ₒ; auto.
+      * exists [], 0ₒ; intros; now rewrite ord_add_zero_left.
       * exists [], (i +ₒ 1ₒ); auto.
       * exists ((x,i)::l'), k.
         intros; simpl; f_equal; auto.
@@ -404,7 +404,9 @@ Section wlist_add.
 
 End wlist_add.
 
-Arguments wlist_cut {_ _}.
-Arguments wlist_add {_ _}.
+Check wlist_cut.
+
+Arguments wlist_cut {_ _ _}.
+Arguments wlist_add {_ _ _}.
 
 Opaque wlist_add.
