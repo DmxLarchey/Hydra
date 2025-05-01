@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Wellfounded Utf8.
-From Hydra Require Import utils ordinal ordered eps0 eps0_mult eps0_fseq ord_omega.
+From Hydra Require Import utils ordinal ordered eps0 eps0_mult eps0_fseq ord_omega fgh.
 
 Set Implicit Arguments.
 
@@ -64,38 +64,57 @@ Section embedding.
 
   Definition oac_embed (e : o) : ord_arith_closure o. 
   Proof. 
-    destruct (ord_zero_succ_limit_dec _ e) as [ [-> | (p & ->)] | ].
+    destruct (ord_zero_or_1add e) as [-> | (p & ->)].
     + exact 0₀.
     + exact (@eps0_exp o 0₀ p).
-    + exact (@eps0_exp o 0₀ e).
   Defined.
+
+  Fact oac_embed_zero : oac_embed 0ₒ = 0₀.
+  Proof.
+    unfold oac_embed.
+    destruct (ord_zero_or_1add (ord_zero _)) as [ E | (p & C)]; auto.
+    symmetry in C; now apply ord_1add_not_zero in C.
+  Qed.
+
+  Fact oac_embed_1add e : oac_embed (1ₒ +ₒ e) = ω^⟨0₀,e⟩.
+  Proof.
+    unfold oac_embed.
+    destruct (ord_zero_or_1add (1ₒ +ₒ e)) as [ E | (p & C)]; auto.
+    + now apply ord_1add_not_zero in E.
+    + now apply ord_add_cancel_right in C as ->.
+  Qed.
 
   Fact oac_lt_embed e f : e <ₒ f → oac_embed e <ₒ oac_embed f.
   Proof.
     intros Hef.
-  Admitted.
+    destruct (ord_zero_or_1add e) as [-> | (p & ->)];
+    destruct (ord_zero_or_1add f) as [-> | (q & ->)].
+    1,3: now apply ord_not_lt_zero in Hef.
+    + rewrite oac_embed_zero, oac_embed_1add; apply eps0_lt_zero_exp.
+    + rewrite !oac_embed_1add; apply ord_add_mono_lt_inv in Hef.
+      now apply eps0_lt_exp_right.
+  Qed.
 
   Definition oac_base : ord_arith_closure o := (@eps0_omega o 1₀).
 
   Fact oac_embed_lt e : oac_embed e <ₒ oac_base.
-  Proof. 
-    unfold oac_embed, oac_base.
-    destruct (ord_zero_succ_limit_dec _ e) as [ [-> | (p & ->)] | He ].
-    + apply eps0_zero_lt_omega.
-    + apply eps0_lt_exp_left, eps0_zero_lt_one.
-    + apply eps0_lt_exp_left, eps0_zero_lt_one.
- Qed.
+  Proof.
+    unfold oac_base.
+    destruct (ord_zero_or_1add e) as [-> | (p & ->)].
+    + rewrite oac_embed_zero; apply eps0_zero_lt_omega.
+    + rewrite oac_embed_1add; apply eps0_lt_exp_left, eps0_zero_lt_one.
+  Qed.
+ 
+  (** o is isomorphic to the initial segment [0,oac_base[ ord_arith_closure  *)
 
   Fact oac_embed_limit g : g <ₒ oac_base → ∃e, g = oac_embed e.
   Proof.
     intros [-> | (e & He) ]%eps0_below_omega1_inv.
-    + exists (ord_zero _).
-      unfold oac_embed.
-      admit.
-    + exists e.
-      unfold oac_embed. 
+    + exists (ord_zero _); now rewrite oac_embed_zero.
+    + exists (1ₒ +ₒ e); now rewrite oac_embed_1add.
+  Qed.
 
-Fact oac_embed_correct o : 
+End embedding.
 
 Fixpoint epsilon n :=
   match n with
@@ -104,4 +123,11 @@ Fixpoint epsilon n :=
   end.
 
 Definition epsilon0 := epsilon 0.
+Definition epsilon1 := epsilon 1.
+
+(* That one is very very very fast growing,
+   perhaps more than Friedman Tree *)
+Definition UltraFastGH n := FGHd (epsilon n) n.
+
+Check UltraFastGH.
 

@@ -900,10 +900,17 @@ Section eps0.
   Fact eps0_below_omega1_inv a :
       a <ε₀ ω^1₀
     → (a = 0₀) 
-    + {n | a <ε₀ ω^⟨0₀,n⟩}.
+    + {n | a = ω^⟨0₀,n⟩}.
   Proof.
-    intros [ | (f & n & H1 & H2)]%eps0_below_omega_inv; auto; right.
-    exists n; now apply eps0_lt_one in H2 as ->.
+    intros [ | (f & n & H1 & H2)]%eps0_below_omega_inv; auto.
+    apply eps0_lt_one in H2 as ->.
+    apply eps0_below_exp_inv in H1
+      as [ [-> | (i & b & E & H1 & H2) ] | (f & _ & _ & C)]; auto.
+    + right; exists i; subst a.
+      rewrite eps0_omega_zero in H2.
+      apply eps0_lt_one in H2 as ->.
+      now rewrite eps0_add_zero_right.
+    + exfalso; revert C; apply eps0_zero_not_gt.
   Qed.
 
   Fact eps0_add_lt_omega a e : a <ε₀ ω^e → a +₀ ω^e = ω^e.

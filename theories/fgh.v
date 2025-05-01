@@ -108,7 +108,7 @@ Section Fast_Growing_Hierarchy.
   (* This function grows faster than any function definable in HA/PA 
      A proof of this result would be very nice addition *)
 
-  Definition FGH_eps0 n := FGH (ord_mseq n) n.
+  Definition FGHd n := FGH (ord_mseq n) n.
 
 End Fast_Growing_Hierarchy.
 
