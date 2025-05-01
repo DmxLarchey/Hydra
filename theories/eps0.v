@@ -168,6 +168,9 @@ Section eps0.
     unfold E0_le; tauto.
   Qed.
 
+  Fact eps0_le_lt_iff e f : e ≤ε₀ f ↔ e = f ∨ e <ε₀ f.
+  Proof. rewrite eps0_le_iff_lt; tauto. Qed.
+
   Fact eps0_zero_least e : 0₀ ≤ε₀ e.
   Proof.
     apply eps0_le_iff.
@@ -299,6 +302,9 @@ Section eps0.
   Fact eps0_lt_add1 e : e <ε₀ e +₀ 1₀.
   Proof. rewrite eps0_add_one_right; apply eps0_lt_succ. Qed.
 
+  Fact eps0_lt_neq e f : e <ε₀ f → e ≠ f.
+  Proof. intros H ->; revert H; apply eps0_lt_irrefl. Qed.
+
   (** The defining equation for _ + S _ *)
   Fact eps0_add_succ_right e f : e +₀ S₀ f = S₀ (e +₀ f).
   Proof. now rewrite <- eps0_add_one_right, <- eps0_add_assoc, eps0_add_one_right. Qed.
@@ -344,7 +350,7 @@ Section eps0.
 
   Hint Resolve eps0_le_add : core.
 
-  Fact eps0_le_lt_add_lt e e' f f' : e ≤ε₀ e' → f <ε₀ f' → e +₀ f <ε₀ e' +₀ f'.
+  Fact eps0_le_lt_add e e' f f' : e ≤ε₀ e' → f <ε₀ f' → e +₀ f <ε₀ e' +₀ f'.
   Proof. intros; apply eps0_le_lt_trans with (e' +₀ f); auto. Qed.
 
   Fact eps0_le_add_incr_left e f : e ≤ε₀ f +₀ e.
@@ -1144,6 +1150,18 @@ Section eps0.
       exists (ω^⟨e,j⟩ +₀ p).
       now rewrite eps0_add_assoc.
     + right; rewrite eps0_add_is_limit_iff; auto.
+  Qed.
+
+  Fact eps0_zero_lt_add1 e : 0₀ <ε₀ e +₀ 1₀.
+  Proof. apply eps0_le_lt_trans with (2 := eps0_lt_add1 _); auto. Qed.
+
+  Hint Resolve eps0_zero_lt_add1 : core.
+
+  Fact eps0_is_succ_dec e : { p | e = p +₀ 1₀ } + { ~ eps0_is_succ e }.
+  Proof.
+    destruct (eps0_zero_succ_limit_dec e) as [ [ -> | He ] | He ]; auto.
+    + right; intros (p & Hp); revert Hp; apply eps0_lt_neq; auto.
+    + right; apply (proj2 He).
   Qed.
 
   Fact eps0_is_limit_dec e : { eps0_is_limit e } + { ~ eps0_is_limit e }.

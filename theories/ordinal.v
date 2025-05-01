@@ -562,6 +562,10 @@ Arguments ord_zero_or_1add {_}.
 Arguments ord_is_succ {_}.
 Arguments ord_is_limit {_}.
 Arguments ord_le_lt_dec {_}.
+Arguments ord_fseq {_ _}.
+Arguments ord_mseq {_}.
+
+Check ord_fseq.
 
 (*
 #[global] Hint Resolve
