@@ -407,5 +407,6 @@ End wlist_add.
 Arguments wlist_cut_choice {_ _ _}.
 Arguments wlist_cut {_ _ _}.
 Arguments wlist_add {_ _ _}.
+Arguments wlist_add_last {_ _ _}.
 
 Opaque wlist_add.

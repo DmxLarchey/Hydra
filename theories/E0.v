@@ -807,7 +807,7 @@ Section E0.
     apply E0_is_limit_iff; eauto.
     destruct a as [l].
     unfold E0_add.
-    destruct (wlist_add_last o E0_lt_sdec l m b i)
+    destruct (wlist_add_last E0_lt_sdec l m b i)
       as (r & j & H1 & H2).
     exists r, b, j; split; auto; f_equal; auto.
     destruct H2 as [ <- | (k & ->) ]; auto.
@@ -826,7 +826,7 @@ Section E0.
     destruct a as [l]; destruct e as [k].
     destruct k as [|k (c,j) _] using rev_rect; auto; right.
     unfold E0_add in E; apply E0_eq_inv in E.
-    destruct (wlist_add_last o E0_lt_sdec l k c j)
+    destruct (wlist_add_last E0_lt_sdec l k c j)
       as (r & p & Hp & H).
     rewrite Hp in E.
     apply app_inj_tail in E as (<- & [=]); subst p c.
@@ -886,9 +886,9 @@ Section E0.
   Proof.
     revert a b e f.
     intros [a] [b] e f; unfold E0_omega, E0_add.
-    destruct (wlist_add_last _ E0_lt_sdec a [] e 0ₒ)
+    destruct (wlist_add_last E0_lt_sdec a [] e 0ₒ)
       as (l & i & H1 & H2).
-    destruct (wlist_add_last _ E0_lt_sdec b [] f 0ₒ)
+    destruct (wlist_add_last E0_lt_sdec b [] f 0ₒ)
       as (m & j & H3 & H4).
     simpl app in H1, H3.
     rewrite H1, H3.
