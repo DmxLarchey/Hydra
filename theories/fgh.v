@@ -27,7 +27,6 @@ Set Implicit Arguments.
 
 Section Fast_Growing_Hierarchy.
 
-
   Variable (o : ord).
 
   Inductive fgh_gr : o → (nat → nat) → Prop :=
@@ -60,15 +59,14 @@ Section Fast_Growing_Hierarchy.
   (** This is the Grzegorczyk hierarchy *)
   Definition FGH_pwc e : { F | fgh_gr e F }.
   Proof.
-    induction e as [ e IH ] using (well_founded_induction_type (@ord_lt_wf o)).
-    destruct (@ord_zero_succ_limit_dec _ e) as [ [ -> | (f & ->) ] | l ].
+    induction e as [ | e IH | e l IH ] using ord_fseq_rect.
     + exists S; auto.
-    + destruct (IH f) as (F & ?); auto.
+    + destruct IH as (F & ?); auto.
       exists (λ n, iter F (S n) n); auto.
-    + set (F i := proj1_sig (IH (ord_fseq l i) (ord_fseq_lt _ _ _))).
+    + set (F n := proj1_sig (IH n)).
       exists (λ n, F n n).
       constructor 3 with l.
-      intro; apply (proj2_sig (IH (ord_fseq l n) (ord_fseq_lt _ _ _))).
+      intro; apply (proj2_sig (IH _)).
   Qed.
 
   (* The hierarchy is uniquely characterized, up to extensionality 

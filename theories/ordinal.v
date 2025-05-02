@@ -9,7 +9,7 @@
 
 From Coq Require Import Relations Utf8.
 
-From Hydra Require Import utils ordered.
+From Hydra Require Import utils ordered lub.
 
 Set Implicit Arguments.
 
@@ -181,7 +181,7 @@ Section ord_extra.
   Fact ord_not_lt_zero i : ¬ i <ₒ 0ₒ.
   Proof. intro; apply (@ord_lt_irrefl o 0ₒ); eauto. Qed.
 
-  Fact ord_zero_or_above i : { i = 0ₒ } + { 0ₒ <ₒ i }.
+  Fact ord_zero_or_pos i : { i = 0ₒ } + { 0ₒ <ₒ i }.
   Proof.
     destruct (ord_le_lt_dec i 0ₒ) as [ H%ord_le_lt_iff | ]; auto.
     left; destruct H; auto.
@@ -200,7 +200,7 @@ Section ord_extra.
 
   Fact ord_add_is_zero_inv i j : i +ₒ j = 0ₒ → i = 0ₒ ∧ j = 0ₒ.
   Proof.
-    destruct (ord_zero_or_above i) as [ -> | Hi ].
+    destruct (ord_zero_or_pos i) as [ -> | Hi ].
     + rewrite ord_add_zero_left; auto.
     + intros E.
       destruct (ord_lt_irrefl (i +ₒ j)).
@@ -393,7 +393,7 @@ Section ord_extra.
         apply ord_le_add; auto.
         rewrite <- (ord_add_zero_left 1ₒ),
                 <- ord_lt__succ_le_iff.
-        now destruct (ord_zero_or_above j).
+        now destruct (ord_zero_or_pos j).
       * rewrite ord_add_assoc in Hk.
         apply ord_add_cancel_right in Hk as ->; auto.
     + intros [ (k & ->) | (-> & ?) ].
@@ -415,6 +415,9 @@ Section ord_extra.
   
   Fact ord_is_limit_succ_iff i : ord_is_limit (i +ₒ 1ₒ) ↔ False.
   Proof. split; [ | easy ]; intros [ _ H]; apply H; auto. Qed.
+  
+  Fact ord_is_limit_zero_iff : ord_is_limit 0ₒ ↔ False.
+  Proof. split; [ | easy ]; now intros [ [] ]. Qed.
   
   Fact ord_is_limit_add_succ i j : ord_is_limit (i +ₒ 1ₒ +ₒ j) ↔ ord_is_limit j.
   Proof. rewrite ord_is_limit_add, ord_is_limit_succ_iff; tauto. Qed.
@@ -479,85 +482,134 @@ Section ord_extra.
     + rewrite <- (ord_add_zero_left i) at 1; auto.
   Admitted.
 
-(*
-  Fact pos_add_comm i j : i +ₚ j = j +ₚ i.
-  Proof. solve pos. Qed.
-  
- *=
-
-  Fact pos_add_assoc i j k : (i +ₚ j) +ₚ k = i +ₚ (j +ₚ k).
-  Proof. solve pos. Qed.
-
-(*
-  Fact pos_mul_comm i j : i *ₚ j = j *ₚ i.
-  Proof. solve pos. Qed.
-  
-  *)
-
-  Fact pos_mul_assoc i j k : (i *ₚ j) *ₚ k = i *ₚ (j *ₚ k).
-  Proof. solve pos. Qed.
-
-  Fact pos_mul_one_left i : 1ₚ *ₚ i = i.
-  Proof. solve pos. Qed.
-
-  Fact pos_mul_one_right i : i *ₚ 1ₚ = i.
-  Proof. solve pos. Qed.
-
-  Fact pos_mul_distr_left i j k : (i +ₚ j) *ₚ k = i *ₚ k +ₚ j *ₚ k.
-  Proof. solve pos. Qed.
-
-  Fact pos_mul_distr_right i j k : k *ₚ (i +ₚ j)  = k *ₚ i +ₚ k *ₚ j.
-  Proof. solve pos. Qed.
-
-  Fact pos_one_lt_S i : 1ₚ < S i.
-  Proof. solve pos. Qed.
-
-  Fact pos_add_sincr_left i j : j < i +ₚ j.
-  Proof. solve pos. Qed.
-
-  Fact pos_add_sincr_right i j : i < i +ₚ j.
-  Proof. solve pos. Qed.
-
-  Fact pos_add_incr_left i j : j ≤ i +ₚ j.
-  Proof. solve pos. Qed.
-
-  Fact pos_add_mono_lt_left i j k : i < j → i +ₚ k < j +ₚ k.
-  Proof. solve pos. Qed.
-
-  Fact pos_one_least i : 1ₚ ≤ i.
-  Proof. solve pos. Qed.
-
-  Fact pos_not_lt_one i : ¬ i < 1ₚ.
-  Proof. solve pos. Qed.
-
-  Fact pos_lt_iff_le_succ i j : i < j ↔ i +ₚ 1ₚ ≤ j.
-  Proof. solve pos. Qed.
-
-  Fact pos_lt_sub i j : i < j → { k | j = i +ₚ k }.
-  Proof. exists (j-i-1); solve pos. Qed.
-
-  Fact pos_mul_mono_left i j p k : i < j → p ≤ k → i *ₚ p < j *ₚ k.
-  Proof. 
-    solve pos; intros H1 H2.
-    assert (i*p <= j*k).
-    + apply Nat.mul_le_mono; lia.
-    + lia.
-  Qed.
-
-  Fact pos_mul_mono_right i j p k : i ≤ j → p < k → i *ₚ p < j *ₚ k.
+  Lemma ord_lub_simpler P i :
+      ub ord_le P i
+    → (∀u, u <ₒ i → ∃v, P v ∧ u <ₒ v)
+    → lub ord_le P i. 
   Proof.
-    intros; rewrite (pos_mul_comm i), (pos_mul_comm j); now apply pos_mul_mono_left.
-  Qed.
-
-  Fact pos_mul_mono i j p k : i ≤ j → p ≤ k → i *ₚ p ≤ j *ₚ k.
-  Proof. 
-    solve pos; intros H1 H2.
-     assert (i*p <= j*k).
-    + apply Nat.mul_le_mono; lia.
-    + lia.
+    intros H1 H2; split; auto.
+    intros v Hv.
+    destruct (ord_le_lt_dec i v) as [ | (w & ? & Hw)%H2 ]; auto.
+    destruct (ord_lt_irrefl v).
+    apply ord_lt_le_trans with (1 := Hw), Hv; auto.
   Qed.
   
-*)
+  Hint Resolve ord_fseq_lt ord_lt_le_weak : core.
+
+  (* for a limit ordinal e, it is the ≤ₒ-lub of its fundemental sequence *) 
+  Fact ord_fseq_lub i (l : ord_is_limit i) : lub ord_le (λ x, ∃n, x = ord_fseq l n) i.
+  Proof.
+    apply ord_lub_simpler.
+    + intros ? (? & ->); apply ord_le_lt_iff; auto.
+    + intros u Hu.
+      apply ord_fseq_limit with (l := l) in Hu as (n & Hn); auto.
+      exists (ord_fseq l n); eauto.
+  Qed.
+
+  (* A limit ordinal is the ≤ₒ-lub of <ₒ-smaller ordinals.
+     This is also the case of 0ₒ. But of course, this is not
+     the case for successor ordinals *)
+  Fact ord_is_limit_lub i : ord_is_limit i → lub ord_le (λ x, x <ₒ i) i.
+  Proof.
+    intros l; apply ord_lub_simpler.
+    + intro; auto.
+    + intros ? []%(ord_fseq_limit _ l); eauto.
+  Qed.
+
+  (* For a successor ordinal i +ₒ 1ₒ, the lub of its <ₒ-smaller ordinals
+     is i (and not i +ₒ 1ₒ). *)
+  Fact ord_is_succ_lub i : lub ord_le (λ x, x <ₒ i +ₒ 1ₒ) i.
+  Proof.
+    split.
+    + now intros ? ?%ord_lt_succ__le_iff.
+    + intros v Hv; apply Hv, ord_lt_succ.
+  Qed.
+
+  Fact ord_lt_add_inv i a b : i <ₒ a +ₒ b → (i <ₒ a) + { j | i = a +ₒ j ∧ j <ₒ b }.
+  Proof.
+    intros H.
+    destruct (ord_le_lt_dec a i) as [ (j & ->)%ord_sub |]; auto.
+    right; exists j; split; auto.
+    revert H; apply ord_add_mono_lt_inv.
+  Qed.
+
+  Hint Resolve ord_le_add ord_lt_add_right : core.
+
+  (** We need the fundemental sequence to work with lubs 
+      constructivelly !!! *)
+ 
+  (** Addition respects the limit, w/o using ord_fseq_add *)
+  Fact ord_add_lub a i :
+      ord_is_limit i
+    → lub ord_le (λ x, ∃u, x = a +ₒ u ∧ u <ₒ i) (a +ₒ i).
+  Proof.
+    intros l; apply ord_lub_simpler.
+    + intros ? (? & -> & ?); auto.
+    + intros v [ Hv | (j & -> & Hj) ]%ord_lt_add_inv.
+      * exists a; split; auto.
+        exists 0ₒ; rewrite ord_add_zero_right; split; auto.
+        destruct (ord_zero_or_pos i) as [ -> | ]; auto.
+        now apply ord_is_limit_zero_iff in l.
+      * apply ord_fseq_limit with (l := l) in Hj as (n & Hn).
+        exists (a +ₒ ord_fseq l n); split; auto.
+        exists (ord_fseq l n); split; auto.
+  Qed.
+
+  Hint Resolve ord_le_mul ord_le_refl : core.
+  
+  (** Addition respects the limit using ord_fseq_add *)
+
+  Fact eps0_add_limit a i :
+      ord_is_limit i
+    → lub ord_le (λ x, ∃u, x = a +ₒ u ∧ u <ₒ i) (a +ₒ i).
+  Proof.
+    intros l; apply ord_lub_simpler.
+    + intros ? (? & -> & ?); auto.
+    + intros v Hv.
+      assert (ord_is_limit (a +ₒ i)) as l'
+        by (apply ord_is_limit_add; auto).
+      apply ord_fseq_limit with (l := l') in Hv.
+      destruct Hv as (n & Hn).
+      exists (a +ₒ ord_fseq l n); split.
+      * exists (ord_fseq l n); auto.
+      * apply ord_lt_le_trans with (2 := ord_fseq_add _ _ l l' _); auto.
+  Qed.
+  
+  (** Multiplication respects the limit using ord_fseq_add *)
+  
+  Corollary eps0_mul_limit a i :
+      ord_is_limit i
+    → lub ord_le (λ x, ∃u, x = a *ₒ u ∧ u <ₒ i) (a *ₒ i).
+  Proof.
+    intros l; apply ord_lub_simpler.
+    + intros ? (? & -> & ?); auto.
+    + intros v Hv.
+      assert (ord_is_limit (a *ₒ i)) as l'.
+      1:{ apply ord_mul_is_limit_right; auto.
+          intros ->; rewrite ord_mul_zero_left in Hv.
+          revert Hv; apply ord_not_lt_zero. }
+      apply ord_fseq_limit with (l := l') in Hv.
+      destruct Hv as (n & Hn).
+      exists (a *ₒ ord_fseq l n); split.
+      * exists (ord_fseq l n); auto.
+      * apply ord_lt_le_trans with (2 := ord_fseq_mul _ _ l l' _); auto.
+  Qed.
+  
+  Section ord_fseq_rect.
+  
+    Variables (P : o → Type)
+              (HP0 : P 0ₒ)
+              (HP1 : forall i, P i -> P (i +ₒ 1ₒ))
+              (HP2 : forall i l, (forall n, P (@ord_fseq _ i l n)) -> P i).
+    
+    Theorem ord_fseq_rect i : P i.
+    Proof.
+      induction i as [ i IH ] using (well_founded_induction_type (ord_lt_wf _)).
+      destruct (ord_zero_succ_limit_dec i) as [ [-> | (j & ->) ] | l ]; auto.
+      apply (HP2 l); auto.
+    Qed.
+    
+  End ord_fseq_rect.
 
 End ord_extra.
 
@@ -567,20 +619,3 @@ Arguments ord_is_limit {_}.
 Arguments ord_le_lt_dec {_}.
 Arguments ord_fseq {_ _}.
 Arguments ord_mseq {_}.
-
-Check ord_fseq.
-
-(*
-#[global] Hint Resolve
-    ord_le_refl : core.
-    
-    (*
-    pos_one_least
-    pos_one_lt_S
-    pos_add_sincr_left
-    pos_add_sincr_right
-    pos_add_incr_left 
-    pos_add_mono_lt_left : core. 
-    *)
-
-*)
