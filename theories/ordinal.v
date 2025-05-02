@@ -362,7 +362,10 @@ Section ord_extra.
   Fact ord_is_succ_1add n : ord_is_succ n → ord_is_succ (1ₒ +ₒ n).
   Proof. intros (j & ->); exists (1ₒ +ₒ j); now rewrite ord_add_assoc. Qed.
 
-  Hint Resolve ord_is_succ_1add : core.
+  Hint Resolve ord_is_succ_1add ord_is_succ_10 ord_is_succ_succ : core.
+  
+  Fact ord_1add_limit_dec j : { ord_is_succ (1ₒ +ₒ j) } + { ord_is_limit j }.
+  Proof. destruct (ord_zero_succ_limit_dec j) as [ [ -> | (p & ->) ] | ]; auto. Qed.
 
   Fact ord_is_succ_1add_inv n : ord_is_succ (1ₒ +ₒ n) → n = 0ₒ ∨ ord_is_succ n.
   Proof. intros [ | [] ]%ord_add_is_succ_inv; auto. Qed.
@@ -378,8 +381,6 @@ Section ord_extra.
       apply ord_lt_le_trans with (1 := C); auto.
       apply ord_add_incr_left.
   Qed.
-
-  Hint Resolve ord_is_succ_10 ord_is_succ_succ : core.
 
   Fact ord_is_succ_add i j : ord_is_succ (i +ₒ j) ↔ ord_is_succ j ∨ j = 0ₒ ∧ ord_is_succ i.
   Proof.
@@ -430,6 +431,9 @@ Section ord_extra.
     + now intros []%ord_add_is_zero_inv.
     + now intros [ | [] ]%ord_add_is_succ_inv.
   Qed.
+  
+  Fact ord_not_is_succ_is_limit j : ord_is_succ (1ₒ +ₒ j) → ord_is_limit j → False.
+  Proof. intros H G%ord_is_limit_1add; now apply G in H. Qed.
 
   Fact ord_mul_is_succ i j : ord_is_succ i → ord_is_succ j → ord_is_succ (i *ₒ j).
   Proof.
@@ -619,3 +623,5 @@ Arguments ord_is_limit {_}.
 Arguments ord_le_lt_dec {_}.
 Arguments ord_fseq {_ _}.
 Arguments ord_mseq {_}.
+Arguments ord_zero_succ_limit_dec {_}.
+Arguments ord_1add_limit_dec {_}.

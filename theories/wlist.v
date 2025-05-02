@@ -404,8 +404,6 @@ Section wlist_add.
 
 End wlist_add.
 
-Check wlist_cut.
-
 Arguments wlist_cut {_ _ _}.
 Arguments wlist_add {_ _ _}.
 

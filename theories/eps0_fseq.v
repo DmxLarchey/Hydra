@@ -50,7 +50,7 @@ Section eps0_fseq_dep_rect.
       * assert (f = 0₀) as ->.
         1: apply eps0_hnf_is_limit in l as [ | [] ]; tauto.
         revert l; rewrite eps0_add_zero_right; clear H Hf; intros l.
-        destruct (ord_zero_succ_limit_dec _ j) as [ [ -> | (i & ->) ] | lj ].
+        destruct (ord_zero_succ_limit_dec j) as [ [ -> | (i & ->) ] | lj ].
         - destruct (eps0_zero_succ_limit_dec e) as [ [ -> | (g & ->) ] | le ].
           ++ exfalso; apply eps0_is_limit_exp_iff in l as [ [] | (_ & []) ]; auto.
           ++ apply HP1.

@@ -1193,7 +1193,7 @@ Section eps0.
     destruct IH2 as [ [ -> | Hf ] | Hf ].
     + rewrite eps0_add_zero_right.
       destruct IH1 as [ [ -> | He ] | He ].
-      * destruct (ord_zero_succ_limit_dec _ j) as [ [ -> | Hj ] | Hj ].
+      * destruct (ord_zero_succ_limit_dec j) as [ [ -> | Hj ] | Hj ].
         - left; right; exists 0₀; now rewrite <- eps0_omega_zero, eps0_add_zero_left.
         - left; right.
           destruct Hj as (q & ->).
