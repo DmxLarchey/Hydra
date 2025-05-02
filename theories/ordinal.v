@@ -235,13 +235,8 @@ Section ord_extra.
   Qed.
   
   Fact ord_add_mono_le_inv i j k : k +ₒ i ≤ₒ k +ₒ j → i ≤ₒ j.
-  Proof.
-    intros [ <-%ord_add_cancel_right | ?%ord_add_mono_lt_inv ]%ord_le_lt_iff; auto.
-  Qed.
+  Proof. intros [ <-%ord_add_cancel_right | ?%ord_add_mono_lt_inv ]%ord_le_lt_iff; auto. Qed.
 
-  (* False: 2 + ω <= 1 + ω but not 2 <= 1 *)
-  (* Fact ord_add_mono_le_inv_left i j k : i +ₒ k ≤ₒ j +ₒ k → i ≤ₒ j. *)
-  
   Fact ord_lt_add_one_is_succ i j : i <ₒ j → j <ₒ i +ₒ 1ₒ → False.
   Proof.
     intros H1 H2.
@@ -268,12 +263,7 @@ Section ord_extra.
     destruct (ord_le_lt_dec i j) as [ | ?%ord_lt__succ_le_iff ]; auto.
     destruct (ord_lt_irrefl (j +ₒ 1ₒ)); eauto.
   Qed.
-
-(*
-  Hint Resolve ord_add_mono_lt_right ord_zero_lt_one
-               ord_add_mono_le ord_le_zero_least
-               ord_le_refl : core. *)
-
+  
   Fact ord_zero_lt_succ i : 0ₒ <ₒ i +ₒ 1ₒ.
   Proof. apply ord_le_lt_trans with (i +ₒ 0ₒ); eauto. Qed.
   
@@ -476,16 +466,6 @@ Section ord_extra.
   Fact ord_mseq_mono n m : n < m → @ord_mseq o n <ₒ @ord_mseq o m.
   Proof. induction 1; eauto. Qed.
 
-  (* i = ω.α hence 1 + i <= 1 + ω.α .??? *)
-  Fact ord_is_limit_1add_eq i : ord_is_limit i → 1ₒ +ₒ i = i.
-  Proof.
-    intros H.
-    apply ord_le_antisym; auto.
-    + apply ord_lt_succ__le_iff.
-      admit.
-    + rewrite <- (ord_add_zero_left i) at 1; auto.
-  Admitted.
-
   Lemma ord_lub_simpler P i :
       ub ord_le P i
     → (∀u, u <ₒ i → ∃v, P v ∧ u <ₒ v)
@@ -539,8 +519,7 @@ Section ord_extra.
 
   Hint Resolve ord_le_add ord_lt_add_right : core.
 
-  (** We need the fundemental sequence to work with lubs 
-      constructivelly !!! *)
+  (** We need the fundamental sequence to work with lubs constructivelly !!! *)
  
   (** Addition respects the limit, w/o using ord_fseq_add *)
   Fact ord_add_lub a i :
@@ -559,11 +538,35 @@ Section ord_extra.
         exists (ord_fseq l n); split; auto.
   Qed.
 
+  (* Of course the converse does not hold because
+     1+(ω+1) = (1+ω)+1 = ω+1 is a successor ordinal 
+     hence 1+x <= x+1 but this is strict for anything
+     above any limit ordinal, see below *)
+  Fact ord_is_limit_1add_eq i : ord_is_limit i → i = 1ₒ +ₒ i.
+  Proof.
+    intros l; apply ord_le_antisym; auto.
+    1: rewrite <- (ord_add_zero_left i) at 1; auto.
+    apply (ord_add_lub 1ₒ l).
+    intros u (v & -> & Hv%ord_lt__succ_le_iff).
+    apply ord_le_trans with (2 := Hv), ord_1add_le_succ_comm.
+  Qed.
+  
+  (* Hence for any ordinal j above ω, we have 1ₒ +ₒ j = j *) 
+  Fact ord_1add_above_limit_eq i j : ord_is_limit i → i ≤ₒ j → 1ₒ +ₒ j = j.
+  Proof.
+    intros l (k & ->)%ord_sub.
+    rewrite <- ord_add_assoc, <- ord_is_limit_1add_eq; auto.
+  Qed.
+  
+  (* Hence for any ordinal j above ω, we have 1ₒ +ₒ j <ₒ j +ₒ 1ₒ *) 
+  Fact ord_1add_lt_succ i j : ord_is_limit i → i ≤ₒ j → 1ₒ +ₒ j <ₒ j +ₒ 1ₒ.
+  Proof. intros l ?; rewrite ord_1add_above_limit_eq with (1 := l); auto. Qed.
+
   Hint Resolve ord_le_mul ord_le_refl : core.
   
   (** Addition respects the limit using ord_fseq_add *)
 
-  Fact eps0_add_limit a i :
+  Fact ord_add_limit a i :
       ord_is_limit i
     → lub ord_le (λ x, ∃u, x = a +ₒ u ∧ u <ₒ i) (a +ₒ i).
   Proof.
@@ -581,7 +584,7 @@ Section ord_extra.
   
   (** Multiplication respects the limit using ord_fseq_add *)
   
-  Corollary eps0_mul_limit a i :
+  Fact ord_mul_limit a i :
       ord_is_limit i
     → lub ord_le (λ x, ∃u, x = a *ₒ u ∧ u <ₒ i) (a *ₒ i).
   Proof.
@@ -600,11 +603,15 @@ Section ord_extra.
   Qed.
   
   Section ord_fseq_rect.
-  
+
+    (** This allows induction on the fundamental sequence for limit
+        ordinals, which is the induction principle used in the construction
+        of Fast Growing Hierarchies *)
+
     Variables (P : o → Type)
               (HP0 : P 0ₒ)
-              (HP1 : forall i, P i -> P (i +ₒ 1ₒ))
-              (HP2 : forall i l, (forall n, P (@ord_fseq _ i l n)) -> P i).
+              (HP1 : ∀i, P i → P (i +ₒ 1ₒ))
+              (HP2 : ∀ i (l : ord_is_limit i), (∀n, P (ord_fseq l n)) → P i).
     
     Theorem ord_fseq_rect i : P i.
     Proof.
@@ -612,7 +619,7 @@ Section ord_extra.
       destruct (ord_zero_succ_limit_dec i) as [ [-> | (j & ->) ] | l ]; auto.
       apply (HP2 l); auto.
     Qed.
-    
+
   End ord_fseq_rect.
 
 End ord_extra.
