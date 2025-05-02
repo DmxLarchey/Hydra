@@ -575,7 +575,7 @@ Section E0.
     1: now intros ?%E0_lt_irrefl.
     intros _.
     unfold E0_add.
-    destruct (wlist_cut_choice _ E0_lt_sdec l y)
+    destruct (wlist_cut_choice E0_lt_sdec l y)
         as [ G1 
          | [ (i & l' & r & E & G1) 
          |   (x & i & l' & r & E & G1 & G2) ] ]; subst; simpl.
@@ -598,7 +598,7 @@ Section E0.
     destruct m as [ | yj m ].
     1: intros; apply E0_add_incr; eauto.
     intros [ (y,j) [ Hyz | (<- & Hjh) ]%lex2_inv | Hmk ]%E0_lt_inv%lex_list_inv; constructor.
-    + destruct (wlist_cut_choice _ E0_lt_sdec l z)
+    + destruct (wlist_cut_choice E0_lt_sdec l z)
         as [ G1 
          | [ (i & l' & r' & E & G1) 
          |   (x & i & l' & r' & E & G1 & G2) ] ]; subst; simpl app.
