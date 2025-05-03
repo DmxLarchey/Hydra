@@ -8,7 +8,7 @@
 (**************************************************************)
 
 From Coq Require Import List Relations Wellfounded Utf8.
-From Hydra Require Import utils ordered list_order.
+From Hydra Require Import utils list_order.
 
 Import ListNotations.
 
@@ -133,7 +133,7 @@ Section tree.
   Proof.
     induction 1 as [ x l Hx _ IH%Acc_lo_iff ] using tree_fall_rect.
     revert IH.
-    apply Acc_rel_morph with (f := fun l m => l = tree_sons m); auto.
+    apply Acc_rel_morph with (f := λ l m, l = tree_sons m); auto.
     + intros []; simpl; eauto.
     + intros ? ? [] []; simpl; intros -> -> ?%tpo_inv; tauto.
   Qed.
@@ -183,6 +183,62 @@ Section ntree.
 
   End ntree_ind.
 
+  Inductive ntree_tree_sub : ntree → tree ntree → Prop :=
+    | ntree_tree_sub_root r s l : ntree_sub r s → ntree_tree_sub r (tree_node s l)
+    | ntree_tree_sub_sons r s l t : ntree_tree_sub r t → t ∈ l → ntree_tree_sub r (tree_node s l)
+  with ntree_sub : ntree → ntree → Prop := 
+    | ntree_sub_root r t : ntree_tree_sub r t → ntree_sub r (ntree_node t).
+
+  Fact ntree_tree_sub_inv r t :
+      ntree_tree_sub r t 
+    → match t with
+      | tree_node s l => ntree_sub r s ∨ ∃t, ntree_tree_sub r t ∧ t ∈ l
+      end.
+  Proof. destruct 1; eauto. Qed.
+
+  Fact ntree_sub_inv r s :
+      ntree_sub r s
+    → match s with
+      | ntree_leaf _ => False
+      | ntree_node t => ntree_tree_sub r t
+      end.
+  Proof. now destruct 1. Qed.
+
+  Fixpoint ntree_sub_Acc s : Acc ntree_sub s.
+  Proof.
+    destruct s as [ x | t ].
+    + constructor; intros ? []%ntree_sub_inv.
+    + revert t. 
+      refine (fix loop t := _).
+      constructor.
+      intros ? ?%ntree_sub_inv.
+      destruct H.
+      apply ntree_sub_Acc.
+Guarded.
+
+  Fact ntree_sub_fall P t : ntree_fall P t → ∀r, ntree_sub r t → P r.
+  Proof.
+    induction 1 as [ s l H1 _ H2 ] using tree_fall_rect.
+    intros r [ | (t & ? & ?) ]%ntree_tree_sub_inv.
+    + destruct s; apply ntree_sub_inv in H; [ easy | ].
+    + eauto.
+
+  Local Fact ntree_sub_wf : well_founded ntree_sub.
+ 
+  Proof. 
+    intros t; induction t as [ x | t Ht ]; constructor.
+    1: intros ? []%ntree_sub_inv.
+    intros r H; revert r t H Ht.
+    intros _ _ [ r s l H | r s l t H1 H2 ]%ntree_sub_inv [H3 H4]%tree_fall_fix.
+    + now apply Acc_inv with (1 := H3).
+    + specialize (H4 _ H2).
+      destruct t as [ k m ].
+rewrite tree_fall_fix in Ht.
+      destruct Ht as 
+apply H
+    Qed.
+
+
   Definition ntree_fall (P : X → Prop) : ntree → Prop :=
     fix loop s :=
       match s with
@@ -215,6 +271,7 @@ Section ntree.
     Qed.
 
   End ntree_fall_ind.
+
 
   Inductive ntpo : ntree → ntree → Prop :=
     | ntpo_leaf x y : R x y → ntpo (ntree_leaf x) (ntree_leaf y)
