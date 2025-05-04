@@ -123,6 +123,12 @@ Section tree.
     → tree_fall Q e.
   Proof. induction 1 using tree_fall_rect; rewrite !tree_fall_fix; intros []; auto. Qed.
 
+  Fact tree_fall_True P : (∀ x l, P x l) → ∀e, tree_fall P e.
+  Proof. induction e; apply tree_fall_fix; split; eauto. Qed.
+
+  Fact tree_fall_mono P Q : P ⊆₂ Q → tree_fall P ⊆₁ tree_fall Q.
+  Proof. intros H1 e H2; apply tree_fall_impl with (1 := H2), tree_fall_True, H1. Qed.
+
   Inductive tree_sub r : tree → Prop :=
     | tree_sub_refl : tree_sub r r
     | tree_sub_sons x t l : t ∈ l → tree_sub r t → tree_sub r (tree_node x l).
@@ -253,7 +259,7 @@ Notation "r ≤t t" := (tree_sub r t) (at level 70).
 
 Section ntree.
 
-  Variables (X : Type) (R : X → X → Prop).
+  Variables (X : Type).
 
   (* ntree = X + tree ntree *)
 
@@ -354,45 +360,6 @@ constructor 1; simpl; destruct s; auto.
 *)
 
 
-  Fact sub_ntree_struct_wf : well_founded sub_ntree_struct.
-  Proof.
-    intros s.
-    induction s as [ x | [ s l ] [H1 H2]%tree_fall_fix ]; constructor.
-    + intros _ [].
-    + intros r [ -> | ([] & <- & Hr%H2)%in_map_iff ]; auto.
-      apply tree_fall_fix, proj1 in Hr; auto.
-  Qed.
-
-  Section ntree_rect.
-  
-    Variables (P : ntree → Type)
-              (HP0 : ∀x, P (ntree_leaf x))  
-              (HP1 : ∀t, (∀s, s ≤t t → P (tree_root s)) 
-                       → P (ntree_node t)).
-
-    Fixpoint ntree_rect s : P s.
-    Proof.
-      destruct s as [ x | t ].
-      + apply HP0.
-      + apply HP1.
-        * generalize (sub_tree_struct_wf t).
-          revert t.
-          refine (fix loop t ht { struct ht } := _). 
-          destruct t as [ x l ]. 
-          intros s Hs; pattern s; revert s Hs.
-          apply tree_sub_fall_fix; simpl.
-          - apply ntree_rect.
-          - intros r Hr. apply loop.
-            induction l as [ | s l IHl ].
-            ++ intros ? C; exfalso.
-               destruct C as (_ & _ & []).
-            ++ intros r Hr; apply IHl.
-intros t [ Ht | ]; [ | now apply IHl ].
-               specialize (loop s); now subst.
-    Qed.
-
-  End ntree_rect.
-
   Inductive ntree_tree_sub : ntree → tree ntree → Prop :=
     | ntree_tree_sub_root r s l : ntree_ntree_sub r s → ntree_tree_sub r (tree_node s l)
     | ntree_tree_sub_sons r s l t : ntree_tree_sub r t → t ∈ l → ntree_tree_sub r (tree_node s l)
@@ -414,19 +381,29 @@ intros t [ Ht | ]; [ | now apply IHl ].
       end.
   Proof. now destruct 1. Qed.
 
-  Definition ntree_fall (P : X → Prop) : ntree → Prop :=
+  Definition ntree_fall (P : X → Prop) (Q : ntree → Prop) : ntree → Prop :=
     fix loop s :=
-      match s with
+      Q s /\ match s with
       | ntree_leaf x => P x
-      | ntree_node t => tree_fall (λ x _, loop x) t
+      | ntree_node t => loop (tree_root t) /\ tree_fall (λ x _, loop x) t
       end.
 
-  Lemma ntree_fall_fix_0 P x : ntree_fall P (ntree_leaf x) ↔ P x. 
+  Lemma ntree_fall_fix_0 P Q x :
+      ntree_fall P Q (ntree_leaf x) ↔ Q (ntree_leaf x) ∧ P x. 
   Proof. simpl; tauto. Qed.
-  
-  Lemma ntree_fall_fix_1 P s : ntree_fall P (ntree_node s) ↔ tree_fall (λ x _, ntree_fall P x) s.
+
+  Lemma ntree_fall_fix_1 P Q s :
+      ntree_fall P Q (ntree_node s)
+    ↔ Q (ntree_node s)
+    ∧ ntree_fall P Q (tree_root s)
+    ∧ tree_fall (λ x _, ntree_fall P Q x) s.
   Proof. simpl; easy. Qed.
 
+  Fact ntree_fall_root P Q s : ntree_fall P Q s -> Q s.
+  Proof. destruct s; simpl; tauto. Qed.
+   
+
+(*
   Section ntree_fall_ind.
 
     Variables (P : X → Prop)
@@ -446,6 +423,110 @@ intros t [ Ht | ]; [ | now apply IHl ].
     Qed.
 
   End ntree_fall_ind.
+*)
+
+  Fact sub_ntree_struct_wf : well_founded sub_ntree_struct.
+  Proof.
+    intros s.
+    induction s as [ x | [ s l ] [H1 H2]%tree_fall_fix ]; constructor.
+    + intros _ [].
+    + intros r [ -> | ([] & <- & Hr%H2)%in_map_iff ]; auto.
+      apply tree_fall_fix, proj1 in Hr; auto.
+  Qed.
+
+  Section test.
+
+   Inductive R : ntree -> ntree -> Prop :=
+     | HR1 s : R (tree_root s) (ntree_node s)
+     | HR2 x l t : t ∈ l → R (ntree_node t) (ntree_node (tree_node x l)).
+
+  Fact R_inv r s :
+       R r s
+     → match s with 
+       | ntree_leaf _ => False
+       | ntree_node t => r = tree_root t ∨ ∃p, p ∈ tree_sons t ∧ r = ntree_node p
+       end.
+  Proof. destruct 1; eauto. Qed.
+
+  Fact tree_sub_lt s t : s ≤t t → clos_trans R (tree_root s) (ntree_node t).
+  Proof.
+    induction 1.
+    + constructor 1; constructor 1.
+    + constructor 2 with (1 := IHtree_sub); constructor 1; constructor 2; auto.
+  Qed.
+
+  Fact R_wf_rec s : ntree_fall (fun _ => True) (fun s => match s with
+                                                         | ntree_node t => tree_fall (fun x _ => Acc R x) t 
+                                                         | ntree_leaf _ => True
+                                                         end) s.
+  Proof.
+    induction s as [ x | t IH ].
+    + apply ntree_fall_fix_0; tauto.
+    + apply ntree_fall_fix_1; repeat split.
+      * revert IH; apply tree_fall_mono.
+        intros [ | ] _.
+        - admit.
+        - rewrite ntree_fall_fix_1.
+      * constructor.
+        destruct t as [ s l ]; simpl.
+        apply tree_fall_fix in IH as (H1 & H2).
+        intros ? [ -> | (p & Hp & ->) ]%R_inv; simpl.
+        - revert H1; apply ntree_fall_root.
+        - simpl in Hp.
+          specialize (H2 _ Hp).
+
+        destruct 1; rewrite ntree_fall_fix_1 in H1.
+        - apply H1.
+        - rewrite tree_fall_fix in H1.
+        
+constructor.
+    apply tree_fall_fix; split; auto.
+    constructor.
+    intros r [ -> | (p & ? & ->) ]%R_inv.
+    + admit.
+    +  
+    apply tree_fall_sub_iff.
+    destruct s as [ x | t ].
+    1: constructor; intros ? []%R_inv.
+    induction t as [ s l IH ].
+    constructor.
+    intros r [-> | Hr ]%R_inv; simpl. 
+    induction s as [ x | t IH ].
+    + constructor; inversion 1.
+    + constructor; destruct t as [ s l ].
+      apply tree_fall_fix in IH as [ H1 H2 ].
+      intros r [ -> | (p & Hp & ->) ]%R_inv; simpl in *; auto.
+      
+      apply H2 in H.
+      destruct p as [ y m ].
+      apply tree_fall_fix in H as [H3 H4 ].
+      constructor.
+      intros q [ -> | (r & Hr & ->) ]%R_inv; simpl; auto.
+      simpl in Hr.
+      
+apply IH.
+      destruct t as [ s l ].
+      inversion 1. 
+
+  Section ntree_rect.
+  
+    Variables (P : ntree → Type)
+              (HP0 : ∀x, P (ntree_leaf x))  
+              (HP1 : ∀t, (∀s, s ≤t t → P (tree_root s)) 
+                       → P (ntree_node t)).
+
+    Fixpoint ntree_rect s (hs : Acc (clos_trans R) s) { struct hs } : P s.
+    Proof.
+      destruct s as [ x | t ].
+      + apply HP0.
+      + apply HP1.
+        * intros s ?%tree_sub_lt; apply ntree_rect.
+          now apply Acc_inv with (1 := hs).
+    Qed.
+
+  End ntree_rect.
+
+  End test.
 
   Section ntree_fall_rect.
 
@@ -457,6 +538,8 @@ intros t [ Ht | ]; [ | now apply IHl ].
                        → Q (ntree_node t)).
 
     Hint Resolve tree_fall_impl : core.
+
+(*
 
     Theorem ntree_fall_rect e : ntree_fall P e → Q e.
     Proof. 
@@ -470,8 +553,11 @@ intros t [ Ht | ]; [ | now apply IHl ].
         rewrite tree_fall_sub_iff in H.
         apply H in Hs; now destruct s.
     Qed.
+*)
 
   End ntree_fall_rect.
+
+  Variables (R : X → X → Prop).
 
   Inductive ntpo : ntree → ntree → Prop :=
     | ntpo_leaf x y : R x y → ntpo (ntree_leaf x) (ntree_leaf y)
