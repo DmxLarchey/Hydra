@@ -7,7 +7,7 @@
 (*        Mozilla Public License Version 2.0, MPL-2.0         *)
 (**************************************************************)
 
-From Coq Require Import List Relations Wellfounded Utf8.
+From Coq Require Import List Arith Lia Relations Wellfounded Utf8.
 From Hydra Require Import utils list_order.
 
 Import ListNotations.
@@ -163,6 +163,52 @@ Section tree.
       * intros r Hr; apply IH; eauto. 
         intros s Hs; apply H; eauto.
   Qed.
+
+  Definition lmax := fold_right max 0.
+
+  Fixpoint tree_ht t :=
+    match t with tree_node _ l => S (lmax (map tree_ht l)) end.
+
+  Fact lmax_in n l : n ∈ l → n ≤ lmax l.
+  Proof.
+    induction l as [ | x l IH ].
+    + intros [].
+    + intros [ <- | ?%IH ]; simpl; lia.
+  Qed.
+
+  Fact tree_ssub_ht r x l : r ∈ l → tree_ht r < tree_ht (tree_node x l).
+  Proof.
+    intros H.
+    apply in_map with (f := tree_ht), lmax_in in H.
+    simpl; lia.
+  Qed.
+
+  Fact tree_sub_ht r t : r ≤t t → tree_ht r ≤ tree_ht t.
+  Proof.
+    induction 1 as [ | x t l H _ IH ]; auto.
+    generalize (tree_ssub_ht _ x _ H); lia.
+  Qed.
+
+  Fact tree_sub_lt_inv r t : r ≤t t → tree_ht r < tree_ht t → ∃s, r ≤t s ∧ s ∈ tree_sons t.
+  Proof. intros [ <- | ]%tree_sub_inv; auto; lia. Qed.
+
+  Fact tree_sub_eq_inv r t : r ≤t t → tree_ht t ≤ tree_ht r → r = t.
+  Proof.
+    intros [ <- | (s & H1%tree_sub_ht & H2) ]%tree_sub_inv C; auto.
+    destruct t as [ x l ]; simpl in H2.
+    generalize (tree_ssub_ht _ x _ H2); lia.
+  Qed.
+
+  Fact tree_sub_inv_dec r t : r ≤t t → { r = t } + { ∃s, r ≤t s ∧ s ∈ tree_sons t }.
+  Proof.
+    intros H.
+    destruct (le_lt_dec (tree_ht t) (tree_ht r)) as [ H1 | H1 ].
+    + left; revert H H1; apply tree_sub_eq_inv.
+    + right; revert H H1; apply tree_sub_lt_inv.
+  Qed.
+
+  Fact tree_sub_fall_fix P t : P t → (∀r, (∃s, r ≤t s ∧ s ∈ tree_sons t) → P r) → (∀s, s ≤t t → P s).
+  Proof. intros H1 H2 s [-> | ]%tree_sub_inv_dec; auto. Qed.
 
   Variables  (R : X → X → Prop).
 
@@ -324,20 +370,26 @@ constructor 1; simpl; destruct s; auto.
               (HP1 : ∀t, (∀s, s ≤t t → P (tree_root s)) 
                        → P (ntree_node t)).
 
-    Theorem ntree_rect : ∀s, P s.
+    Fixpoint ntree_rect s : P s.
     Proof.
-      intros [ x | t ]; simpl; auto.
-      induction t.
-      apply HP1.
-      apply Fix with (1 := wf_clos_trans _ _ sub_ntree_struct_wf).
-      intros [ x | [ s l ] ] IH; auto.
-      apply HP1; simpl; auto.
-      intros [ r m ] Hr; apply IH; simpl.
-      apply clos_rt_t with s.
-      2: constructor 1; simpl; auto.
-
-      admit.
-    Admitted.
+      destruct s as [ x | t ].
+      + apply HP0.
+      + apply HP1.
+        * generalize (sub_tree_struct_wf t).
+          revert t.
+          refine (fix loop t ht { struct ht } := _). 
+          destruct t as [ x l ]. 
+          intros s Hs; pattern s; revert s Hs.
+          apply tree_sub_fall_fix; simpl.
+          - apply ntree_rect.
+          - intros r Hr. apply loop.
+            induction l as [ | s l IHl ].
+            ++ intros ? C; exfalso.
+               destruct C as (_ & _ & []).
+            ++ intros r Hr; apply IHl.
+intros t [ Ht | ]; [ | now apply IHl ].
+               specialize (loop s); now subst.
+    Qed.
 
   End ntree_rect.
 
