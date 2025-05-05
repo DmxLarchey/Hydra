@@ -17,7 +17,7 @@ Set Implicit Arguments.
 #[local] Hint Constructors clos_refl_trans : core.
 
 Fact crt_mono X (R T : X → X → Prop) : R ⊆₂ T → clos_refl_trans R ⊆₂ clos_refl_trans T.
-Proof. induction 2; eauto. Qed. 
+Proof. induction 2; eauto. Qed.
 
 Section Acc_sum_prod.
 
@@ -27,8 +27,8 @@ Section Acc_sum_prod.
 
   Fact Acc_prod x y : Acc R x → Acc T y → Acc rel_prod (x,y).
   Proof.
-    induction 1 in y |- *; induction 1; constructor.
-    intros [] []; auto.
+    induction 1 in y |- *; induction 1.
+    constructor; intros [] []; auto.
   Qed.
 
   Definition rel_sum (p q : X + Y) :=
@@ -71,10 +71,10 @@ Section tree.
     Proof.
       destruct t as [ x l ].
       apply HP.
-      induction l as [ | s l IHl ].
+      induction l as [ | s ].
       + intros ? [].
-      + intros t [ Ht | ]; [ | now apply IHl ].
-        specialize (tree_ind s); now subst.
+      + specialize (tree_ind s).
+        intros ? [->|]; auto.
     Qed.
 
   End tree_ind.
@@ -113,7 +113,7 @@ Section tree.
               (HQ : ∀ x l, P x l 
                          → (∀ r, r ∈ l → tree_fall P r)
                          → (∀ r, r ∈ l → Q r)
-                      → Q (tree_node x l)).
+                         → Q (tree_node x l)).
 
     Theorem tree_fall_rect e : tree_fall P e → Q e.
     Proof. induction e; intros []%tree_fall_fix; eauto. Qed.
@@ -165,55 +165,6 @@ Section tree.
       apply (H (tree_node x l)); auto.
   Qed.
 
-(*
-  Definition lmax := fold_right max 0.
-
-  Fixpoint tree_ht t :=
-    match t with tree_node _ l => S (lmax (map tree_ht l)) end.
-
-  Fact lmax_in n l : n ∈ l → n ≤ lmax l.
-  Proof.
-    induction l as [ | x l IH ].
-    + intros [].
-    + intros [ <- | ?%IH ]; simpl; lia.
-  Qed.
-
-  Fact tree_ssub_ht r x l : r ∈ l → tree_ht r < tree_ht (tree_node x l).
-  Proof.
-    intros H.
-    apply in_map with (f := tree_ht), lmax_in in H.
-    simpl; lia.
-  Qed.
-
-  Fact tree_sub_ht r t : r ≤t t → tree_ht r ≤ tree_ht t.
-  Proof.
-    induction 1 as [ | x t l H _ IH ]; auto.
-    generalize (tree_ssub_ht _ x _ H); lia.
-  Qed.
-
-  Fact tree_sub_lt_inv r t : r ≤t t → tree_ht r < tree_ht t → ∃s, r ≤t s ∧ s ∈ tree_sons t.
-  Proof. intros [ <- | ]%tree_sub_inv; auto; lia. Qed.
-
-  Fact tree_sub_eq_inv r t : r ≤t t → tree_ht t ≤ tree_ht r → r = t.
-  Proof.
-    intros [ <- | (s & H1%tree_sub_ht & H2) ]%tree_sub_inv C; auto.
-    destruct t as [ x l ]; simpl in H2.
-    generalize (tree_ssub_ht _ x _ H2); lia.
-  Qed.
-
-  Fact tree_sub_inv_dec r t : r ≤t t → { r = t } + { ∃s, r ≤t s ∧ s ∈ tree_sons t }.
-  Proof.
-    intros H.
-    destruct (le_lt_dec (tree_ht t) (tree_ht r)) as [ H1 | H1 ].
-    + left; revert H H1; apply tree_sub_eq_inv.
-    + right; revert H H1; apply tree_sub_lt_inv.
-  Qed.
-
-  Fact tree_sub_fall_fix P t : P t → (∀r, (∃s, r ≤t s ∧ s ∈ tree_sons t) → P r) → (∀s, s ≤t t → P s).
-  Proof. intros H1 H2 s [-> | ]%tree_sub_inv_dec; auto. Qed.
-
-*)
-
   Variables  (R : X → X → Prop).
 
   Inductive tpo : tree → tree → Prop :=
@@ -232,8 +183,7 @@ Section tree.
   Theorem Acc_tpo e : tree_fall (λ x _, Acc R x) e → Acc tpo e.
   Proof.
     induction 1 as [ x l Hx _ IH%Acc_lo_iff ] using tree_fall_rect.
-    revert IH.
-    apply Acc_rel_morph with (f := λ l m, l = tree_sons m); auto.
+    revert IH; apply Acc_rel_morph with (f := λ l m, l = tree_sons m); auto.
     + intros []; simpl; eauto.
     + intros ? ? [] []; simpl; intros -> -> ?%tpo_inv; tauto.
   Qed.
@@ -299,9 +249,9 @@ Section ntree.
     Proof.
       split.
       + induction 1; eauto.
-      + induction 1 as [ s [ | t ] H | ]; eauto.
+      + induction 1 as [ ? [ | ] H | ]; eauto.
         * now destruct H.
-        * destruct H as [ -> | (p & ? & ->) ]; eauto.
+        * destruct H as [ -> | (? & ? & ->) ]; eauto.
     Qed.
 
     Local Fixpoint wf_sub_ntree_struct s : Acc sub_ntree_struct s.
@@ -310,15 +260,15 @@ Section ntree.
       1: constructor; intros _ [].
       revert t; refine (fix loop t := _).
       destruct t as [ s l ].
+      specialize (wf_sub_ntree_struct s).
       constructor.
-      intros z [H | (p & ? & ->)]; simpl in H.
-      + specialize (wf_sub_ntree_struct s); now subst.
-      + clear s wf_sub_ntree_struct; revert H.
-        induction l as [ | t l IHl ].
+      intros z [ -> | (p & ? & ->)].
+      + assumption.
+      + revert H.
+        induction l as [ | t ].
         * intros [].
-        * intros [ | H ].
-          - specialize (loop t); now subst.
-          - apply IHl, H.
+        * specialize (loop t).
+          intros [ -> | ]; auto.
     Qed.
 
     Local Corollary wf_ntree_sub : well_founded ntree_sub.
@@ -387,11 +337,11 @@ Section ntree.
   Fact ntree_fall_True P : (∀x, P x) → ∀s, ntree_fall P s.
   Proof.
     intros HP s.
-    induction s as [ x | t ].
+    induction s as [ | t IHt ].
     + now rewrite ntree_fall_fix_0.
     + rewrite ntree_fall_fix_1; split; auto.
-      rewrite tree_fall_sub_iff in H.
-      apply H; constructor 1.
+      rewrite tree_fall_sub_iff in IHt.
+      apply IHt; constructor 1.
   Qed.
 
   Section ntree_fall_ind.
@@ -408,7 +358,7 @@ Section ntree.
     Theorem ntree_fall_ind e : ntree_fall P e → Q e.
     Proof. 
       induction e.
-      + intros ?%ntree_fall_fix_0; eauto.
+      + rewrite ntree_fall_fix_0; eauto.
       + rewrite ntree_fall_fix_1; intros []; eauto.
     Qed.
 
@@ -497,7 +447,7 @@ Fixpoint listn n :=
 
 Fixpoint mytree {X} n (x : X) :=
   match n with
-  | 0 => tree_node x []
+  | 0   => tree_node x []
   | S n => tree_node x (map (fun _ => mytree n x) (listn n))
   end.
 
