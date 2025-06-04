@@ -458,4 +458,79 @@ Fixpoint myntree n : ntree unit :=
 
 Eval compute in myntree 5.
 
+Inductive list_eps {X} (P : X -> Type) : list X -> Type :=
+  | nil_eps : list_eps P []
+  | cons_eps x (ax : P x) l (al : list_eps P l) : list_eps P (x :: l).
+
+Print list_eps.
+
+Inductive tree_eps {X} (P : X -> Type) : tree X -> Type :=
+  | tree_node_eps x (ax : P x) l (al : list_eps (tree_eps P) l) : tree_eps P (tree_node x l).
+
+Definition tree_fall' {X} (P : X -> Prop) : tree X → Prop :=
+  fix loop e :=
+    match e with
+    | tree_node x l => P x ∧ fold_right (λ p, and (loop p)) True l
+    end.
+
+Lemma tree_fall'_fix X P (x : X) l : tree_fall' P (tree_node x l) ↔ P x ∧ ∀r, In r l → tree_fall' P r.
+Proof.
+  simpl; apply and_iff_compat_l.
+  generalize (tree_fall' P); intros Q.
+  clear P x.
+  induction l; simpl; try tauto.
+  rewrite IHl; firstorder; now subst.
+Qed.
+
+Fact tree_eps_fall X (P : X -> Prop) t : tree_eps P t -> tree_fall (fun x _ => P x) t.
+Proof.
+  induction 1 as [ x Hx l IH ].
+  apply tree_fall_fix; split; auto.
+  rewrite <- Forall_forall.
+  induction IH; eauto.
+  constructor; auto.
+
+Check tree_eps_rect.
+
+Definition ntree_elim X P :
+  (forall x : X, P (ntree_leaf x)) ->
+  (forall t, tree_eps P t -> P (ntree_node t)) ->
+  forall t, P t.
+Proof.
+  intros XL XN.
+  fix rec 1.
+  intros [].
+  - apply XL.
+  - apply XN.
+    revert t. fix rec2 1.
+    intros [].
+    constructor.
+    1: auto.
+    revert l. fix rec3 1.
+    intros [].
+    + constructor.
+    + constructor; auto.
+Defined.
+
+Notation "x ∈ l" := (In x l) (at level 70, no associativity, format "x  ∈  l").
+
+Definition ntree_ssub {X} (r s : ntree X) :=
+  match s with
+  | ntree_leaf _ => False
+  | ntree_node t => r = tree_root t
+                  ∨ ∃p, p ∈ tree_sons t
+                  ∧ r = ntree_node p
+  end.
+
+Fact wf_sub_ntree_struct_all X : well_founded (@ntree_ssub X).
+Proof.
+  intros s.
+  induction s as [ [x | t] IH ] using ntree_wf_rect.
+  + constructor; intros ? [].
+  + constructor.
+    intros r [ -> | (p & Hp & ->) ].
+    * apply IH; constructor 1.
+    * apply IH; now constructor 2.
+Qed.
+ 
 
