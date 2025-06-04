@@ -11,6 +11,7 @@ ordinal.v
 E0.v
 eps0.v
 eps0_mult.v
+eps0_exp.v
 eps0_fseq.v
 fgh.v
 ord_omega.v
