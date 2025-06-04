@@ -35,20 +35,64 @@ Set Implicit Arguments.
 Check eps0_omega_zero.
 
 (** Define exponentiation in CNF 
+
+    α^0 = 1
+    α^(β+1) = α^β.α
+    α^γ = sup { α^x | x < γ }
+
+    α^(x+y) = α^x.α^y
+    (α^x)^y = α^(x.y)
    
       The formula here: 
 
          https://proofwiki.org/wiki/Ordinal_Exponentiation_via_Cantor_Normal_Form/Limit_Exponents
 
-      (w^a₁.n₁+...+w^aₚ.nₚ)^e = w^(a₁.e) when a₁ > ... > aₚ
+      (α^a₁.n₁+...+α^aₚ.nₚ)^β = α^(a₁.β) when a₁ > ... > aₚ > 0 are ordinals 
+                                              0 < n₁,...,nₚ < α are ordinals
+          and α, β are limit ordinals !!
 
-      The spec here is probably wrong for α successor
-      
-    α^0 = 1
-    α^(β+1) = α^β.α
-    α^γ = sup { α^x | x < γ }
-    
-    α^(x+y) = α^x.α^y
+      The spec above is probably wrong for α or β successor
+
+    α^a₁ <= α^a₁.n₁+...+α^aₚ.nₚ <= α^a₁.n₁ + α^a₁ = α^a₁.(n₁+1)
+    (α^a₁)^β <= (α^a₁.n₁+...+α^aₚ.nₚ)^β
+             <= (α^a₁.(n₁+1))^β
+             <= (α^a₁)^β = α^(a₁.β)
+
+   we only need (α^a.n)^β = (α^a)^β for 0 < n < α and 0 < a and α, β limit
+   PROOF.
+   ADMITTED.
+
+   Then there is the case n^β = (α^0.n)^β where β is limit ordinal and 0 < n < α.
+   I would say n^β < α:
+   Proof.
+     by induction on β:
+      n^(β+1) = n^β.n is product of two ords < α (α is closure) so < α
+      n^γ < α for all γ < β so n^β <= α
+   
+   ω^(ε₀+1) = ω^ε₀.ω = ε₀.ω > ε₀
+
+   Compute n^β for n < α and β < ε where ε is lfp of ε = α^ε
+   assuming n^a already exists for n,a < α
+
+     n^(α^a₁.u + v) with v < α^a₁
+   = n^(α^a₁.u).n^v
+   = (n^(α^a₁))^u.n^v
+
+     n^(α^a) = 
+     n^α = sup { n^i | i < α } <= α
+      but >= sup { i | i < α } = α
+
+     if a is limit then n^(α^a) = n^(α^(1+a)) = n^(α^1.α^a) = n^(α.α^a) = (n^α)^(α^a) = α^(α^a) (if 1 < n < α)
+        a is succ then  n^(α^(b+1)) = n^(α^b.α) = (n^(α^b))^α =? (α^(α^b))^α = α^(α^b.α) = α^(α^(b+1))
+
+     Can we show than, for 1 < n < α, we have n^(α^a) = α^(α^a) ??
+
+     n^ω = ω  for 2 < n < ω
+     n^ω² = sup n^(ω.i) = sup (n^ω)^i = sup ω^i = ω^ω
+     n^ω² = ω^ω < ω^ω² so the answer above is NO !!
+   
+
+
 *)
 
 
