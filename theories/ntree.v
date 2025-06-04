@@ -73,7 +73,7 @@ Section tree.
       apply HP.
       induction l as [ | s ].
       + intros ? [].
-      + specialize (tree_ind s).
+      + specialize (tree_ind s). (* avoids auto to wrongly use tree_ind *)
         intros ? [->|]; auto.
     Qed.
 
@@ -258,8 +258,7 @@ Section ntree.
     Proof.
       destruct s as [ | t ].
       1: constructor; intros _ [].
-      revert t; refine (fix loop t := _).
-      destruct t as [ s l ].
+      revert t; fix loop 1; intros [ s l ].
       specialize (wf_sub_ntree_struct s).
       constructor.
       intros z [ -> | (p & ? & ->)].
