@@ -36,13 +36,57 @@ Check eps0_omega_zero.
 
 (** Define exponentiation in CNF 
 
+    α * 0     = 0
+    α * (β+1) = α*β + α
+    α * γ     = sup { α*x | x < γ }
+ 
+    and 
+
     α^0 = 1
     α^(β+1) = α^β.α
     α^γ = sup { α^x | x < γ }
+    
+    are isomorphic
 
     α^(x+y) = α^x.α^y
     (α^x)^y = α^(x.y)
+    
+    for the multiplication    
+    start with the operation (θ : ε₀) (j : ord) => θ * (1+j)   (struct on θ)
    
+         0 * (1+j) = 0
+         (ω^⟨α,i⟩+β)) * (1+j) = ω^⟨α,i.j⟩+β  (if 1+j is succ)
+         (ω^⟨α,i⟩+β)) * (1+j) = ω^⟨α,i.j⟩      (if j is limit)
+   
+         then the operation (θ α : ε₀)         => θ * ω^α     (struct on θ)
+         
+         0 * ω^α = 0
+         (ω^⟨γ,n⟩+β) * ω^α = ω^(γ+α)
+         
+         and finally        (γ α : ε₀)         => γ * α       (struct on α)
+   
+         γ * 0           = 0
+         γ * ω^⟨0,n⟩     = γ * (1+n⟩
+         γ * (ω^⟨α,n⟩+β) = (γ*ω^α)*(1+n) + γ*β
+         
+    for the exponentiation
+    start with the operation (θ : ε₀) (j : ord) => θ ^ (1+j)   (struct on θ)
+   
+         0 ^ (1+j) = 0
+         (ω^⟨α,i⟩+β)) ^ (1+j) = ????         (if 1+j is succ)  <=== HERE is the MISSING EQUATION
+         (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*j⟩      (if j is limit)
+   
+         then the operation (θ α : ε₀)         => θ ^ ω^α     (struct on θ)
+         
+         0 ^ ω^α = 0
+         (ω^⟨γ,n⟩+β) ^ ω^α = ω^(γ*ω^α)
+         
+         and finally        (γ α : ε₀)         => γ ^ α       (struct on α)
+   
+         γ ^ 0           = 1
+         γ ^ ω^⟨0,n⟩     = γ ^ (1+n⟩
+         γ ^ (ω^⟨α,n⟩+β) = (γ ^ ω^α) ^ (1+n) * γ^β
+         
       The formula here: 
 
          https://proofwiki.org/wiki/Ordinal_Exponentiation_via_Cantor_Normal_Form/Limit_Exponents
@@ -50,6 +94,17 @@ Check eps0_omega_zero.
       (α^a₁.n₁+...+α^aₚ.nₚ)^β = α^(a₁.β) when a₁ > ... > aₚ > 0 are ordinals 
                                               0 < n₁,...,nₚ < α are ordinals
           and α, β are limit ordinals !!
+          
+          
+      (ω^⟨α,i⟩+β)) ^ (l+n) = (ω^⟨α,i⟩+β)) ^ l * (ω^⟨α,i⟩+β)) ^ n
+      
+      if 0 < α
+      (ω^⟨α,i⟩+β)) ^ 0 = 1
+      (ω^⟨α,i⟩+β)) ^ (n+1) = (ω^⟨α,i⟩+β))^n * (ω^⟨α,i⟩+β))
+      can we compute a general formula for successor ordinals ?     
+      
+      (ω^⟨α,i⟩+β)) * (ω^⟨α,i⟩+β)) = ω^⟨α+α,i⟩ + ω^⟨α,i⟩*β.
+      
 
       The spec above is probably wrong for α or β successor
 
