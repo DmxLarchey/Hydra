@@ -73,7 +73,7 @@ Check eps0_omega_zero.
     start with the operation (θ : ε₀) (j : ord) => θ ^ (1+j)   (struct on θ)
    
          0 ^ (1+j) = 0
-         (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*(1+j),i⟩ + ω^⟨α*k,i⟩*β         (if 1+j = k+1, what if 1+j = 1 ie k = 0 ?) 
+         (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*(1+j),i⟩ + ω^(α*k)*β         (if 1+j = k+1, see below, 0 < α) 
          (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*j⟩      (if j is limit)
    
          then the operation (θ α : ε₀)         => θ ^ ω^α     (struct on θ)
@@ -95,6 +95,63 @@ Check eps0_omega_zero.
                                               0 < n₁,...,nₚ < α are ordinals
           and α, β are limit ordinals !!
           
+            The spec above is probably wrong for α or β successor
+
+    α^a₁ <= α^a₁.n₁+...+α^aₚ.nₚ <= α^a₁.n₁ + α^a₁ = α^a₁.(n₁+1)
+    (α^a₁)^β <= (α^a₁.n₁+...+α^aₚ.nₚ)^β
+             <= (α^a₁.(n₁+1))^β
+             <= (α^a₁)^β = α^(a₁.β)
+
+   we only need (α^a.n)^β = (α^a)^β for 0 < n < α and 0 < a and α, β limit
+   PROOF.
+   ADMITTED.
+   
+      Thm: if if ω, l are a limit ordinals, 0 < i < ω and 0 < α
+           then (ω^α.i)^l = (ω^α)^l
+      Proof.
+         we only need to show i.ω^α = ω^α
+         example i.ω^l = i.ω^(1+l) = i.ω.ω^l = ω.ω^l = ω^(1+l) = ω^l (l is limit)
+                 i.ω^(l+n) =  i.ω^(l+n) = i.ω^l.ω^n = ω^(l+n) = 
+      ADMITTED.
+
+      Thm: if ω, l are a limit ordinals, 0 < i < ω and β < ω^α
+           then (ω^α.i+β))^l = ω^(α.l)
+      Proof.
+            ω^α <= ω^α.i+β <= ω^α.i + ω^α.1 = ω^α.(i+1)
+        then (ω^α)^l <= (ω^α.i+β)^l <= (ω^α.(i+1))^l = (ω^α)^l = ω^(α.l)
+      Qed.
+      
+      Thm: if ω is a limit ordinals, 0 < i < ω and β < ω^α and n is nat
+              then (ω^α.i+β)^(n+1) = ω^(α.(n+1)).i + ω^(α.n).β
+      Proof.
+      
+        using equation:   (ω^⟨a,i⟩+b) * (ω^⟨e,j⟩+f) = ω^⟨a+e,j⟩ + (ω^⟨a,i⟩+b)*f.
+      
+        by induction on n:
+        n = 0. (ω^α.i+β)^(n+1) = ω^α.i+β
+               ω^(α.(n+1)).i + ω^(α.n).β = ω^(α.1).i + ω^0.β = ω^α.i+β
+        
+        n = 1+k.
+               (ω^α.i+β)^(n+1)
+             = (ω^α.i+β)^(1+k+1)
+             = (ω^α.i+β).(ω^α.i+β)^(k+1)
+             = (ω^α.i+β).(ω^(α.(k+1)).i + ω^(α.k).β)
+             = ω^(α+α.(k+1)).i + (ω^α.i+β).ω^(α.k).β
+             = ω^(α.(1+k+1)).i + ((ω^α.i+β).ω^(α.k)).β
+             = ω^(α.(n+1)).i + (ω^(α+α.k) + 0).β
+             = ω^(α.(n+1)).i + ω^(α.n).β
+      Qed.
+      
+      Thm: if ω, l are a limit ordinals, 0 < i < ω and β < ω^α and n is nat
+              then (ω^α.i+β)^(l+n+1) = ω^(α.(l+n+1)).i + ω^(α.(l+n)).β
+      Proof.
+        (ω^α.i+β)^(l+n+1) = (ω^α.i+β)^l.(ω^α.i+β)^(n+1)
+                          = ω^(α.l).(ω^(α.(n+1)).i + ω^(α.n).β)
+                          = ω^(α.l+α.(n+1)).i + ω^(α.l).ω^(α.n).β
+                          = ω^(α.(l+n+1)).i + ω^(α.(l+n)).β
+      Qed.
+ 
+      
           
       (ω^⟨α,i⟩+β)) ^ (l+n) = (ω^⟨α,i⟩+β)) ^ l * (ω^⟨α,i⟩+β)) ^ n
       
@@ -114,16 +171,6 @@ Check eps0_omega_zero.
           if k = n+1    then (ω^⟨α,i⟩+β)^(n+1) = ω^⟨α.(n+1),i⟩ + ω^⟨α.n,i⟩*β
           if k is limit then (ω^⟨α,i⟩+β)^k = ω^⟨α.k⟩
 
-      The spec above is probably wrong for α or β successor
-
-    α^a₁ <= α^a₁.n₁+...+α^aₚ.nₚ <= α^a₁.n₁ + α^a₁ = α^a₁.(n₁+1)
-    (α^a₁)^β <= (α^a₁.n₁+...+α^aₚ.nₚ)^β
-             <= (α^a₁.(n₁+1))^β
-             <= (α^a₁)^β = α^(a₁.β)
-
-   we only need (α^a.n)^β = (α^a)^β for 0 < n < α and 0 < a and α, β limit
-   PROOF.
-   ADMITTED.
 
    Then there is the case n^β = (α^0.n)^β where β is limit ordinal and 0 < n < α.
    I would say n^β < α:
