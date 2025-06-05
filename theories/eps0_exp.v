@@ -73,7 +73,7 @@ Check eps0_omega_zero.
     start with the operation (θ : ε₀) (j : ord) => θ ^ (1+j)   (struct on θ)
    
          0 ^ (1+j) = 0
-         (ω^⟨α,i⟩+β)) ^ (1+j) = ????         (if 1+j is succ)  <=== HERE is the MISSING EQUATION
+         (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*(1+j),i⟩ + ω^⟨α*k,i⟩*β         (if 1+j = k+1, what if 1+j = 1 ie k = 0 ?) 
          (ω^⟨α,i⟩+β)) ^ (1+j) = ω^⟨α*j⟩      (if j is limit)
    
          then the operation (θ α : ε₀)         => θ ^ ω^α     (struct on θ)
@@ -101,10 +101,18 @@ Check eps0_omega_zero.
       if 0 < α
       (ω^⟨α,i⟩+β)) ^ 0 = 1
       (ω^⟨α,i⟩+β)) ^ (n+1) = (ω^⟨α,i⟩+β))^n * (ω^⟨α,i⟩+β))
-      can we compute a general formula for successor ordinals ?     
+      can we compute a general formula for successor ordinals ?  
       
-      (ω^⟨α,i⟩+β)) * (ω^⟨α,i⟩+β)) = ω^⟨α+α,i⟩ + ω^⟨α,i⟩*β.
+         (ω^⟨a,i⟩+b) * (ω^⟨e,j⟩+f) = ω^⟨a+e,j⟩ + (ω^⟨a,i⟩+b)*f.
       
+      (ω^⟨α,i⟩+β) * (ω^⟨α,i⟩+β) = ω^⟨α.2,i⟩ + ω^⟨α,i⟩*β.
+      (ω^⟨α,i⟩+β) * (ω^⟨α,i⟩+β)² = (ω^⟨α,i⟩+β) * (ω^⟨α.2,i⟩ + ω^⟨α,i⟩*β) 
+                                 = ω^⟨α.3,i⟩ + (ω^⟨α,i⟩+β)*ω^⟨α,i⟩*β
+                                 = ω^⟨α.3,i⟩ + ω^⟨α.2,i⟩*β
+      
+      try to prove this:
+          if k = n+1    then (ω^⟨α,i⟩+β)^(n+1) = ω^⟨α.(n+1),i⟩ + ω^⟨α.n,i⟩*β
+          if k is limit then (ω^⟨α,i⟩+β)^k = ω^⟨α.k⟩
 
       The spec above is probably wrong for α or β successor
 
