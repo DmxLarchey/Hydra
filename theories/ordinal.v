@@ -21,6 +21,7 @@ Record ord : Type := {
   ord_one  : ord_type;
   ord_add : ord_type → ord_type → ord_type;
   ord_mul : ord_type → ord_type → ord_type;
+  ord_pow : ord_type → ord_type → ord_type;
 
   ord_lt_wf : well_founded ord_lt;
   ord_lt_irrefl : ∀i, ¬ ord_lt i i;
@@ -46,10 +47,21 @@ Record ord : Type := {
   ord_mul_one_right : ∀i,ord_mul i ord_one = i;
   ord_mul_distr : ∀ i j k, ord_mul k (ord_add i j) = ord_add (ord_mul k i) (ord_mul k j);
   ord_le_mul : ∀ i j k l, ord_le i j → ord_le k l → ord_le (ord_mul i k) (ord_mul j l);
+  
+  ord_pow_zero : ∀ i, ord_pow i ord_zero = ord_one;
+  ord_pow_one_right : ∀ i, ord_pow i ord_one = i;
+  ord_pow_one_left : ∀ i, ord_pow ord_one i = ord_one;
+  ord_pow_add : ∀ i j k, ord_pow i (ord_add j k) = ord_mul (ord_pow i j) (ord_pow i k);
+  ord_pow_mul : ∀ i j k, ord_pow i (ord_mul j k) = ord_pow (ord_pow i j) k;
+  ord_lt_pow_right : ∀ i j k, ord_lt ord_one i → ord_lt j k → ord_lt (ord_pow i j) (ord_pow i k);
+  ord_le_pow_left : ∀ i j k, ord_le i j → ord_le (ord_pow i k) (ord_pow j k);
 
   ord_is_succ_dec : ∀i, { j | i = ord_add j ord_one } + { ¬ ∃j, i = ord_add j ord_one  };
   (* if _.i is a successor then i must be a successor *)
   ord_mul_is_succ_inv : ∀ a i, (∃j, ord_mul a i = ord_add j ord_one) 
+                             → (∃j, i = ord_add j ord_one);
+  (* if _^i is a successor then i must be a successor *)
+  ord_pow_is_succ_inv : ∀ a i, (∃j, ord_pow a i = ord_add j ord_one) 
                              → (∃j, i = ord_add j ord_one);
 
   ord_fseq : ∀ i, (i ≠ ord_zero ∧ ¬ ∃j, i = ord_add j ord_one) → nat → ord_type;
@@ -59,6 +71,7 @@ Record ord : Type := {
   ord_fseq_limit : ∀ i l j, ord_lt j i → ∃n, ord_lt j (@ord_fseq i l n);
   ord_fseq_add : ∀ i j lj lij n, ord_le (@ord_fseq (ord_add i j) lij n) (ord_add i (@ord_fseq j lj n));
   ord_fseq_mul : ∀ i j lj lij n, ord_le (@ord_fseq (ord_mul i j) lij n) (ord_mul i (@ord_fseq j lj n));
+  ord_fseq_pow : ∀ i j lj lij n, ord_le (@ord_fseq (ord_pow i j) lij n) (ord_pow i (@ord_fseq j lj n));
 
   ord_mseq : nat → ord_type;
   ord_mseq_incr : ∀n, ord_lt (ord_mseq n) (ord_mseq (S n));
@@ -69,6 +82,7 @@ Arguments ord_lt {_}.
 Arguments ord_le {_}.
 Arguments ord_add {_}.
 Arguments ord_mul {_}.
+Arguments ord_pow {_}.
 Arguments ord_sub {_}.
 Arguments ord_fseq {_ _}.
 Arguments ord_zero_ge_one {_}.
@@ -77,6 +91,8 @@ Arguments ord_add_zero_left {_}.
 Arguments ord_add_zero_right {_}.
 Arguments ord_lt_irrefl [_].
 Arguments ord_zero_lt_one {_}.
+Arguments ord_pow_one_left {_}.
+Arguments ord_pow_one_right {_}.
 
 #[global] Notation "x '<ₒ' y" := (ord_lt x y) (at level 70, no associativity, format "x  <ₒ  y").
 #[global] Notation "x '≤ₒ' y" := (ord_le x y) (at level 70, no associativity, format "x  ≤ₒ  y").
@@ -85,6 +101,7 @@ Arguments ord_zero_lt_one {_}.
 #[global] Notation "1ₒ" := (@ord_one _).
 #[global] Notation "x '+ₒ' y" := (ord_add x y) (at level 31, left associativity).
 #[global] Notation "x '*ₒ' y" := (ord_mul x y) (at level 29, left associativity).
+#[global] Notation "x '^ₒ' y" := (ord_pow x y) (at level 27, left associativity, format "x ^ₒ y").
 
 Section ord_extra.
 
@@ -98,7 +115,7 @@ Section ord_extra.
   Fact ord_lt_le_weak i j : i <ₒ j → i ≤ₒ j.
   Proof. rewrite ord_le_lt_iff; auto. Qed.
   
-  Fact ord_le_refl i j : i ≤ₒ i.
+  Fact ord_le_refl i : i ≤ₒ i.
   Proof. rewrite ord_le_lt_iff; auto. Qed.
 
   Hint Resolve ord_lt_trans : core.
@@ -164,6 +181,12 @@ Section ord_extra.
 
   Fact ord_lt_zero_succ i : 0ₒ <ₒ i +ₒ 1ₒ.
   Proof. eauto. Qed.
+  
+  Fact ord_lt_zero_one : @ord_lt o 0ₒ 1ₒ.
+  Proof.
+    rewrite <- (ord_add_zero_right 1ₒ).
+    apply ord_lt_zero_1add.
+  Qed.
 
   Fact ord_mul_is_zero_inv i j : i *ₒ j = 0ₒ → i = 0ₒ ∨ j = 0ₒ.
   Proof.
@@ -186,6 +209,21 @@ Section ord_extra.
     destruct (ord_le_lt_dec i 0ₒ) as [ H%ord_le_lt_iff | ]; auto.
     left; destruct H; auto.
     now apply ord_not_lt_zero in H.
+  Qed.
+  
+  Fact ord_le_zero_is_zero i : i ≤ₒ 0ₒ → i = 0ₒ.
+  Proof.
+    intros H.
+    destruct (ord_zero_or_pos i) as [ | C ]; auto.
+    destruct (@ord_lt_irrefl o 0ₒ); eauto.
+  Qed.
+  
+  Fact ord_not_one_le_zero : ¬ @ord_le o 1ₒ 0ₒ.
+  Proof.
+    intros E%ord_le_zero_is_zero.
+    destruct (@ord_lt_irrefl o 0ₒ).
+    rewrite <- E at 2.
+    apply ord_lt_zero_one.
   Qed.
 
   Fact ord_add_cancel_right i j k : k +ₒ i = k +ₒ j → i = j.
@@ -435,7 +473,7 @@ Section ord_extra.
   Proof.
     intros H1 (H2 & H3); split.
     + now intros [-> | ->]%ord_mul_is_zero_inv.
-    + contradict H3; revert H3. apply ord_mul_is_succ_inv.
+    + contradict H3; revert H3; apply ord_mul_is_succ_inv.
   Qed.
 
   Fact ord_mul_is_limit_left a i : i ≠ 0ₒ → ord_is_limit a → ord_is_limit (a *ₒ i).
@@ -457,9 +495,57 @@ Section ord_extra.
       rewrite <- (ord_add_zero_right (i *ₒ k)) at 1; auto.
     + apply ord_le_mul; auto.
   Qed.
+  
+  Fact ord_pow_zero_left i : 0ₒ <ₒ i → 0ₒ ^ₒ i = 0ₒ.
+  Proof.
+    intros Hi.
+    destruct (ord_zero_or_1add i) as [ -> | (j & ->) ].
+    + now apply ord_lt_irrefl in Hi.
+    + now rewrite ord_pow_add, ord_pow_one_right, ord_mul_zero_left.
+  Qed.
+  
+  Fact ord_one_le_pow i j : 1ₒ ≤ₒ i → 1ₒ ≤ₒ i ^ₒ j.
+  Proof.
+    intros Hi.
+    rewrite <- (ord_pow_one_left j).
+    apply ord_le_pow_left; auto.
+  Qed.
+
+  Fact ord_le_pow_right i j k : 0ₒ <ₒ i → j ≤ₒ k → i ^ₒ j ≤ₒ i ^ₒ k.
+  Proof.
+    intros Hj (q & ->)%ord_sub.
+    rewrite ord_pow_add.
+    rewrite <- ord_mul_one_right with (i := i ^ₒ j) at 1.
+    apply ord_le_mul; auto.
+    apply ord_one_le_pow.
+    destruct (ord_zero_ge_one i) as [ -> | ]; auto.
+    now apply ord_lt_irrefl in Hj.
+  Qed.
+  
+  Fact ord_le_pow_right' i j k : 0ₒ <ₒ j → j ≤ₒ k → i ^ₒ j ≤ₒ i ^ₒ k.
+  Proof.
+    intros H1 H2.
+    destruct (ord_zero_or_pos i) as [ -> | ].
+    + rewrite !ord_pow_zero_left; eauto.
+    + apply ord_le_pow_right; auto.
+  Qed.
+
+  Fact ord_pow_is_limit_right a i : a ≠ 0ₒ → ord_is_limit i → ord_is_limit (a ^ₒ i).
+  Proof.
+    intros H1 (H2 & H3); split.
+    + intros H.
+      cut (1ₒ ≤ₒ a).
+      * intros Ha.
+        generalize (@ord_zero_lt_one o) (ord_one_le_pow  a i Ha).
+        rewrite H.
+        intros ? ?.
+        apply (@ord_lt_irrefl o 0ₒ); eauto.
+      * now destruct (ord_zero_ge_one a).
+    + contradict H3; revert H3; apply ord_pow_is_succ_inv.
+  Qed.
 
   Hint Resolve ord_fseq_incr ord_mseq_incr : core.
-
+ 
   Fact ord_fseq_mono i l n m : n < m → @ord_fseq _ i l n <ₒ ord_fseq l m.
   Proof. induction 1; eauto. Qed.
 
@@ -582,7 +668,7 @@ Section ord_extra.
       * apply ord_lt_le_trans with (2 := ord_fseq_add _ _ l l' _); auto.
   Qed.
   
-  (** Multiplication respects the limit using ord_fseq_add *)
+  (** Multiplication respects the limit using ord_fseq_mul *)
   
   Fact ord_mul_limit a i :
       ord_is_limit i
@@ -602,6 +688,32 @@ Section ord_extra.
       * apply ord_lt_le_trans with (2 := ord_fseq_mul _ _ l l' _); auto.
   Qed.
   
+  (** Exponentiation respects the limit using ord_fseq_pow *) 
+  
+  Fact ord_pow_limit a i :
+      ord_is_limit i
+    → lub ord_le (λ x, ∃u, x = a ^ₒ u ∧ 0ₒ <ₒ u ∧ u <ₒ i) (a ^ₒ i).
+  Proof.
+    intros l; apply ord_lub_simpler.
+    + intros ? (? & -> & ? & ?); auto.
+      apply ord_le_pow_right'; auto.
+    + intros v Hv.
+      assert (ord_is_limit (a ^ₒ i)) as l'.
+      1:{ apply ord_pow_is_limit_right; auto.
+          intros ->. 
+          rewrite ord_pow_zero_left in Hv.
+          * revert Hv; apply ord_not_lt_zero.
+          * destruct (ord_zero_or_pos i) as [ -> | ]; auto.
+            now destruct l as [ [] ]. }
+      apply ord_fseq_limit with (l := l') in Hv.
+      destruct Hv as (n & Hn).
+      exists (a ^ₒ ord_fseq l (S n)); split.
+      * exists (ord_fseq l (S n)); repeat split; auto.
+        apply ord_le_lt_trans with (2 := ord_fseq_incr _ l _); auto.
+      * apply ord_lt_le_trans with (2 := ord_fseq_pow _ _ l l' _); auto.
+        apply ord_lt_trans with (2 := ord_fseq_incr _ l' _); auto.
+  Qed.
+
   Section ord_fseq_rect.
 
     (** This allows induction on the fundamental sequence for limit

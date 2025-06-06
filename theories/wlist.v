@@ -288,8 +288,7 @@ Section wlist_add.
       * simpl app at 2.
         rewrite wlist_add_gt_list, wlist_add_eq; auto.
         intros [H|[[=]|H]]%in_app_iff; subst; eauto.
-        - exists i; rewrite in_app_iff; auto.
-        - exists i; eauto.  
+        exists i; rewrite in_app_iff; auto.
       * simpl app at 2. 
         rewrite wlist_add_gt_list, wlist_add_lt; auto. 
         intros []%in_app_iff; eauto.
